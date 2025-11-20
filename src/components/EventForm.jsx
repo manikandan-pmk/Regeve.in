@@ -42,7 +42,7 @@ export default function EventForm() {
     const fd = new FormData();
     fd.append("files", photo);
 
-    const res = await axios.post("https://api.moviemads.com/api/upload", fd);
+    const res = await axios.post("https://api.regeve.in/api/upload", fd);
     return res.data[0].id;
   };
 
@@ -59,7 +59,7 @@ export default function EventForm() {
 
       // Save form with uploaded photo ID
       const response = await axios.post(
-        "https://api.moviemads.com/api/event-forms",
+        "https://api.regeve.in/api/event-forms",
         {
           data: {
             ...form,
@@ -74,7 +74,7 @@ export default function EventForm() {
 
       // Fetch user details using Member_ID
       const userDetails = await axios.get(
-        `https://api.moviemads.com/api/event-forms/${memberId}`
+        `https://api.regeve.in/api/event-forms/${memberId}`
       );
 
       setMemberData(userDetails.data.data);

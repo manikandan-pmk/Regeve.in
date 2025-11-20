@@ -7,7 +7,7 @@ import FAQSection from '../components/FAQSection'
 
 const Home = () => {
     return (
-        <div>
+        <div >
             <HeroSection
                 onRegisterClick={() => console.log("Register clicked!")}
                 onLuckyDrawClick={() => console.log("Lucky Draw clicked!")}

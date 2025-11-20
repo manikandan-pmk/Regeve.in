@@ -120,7 +120,7 @@ const Footer = () => {
   };
 
   return (
-    <footer className="bg-gradient-to-r from-blue-600 to-cyan-600 backdrop-blur-md border-t border-gray-200">
+    <footer className="bg-[#4A70A9] backdrop-blur-md border-t border-gray-200">
       {/* Main Footer Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <motion.div

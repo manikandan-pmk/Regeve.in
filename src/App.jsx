@@ -16,6 +16,9 @@ import FoodManagement from './components/services/FoodManagement';
 import DashboardSystemPage from './components/services/DashboardSystemPage';
 import ScrollToTop from './components/ScrollToTop';
 import UserDetail from './components/UserDetails';
+import BlogPage from './components/BlogPage';
+import HelpCenter from './components/HelpCenter';
+import PrivacyPolicy from './components/PrivacyPolicy ';
 
 
 function App() {
@@ -40,6 +43,9 @@ function App() {
         <Route path='/service/food-management' element={<FoodManagement />} />
         <Route path='/service/dashboard-system-page' element={<DashboardSystemPage />} />
         <Route path='/user-details' element={<UserDetail />} />
+        <Route path='/blog' element={<BlogPage />} />
+        <Route path='/help' element={<HelpCenter />} />
+        <Route path='/privacy' element={<PrivacyPolicy />} />
       </Routes>
       {!hideLayout && <Footer />}
     </>
