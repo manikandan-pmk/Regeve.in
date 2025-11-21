@@ -337,7 +337,7 @@ const LuckyDraw = () => {
 
     console.log("Formatting member:", member);
     const memberData = member.attributes || member;
-    const baseUrl = "https://api.moviemads.com";
+    const baseUrl = "https://api.regeve.in";
 
     return {
       name: memberData.Name || "No Name",

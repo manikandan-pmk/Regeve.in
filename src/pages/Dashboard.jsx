@@ -309,7 +309,7 @@ const EditPopup = ({ user, onClose, onSaved }) => {
         fd.append("files", photoFile);
 
         const uploadRes = await axios.post(
-          "https://api.moviemads.com/api/upload",
+          "https://api.regeve.in/api/upload",
           fd,
           { headers: { "Content-Type": "multipart/form-data" } }
         );
@@ -345,7 +345,7 @@ const EditPopup = ({ user, onClose, onSaved }) => {
       }
 
       await axios.put(
-        `https://api.moviemads.com/api/event-forms/${user.userId}`,
+        `https://api.regeve.in/api/event-forms/${user.userId}`,
         { data: payload }
       );
 
@@ -615,17 +615,17 @@ const Dashboard = () => {
   const fetchData = async () => {
     try {
       const response = await axios.get(
-        "https://api.moviemads.com/api/event-forms"
+        "https://api.regeve.in/api/event-forms"
       );
 
-      const data = response.data.data;
+      const data = response.data?.data;
 
       const formatted = data.map((item) => ({
         id: item.id,
         name: item.Name,
         userId: item.Member_ID,
         userImage: item.Photo?.url
-          ? `https://api.moviemads.com${item.Photo.url}`
+          ? `https://api.regeve.in${item.Photo.url}`
           : "https://via.placeholder.com/150?text=No+Image",
         food: item.Food,
         address: item.Address,
@@ -640,7 +640,7 @@ const Dashboard = () => {
         nonvegcount: Number(item.Non_Veg_Count) || 0,
         companyId: item.Company_ID,
         qrCode: item.QRCode?.url
-          ? `https://api.moviemads.com${item.QRCode.url}`
+          ? `https://api.regeve.in${item.QRCode.url}`
           : null,
         raw: item,
         isGiftReceived: item.IsGiftReceived === true,

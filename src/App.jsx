@@ -15,22 +15,27 @@ import LuckydrawFooter from './components/services/LuckydrawFooter';
 import FoodManagement from './components/services/FoodManagement';
 import DashboardSystemPage from './components/services/DashboardSystemPage';
 import ScrollToTop from './components/ScrollToTop';
-import UserDetail from './components/UserDetails';
+import UserDetail from './components/UserDetail';
 import BlogPage from './components/BlogPage';
 import HelpCenter from './components/HelpCenter';
 import PrivacyPolicy from './components/PrivacyPolicy ';
 
 
-function App() {
+export default function App() {
   const location = useLocation();
 
-  // pages where navbar & footer should be hidden
-  const hideLayout = ["/event-form", "/luckydraw", "/dashboard"].includes(location.pathname);
+  // Hide navbar & footer on specific pages
+  const hideLayout =
+    location.pathname === "/event-form" ||
+    location.pathname === "/luckydraw" ||
+    location.pathname === "/dashboard" ||
+    location.pathname.startsWith("/member-details/");
 
   return (
     <>
-      <ScrollToTop/>
+      <ScrollToTop />
       {!hideLayout && <Navbar />}
+
       <Routes>
         <Route path='/' element={<Home />} />
         <Route path='/about' element={<About />} />
@@ -42,15 +47,14 @@ function App() {
         <Route path='/service/luckydraw-system-page' element={<LuckydrawFooter />} />
         <Route path='/service/food-management' element={<FoodManagement />} />
         <Route path='/service/dashboard-system-page' element={<DashboardSystemPage />} />
-        <Route path='/user-details' element={<UserDetail />} />
+        <Route path='/member-details/:Member_ID' element={<UserDetail />} />
         <Route path='/blog' element={<BlogPage />} />
         <Route path='/help' element={<HelpCenter />} />
         <Route path='/privacy' element={<PrivacyPolicy />} />
       </Routes>
+
       {!hideLayout && <Footer />}
     </>
-
-  )
+  );
 }
 
-export default App

@@ -96,14 +96,14 @@ export default function EventForm() {
         <div className="text-center mb-6 sm:mb-8 relative">
 
           {/* Logo */}
-          <div className="flex justify-center mb-4">
+          {/* <div className="flex justify-center mb-4">
             <img
               src={Logo}
               alt="Event Logo"
              className="w-32 sm:w-40 md:w-48"
 
             />
-          </div>
+          </div> */}
 
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2 sm:mb-3">
             Event Registration Form
