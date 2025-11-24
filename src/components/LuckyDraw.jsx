@@ -21,7 +21,7 @@ import ProfilePopup from "./ProfilePopup";
 import { useNavigate } from "react-router-dom";
 import Logo from "../assets/form-logo.png";
 
-// Animation variants (unchanged)
+// Animation variants
 const containerVariants = {
   hidden: { opacity: 0, y: 100 },
   visible: {
@@ -194,9 +194,17 @@ const LuckyDraw = () => {
     try {
       setLoading(true);
       const response = await axios.get(
-        "https://api.moviemads.com/api/event-forms"
+        "https://api.regeve.in/api/event-forms"
       );
-      const eligible = response.data.data.filter((m) => m.IsWinned === false);
+      console.log("API Response:", response.data.data);
+      
+      // Filter members who haven't won yet
+const eligible = response.data.data.filter((m) => {
+  const isWinner = m?.IsWinnned ?? m?.attributes?.IsWinnned ?? false;
+  return isWinner === false;
+});
+
+      console.log("Eligible members:", eligible);
       setAllMembers(eligible);
     } catch (error) {
       console.error("Error fetching members:", error);
@@ -207,31 +215,38 @@ const LuckyDraw = () => {
 
   const updateWinnerStatus = async (memberId) => {
     try {
-      const member = allMembers.find(m => m.Member_ID === memberId);
+      const member = allMembers.find(m => m.Member_ID === memberId || m.Member_ID === memberId);
       if (!member) {
         console.error("Member not found:", memberId);
         return false;
       }
 
+      console.log("Updating winner status for:", memberId);
+      
       const response = await axios.put(
-        `https://api.moviemads.com/api/event-forms/${member.Member_ID}`,
+        `https://api.regeve.in/api/event-forms/${memberId}`,
         {
           data: {
-            IsWinned: true
+            IsWinnned: true  // CHANGED FROM false TO true
           }
         }
       );
 
-      console.log("Updated:", response.data);
+      console.log("Update successful:", response.data);
       return true;
     } catch (error) {
       console.error("Update failed:", error);
-      console.log("Backend says:", error.response?.data);
+      console.log("Error details:", error.response?.data);
       return false;
     }
   };
 
   const startSpinning = () => {
+    if (allMembers.length === 0) {
+      alert("No eligible participants available!");
+      return;
+    }
+
     setIsSpinning(true);
     setShowResult(false);
     setResult(null);
@@ -256,6 +271,7 @@ const LuckyDraw = () => {
         console.log("Selected Winner:", winner);
         setSelectedMember(winner);
 
+        // Extract member ID from either direct property or attributes
         const memberId = winner.Member_ID || winner.attributes?.Member_ID;
         const memberNumber = memberId ? memberId.substring(1) : "000";
         const finalDisplayValues = [
@@ -285,6 +301,7 @@ const LuckyDraw = () => {
         });
 
         if (updateSuccess) {
+          // Refresh the members list after a short delay
           setTimeout(() => {
             fetchAllMembers();
           }, 2000);
@@ -356,7 +373,7 @@ const LuckyDraw = () => {
       foodPreference: memberData.Food || "Not specified",
       gender: memberData.Gender || "Not specified",
       memberId: memberData.Member_ID || "Not provided",
-      isWinned: memberData.isWinned || false,
+      isWinnned: memberData.IsWinnned || false,
     };
   };
 
@@ -377,9 +394,6 @@ const LuckyDraw = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-800 flex items-center justify-center p-4 font-serif relative">
-
-      
-
 
       {/* Fixed Go Home Button - Top Right */}
       <motion.button
@@ -730,7 +744,7 @@ const LuckyDraw = () => {
             }}
             whileTap={{ scale: 0.95 }}
             onClick={startSpinning}
-            disabled={isSpinning || loading}
+            disabled={isSpinning || loading || allMembers.length === 0}
             className="flex-1 bg-gradient-to-r cursor-pointer from-green-500 to-emerald-600 text-white py-4 px-6 rounded-xl font-bold text-lg shadow-2xl flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed border border-emerald-400 relative overflow-hidden"
           >
             <motion.div

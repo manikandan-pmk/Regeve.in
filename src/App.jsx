@@ -18,21 +18,23 @@ import ScrollToTop from './components/ScrollToTop';
 import UserDetail from './components/UserDetail';
 import BlogPage from './components/BlogPage';
 import HelpCenter from './components/HelpCenter';
-import PrivacyPolicy from './components/PrivacyPolicy ';
-
+import PrivacyPolicy from './components/PrivacyPolicy';
+import RegisterForm from './pages/Auth/RegisterForm';
+import MemberDashBoard from './pages/Scan/MemberDashBoard';
 
 export default function App() {
   const location = useLocation();
 
-  // Hide navbar & footer on specific pages
   const hideLayout =
     location.pathname === "/event-form" ||
+    location.pathname === "/scanDashboard" ||
     location.pathname === "/luckydraw" ||
+    location.pathname === "/regeve-admin" ||
     location.pathname === "/dashboard" ||
     location.pathname.startsWith("/member-details/");
 
   return (
-    <>
+    <div className="max-w-full overflow-x-hidden">
       <ScrollToTop />
       {!hideLayout && <Navbar />}
 
@@ -42,6 +44,7 @@ export default function App() {
         <Route path='/contact' element={<Contact />} />
         <Route path='/dashboard' element={<Dashboard />} />
         <Route path='/event-form' element={<EventForm />} />
+        <Route path='/regeve-admin' element={<RegisterForm />} />
         <Route path='/luckydraw' element={<LuckyDraw />} />
         <Route path='/service/registration' element={<EventRegistration />} />
         <Route path='/service/luckydraw-system-page' element={<LuckydrawFooter />} />
@@ -51,10 +54,10 @@ export default function App() {
         <Route path='/blog' element={<BlogPage />} />
         <Route path='/help' element={<HelpCenter />} />
         <Route path='/privacy' element={<PrivacyPolicy />} />
+        <Route path="/scanDashboard" element={<MemberDashBoard/>}/>
       </Routes>
 
       {!hideLayout && <Footer />}
-    </>
+    </div>
   );
 }
-

@@ -3,7 +3,6 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Logo from "../assets/form-logo.png"
 
-
 export default function EventForm() {
   const defaultForm = {
     Name: "",
@@ -21,7 +20,6 @@ export default function EventForm() {
   };
 
   const navigate = useNavigate();
-
 
   const [form, setForm] = useState(defaultForm);
   const [photo, setPhoto] = useState(null);
@@ -50,6 +48,19 @@ export default function EventForm() {
     e.preventDefault();
 
     try {
+      const totalPersons =
+        Number(form.Adult_Count || 0) + Number(form.Children_Count || 0);
+
+      const totalFoodCount =
+        Number(form.Veg_Count || 0) + Number(form.Non_Veg_Count || 0);
+
+      if (totalPersons !== totalFoodCount) {
+        alert(
+          `Total Persons (${totalPersons}) must match Veg + Non-Veg Count (${totalFoodCount})`
+        );
+        return;
+      }
+
       let photoId = null;
 
       // Upload photo first
@@ -94,7 +105,6 @@ export default function EventForm() {
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="text-center mb-6 sm:mb-8 relative">
-
           {/* Logo */}
           {/* <div className="flex justify-center mb-4">
             <img
@@ -120,10 +130,6 @@ export default function EventForm() {
             ← Go Home
           </button>
         </div>
-
-
-
-
 
         {/* Form Container */}
         <div className="bg-white rounded-xl sm:rounded-2xl shadow-lg sm:shadow-xl border border-gray-200 overflow-hidden">
@@ -557,7 +563,7 @@ export default function EventForm() {
                         <div className="text-center">
                           <div className="flex justify-center mb-3">
                             <img
-                              src={`https://api.moviemads.com${memberData.QRCode.url}`}
+                              src={`https://api.regeve.in${memberData.QRCode.url}`}
                               alt="QR Code"
                               className="w-32 h-32 sm:w-36 sm:h-36 border border-gray-200 rounded-lg bg-white p-2 mx-auto"
                             />
@@ -736,3 +742,4 @@ export default function EventForm() {
     </div>
   );
 }
+

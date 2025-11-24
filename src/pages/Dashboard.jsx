@@ -12,7 +12,6 @@ import {
 } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 
-
 /* -----------------------------------------------------
    VIEW POPUP COMPONENT (MERGED)
 ----------------------------------------------------- */
@@ -77,7 +76,7 @@ const ViewPopup = ({ user, onClose }) => {
                       Company ID
                     </p>
                     <p className="text-base font-semibold text-purple-900">
-                      {user.companyId || "N/A"}
+                      {user.companyId}
                     </p>
                   </div>
                 </div>
@@ -261,6 +260,7 @@ const EditPopup = ({ user, onClose, onSaved }) => {
     Veg_Count: "",
     Company_ID: "",
     Food: "",
+     IsGiftReceived: false,
   });
 
   const [photoFile, setPhotoFile] = useState(null);
@@ -284,6 +284,7 @@ const EditPopup = ({ user, onClose, onSaved }) => {
       Company_ID: user.companyId || "",
       Veg_Count: user.vegcount || "",
       Non_Veg_Count: user.nonvegcount || "",
+      IsGiftReceived: user.isGiftReceived || false,
     });
   }, [user]);
 
@@ -337,17 +338,17 @@ const EditPopup = ({ user, onClose, onSaved }) => {
         Company_ID: form.Company_ID,
         Food: form.Food,
         IsWinned: form.IsWinned,
-        IsGiftReceived: form.IsGiftReceived,
+        IsGiftReceived: form.IsGiftReceived === true ? true : false,
+
       };
 
       if (uploadedPhoto) {
         payload.Photo = uploadedPhoto.id;
       }
 
-      await axios.put(
-        `https://api.regeve.in/api/event-forms/${user.userId}`,
-        { data: payload }
-      );
+      await axios.put(`https://api.regeve.in/api/event-forms/${user.userId}`, {
+        data: payload,
+      });
 
       setSaving(false);
       onSaved();
@@ -469,6 +470,48 @@ const EditPopup = ({ user, onClose, onSaved }) => {
                 </div>
               </div>
             </div>
+            {/* Gift Received Toggle */}
+<div className="flex items-center justify-between p-5 bg-white rounded-2xl shadow-sm border border-gray-200 hover:shadow-md transition-all duration-200">
+  <label className="text-sm font-semibold text-gray-700 flex items-center">
+    <span className="text-lg mr-2">🎁</span>
+    Gift Received
+  </label>
+
+  <label className="inline-flex items-center cursor-pointer">
+    <input
+      type="checkbox"
+      checked={form.IsGiftReceived}
+      onChange={(e) =>
+        setForm((prev) => ({
+          ...prev,
+          IsGiftReceived: e.target.checked,
+        }))
+      }
+      className="hidden"
+    />
+
+    <div
+      className={`w-14 h-7 flex items-center rounded-full p-1 transition-all duration-300 ${
+        form.IsGiftReceived ? "bg-green-500" : "bg-gray-300"
+      }`}
+    >
+      <div
+        className={`bg-white w-5 h-5 rounded-full shadow-md transform transition-transform duration-300 ${
+          form.IsGiftReceived ? "translate-x-7" : "translate-x-0"
+        }`}
+      />
+    </div>
+
+    <span
+      className={`ml-3 text-sm font-medium ${
+        form.IsGiftReceived ? "text-green-600" : "text-gray-500"
+      }`}
+    >
+      {form.IsGiftReceived ? "Received" : "Pending"}
+    </span>
+  </label>
+</div>
+
           </div>
 
           {/* Right Side - Form */}
@@ -590,7 +633,9 @@ const Dashboard = () => {
     totalMembers: 0,
     totalNonVeg: 0,
     totalVeg: 0,
-    gifts: 0,
+    totalGifts: 0,
+    totalForms: 0, // ➕ added
+    totalPresent: 0,
   });
 
   const [searchTerm, setSearchTerm] = useState("");
@@ -604,21 +649,18 @@ const Dashboard = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-  const isLoggedIn = localStorage.getItem("isLoggedIn") === "true";
-  if (!isLoggedIn) {
-    navigate("/"); // redirect home
-  }
-}, []);
+    const isLoggedIn = localStorage.getItem("isLoggedIn") === "true";
+    if (!isLoggedIn) {
+      navigate("/"); // redirect home
+    }
+  }, []);
 
 
   // ----------------------------- FETCH API -----------------------------
   const fetchData = async () => {
     try {
-      const response = await axios.get(
-        "https://api.regeve.in/api/event-forms"
-      );
-
-      const data = response.data?.data;
+      const response = await axios.get("https://api.regeve.in/api/event-forms");
+      const data = response.data?.data || [];
 
       const formatted = data.map((item) => ({
         id: item.id,
@@ -627,61 +669,125 @@ const Dashboard = () => {
         userImage: item.Photo?.url
           ? `https://api.regeve.in${item.Photo.url}`
           : "https://via.placeholder.com/150?text=No+Image",
-        food: item.Food,
-        address: item.Address,
         age: item.Age,
         gender: item.Gender,
         phone: item.Phone_Number,
         whatsapp: item.WhatsApp_Number,
         email: item.Email,
+        address: item.Address,
+        companyId: item.Company_ID, 
+
         adultcount: Number(item.Adult_Count) || 0,
         childrencount: Number(item.Children_Count) || 0,
         vegcount: Number(item.Veg_Count) || 0,
         nonvegcount: Number(item.Non_Veg_Count) || 0,
-        companyId: item.Company_ID,
-        qrCode: item.QRCode?.url
-          ? `https://api.regeve.in${item.QRCode.url}`
-          : null,
+
+        isPresent: item.IsPresent === true,
+        IsVerified_Member: item.IsVerified_Member === true,
+
+ isGiftReceived:
+  item.IsGiftReceived === true ||
+  item.IsGiftReceived === 1 ||
+  item.IsGiftReceived === "true",
+
+
+
         raw: item,
-        isGiftReceived: item.IsGiftReceived === true,
       }));
 
-      // IMPORTANT: update users
       setUsers(formatted);
 
-      // Total Users
-      const totalUsers = formatted.length;
+      // -----------------------------
+      // TOTAL REGISTERED USERS
+      // -----------------------------
+      // ONLY VERIFIED USERS ARE COUNTED AS REGISTERED
+const totalRegistered = formatted.filter(u => u.IsVerified_Member === true).length;
 
-      // Total Members = Adults + Children
-      const totalMembers = formatted.reduce(
-        (sum, u) => sum + (u.adultcount || 0) + (u.childrencount || 0),
+
+      // -----------------------------
+      // PRESENT USERS ONLY
+      // -----------------------------
+      const presentUsers = formatted.filter((u) => u.isPresent);
+
+      // -----------------------------
+      // GIFTS
+      // -----------------------------
+const totalGifts = presentUsers.filter(u => u.isGiftReceived).length;
+
+
+
+
+      // -----------------------------
+      // TOTAL ATTENDEES (PRESENT USERS)
+      // -----------------------------
+      const totalAttendees = presentUsers.length;
+
+      // -----------------------------
+      // HEAD COUNTS
+      // -----------------------------
+      const totalAdults = presentUsers.reduce((sum, u) => sum + u.adultcount, 0);
+      const totalChildren = presentUsers.reduce(
+        (sum, u) => sum + u.childrencount,
+        0
+      );
+      const totalVeg = presentUsers.reduce((sum, u) => sum + u.vegcount, 0);
+      const totalNonVeg = presentUsers.reduce(
+        (sum, u) => sum + u.nonvegcount,
         0
       );
 
-      // Total Veg
-      const totalVeg = formatted.reduce((sum, u) => sum + (u.vegcount || 0), 0);
-
-      // Total Non-Veg
-      const totalNonVeg = formatted.reduce(
-        (sum, u) => sum + (u.nonvegcount || 0),
-        0
-      );
-
-      // Count:
-      const totalGifts = formatted.filter((u) => u.isGiftReceived).length;
-
-      // UPDATE DASHBOARD STATE
+      // UPDATE DASHBOARD
       setDashboardData({
-        totalUsers,
-        totalMembers,
+        totalRegistered,
+        totalAttendees,
+        totalAdults,
+        totalChildren,
         totalVeg,
         totalNonVeg,
-        gifts: totalGifts,
+        totalGifts,
       });
     } catch (err) {
       console.log("API Error:", err);
     }
   };
+
+const handleVerificationToggle = async (memberId, newStatus) => {
+  try {
+    // update UI instantly
+    setUsers(prev =>
+      prev.map(u =>
+        u.userId === memberId ? { ...u, IsVerified_Member: newStatus } : u
+      )
+    );
+
+    // send correct body structure expected by backend
+    await axios.put(
+      `https://api.regeve.in/api/event-forms/${memberId}`,
+      {
+        data: {
+          IsVerified_Member: newStatus
+        }
+      },
+      {
+        headers: { "Content-Type": "application/json" }
+      }
+    );
+
+    console.log("Updated verified:", memberId);
+  } catch (error) {
+    console.error("Verification failed:", error);
+
+    // rollback
+    setUsers(prev =>
+      prev.map(u =>
+        u.userId === memberId ? { ...u, IsVerified_Member: !newStatus } : u
+      )
+    );
+  }
+};
+
+
+
 
   useEffect(() => {
     fetchData();
@@ -691,7 +797,8 @@ const Dashboard = () => {
   const filteredUsers = users.filter(
     (u) =>
       u.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      u.userId?.toLowerCase().includes(searchTerm.toLowerCase())
+      u.userId?.toLowerCase().includes(searchTerm.toLowerCase())||
+      u.companyId?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const indexOfLast = currentPage * usersPerPage;
@@ -741,7 +848,6 @@ const Dashboard = () => {
       {/* ---------------- HEADER SECTION (UNCHANGED) ---------------- */}
       <div className="mb-8">
         <div className="flex items-center justify-between">
-
           <div>
             <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">
               Event Dashboard
@@ -759,13 +865,34 @@ const Dashboard = () => {
             </button>
           </div>
         </div>
-
       </div>
 
-
       {/* ---------------- STATS CARDS (LIVE DATA INSERTED) ---------------- */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
-        {/* PEOPLE */}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 mb-8">
+        {/* TOTAL REGISTERED USERS */}
+        <div className="bg-gradient-to-br from-white to-blue-50 rounded-3xl p-6 shadow-2xl border border-blue-100 transform hover:scale-105 transition-all duration-300">
+          <div className="flex items-start justify-between">
+            <div className="flex-1">
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center space-x-4">
+                  <div className="p-4 bg-blue-500/20 rounded-2xl shadow-inner">
+                    <FaUsers className="text-blue-600 text-2xl" />
+                  </div>
+                  <div>
+                    <p className="text-blue-600 font-semibold text-lg">
+                      Registered Users
+                    </p>
+                    <h3 className="text-4xl font-bold text-gray-800 mt-1">
+                      {dashboardData.totalRegistered}
+                    </h3>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* TOTAL ATTENDEES WITH CIRCLE PROGRESS — DYNAMIC CAPACITY */}
         <div className="bg-gradient-to-br from-white to-blue-50 rounded-3xl p-6 shadow-2xl border border-blue-100 transform hover:scale-105 transition-all duration-300">
           <div className="flex items-start justify-between">
             <div className="flex-1">
@@ -779,7 +906,7 @@ const Dashboard = () => {
                       Total Attendees
                     </p>
                     <h3 className="text-4xl font-bold text-gray-800 mt-1">
-                      {dashboardData.totalUsers}
+                      {dashboardData.totalAttendees}
                     </h3>
                   </div>
                 </div>
@@ -791,21 +918,29 @@ const Dashboard = () => {
                       className="w-20 h-20 transform -rotate-90"
                       viewBox="0 0 36 36"
                     >
+                      {/* Background circle */}
                       <path
                         d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
                         fill="none"
                         stroke="#E5E7EB"
                         strokeWidth="3"
                       />
+
+                      {/* Progress circle */}
                       <path
                         d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
                         fill="none"
                         stroke="url(#blueGradient)"
                         strokeWidth="3"
-                        strokeDasharray={`${(dashboardData.totalUsers / 200) * 100
+                        strokeDasharray={`${dashboardData.totalRegistered === 0
+                            ? 0
+                            : (dashboardData.totalAttendees /
+                              dashboardData.totalRegistered) *
+                            100
                           }, 100`}
                         className="transition-all duration-1000 ease-out"
                       />
+
                       <defs>
                         <linearGradient
                           id="blueGradient"
@@ -820,27 +955,32 @@ const Dashboard = () => {
                       </defs>
                     </svg>
                   </div>
+
+                  {/* Percentage */}
                   <div className="absolute inset-0 flex items-center justify-center">
                     <span className="text-sm font-bold text-blue-600">
-                      {Math.min(
-                        100,
-                        (dashboardData.totalUsers / 200) * 100
-                      ).toFixed(0)}
+                      {dashboardData.totalRegistered === 0
+                        ? 0
+                        : (
+                          (dashboardData.totalAttendees /
+                            dashboardData.totalRegistered) *
+                          100
+                        ).toFixed(0)}
                       %
                     </span>
                   </div>
                 </div>
               </div>
-              <div className="mt-4">
-                <p className="text-sm text-gray-600 text-center">
-                  Venue capacity • {dashboardData.totalUsers}/200
-                </p>
-              </div>
+
+              {/* Capacity label */}
+              <p className="text-sm text-gray-600 text-center">
+                Capacity • {dashboardData.totalAttendees}/
+                {dashboardData.totalRegistered}
+              </p>
             </div>
           </div>
         </div>
 
-        {/* FOOD */}
         <div className="bg-gradient-to-br from-white to-green-50 rounded-3xl p-6 shadow-2xl border border-green-100 transform hover:scale-105 transition-all duration-300">
           <div className="flex items-start justify-between">
             <div className="flex-1">
@@ -853,7 +993,7 @@ const Dashboard = () => {
                     Food Distribution
                   </p>
                   <h3 className="text-4xl font-bold text-gray-800 mt-1 animate-pulse">
-                    {dashboardData.totalMembers}
+                    {dashboardData.totalAdults + dashboardData.totalChildren}
                   </h3>
                 </div>
               </div>
@@ -908,12 +1048,13 @@ const Dashboard = () => {
                     Gifts Distributed
                   </p>
                   <h3 className="text-4xl font-bold text-gray-800 mt-1">
-                    {dashboardData.gifts}
+                    {dashboardData.totalGifts}
                   </h3>
                 </div>
               </div>
 
               <div className="space-y-4">
+                {/* Delivered */}
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
                     <span className="text-green-600 font-medium flex items-center">
@@ -921,16 +1062,18 @@ const Dashboard = () => {
                       Delivered
                     </span>
                     <span className="text-gray-800 font-bold">
-                      {dashboardData.gifts}
+                      {dashboardData.totalGifts}
                     </span>
                   </div>
+
                   <div className="w-full bg-gray-200 rounded-full h-2">
                     <div
                       className="bg-gradient-to-r from-green-500 to-green-600 h-2 rounded-full transition-all duration-1000"
                       style={{
-                        width: `${dashboardData.totalUsers === 0
+                        width: `${dashboardData.totalAttendees === 0
                             ? 0
-                            : (dashboardData.gifts / dashboardData.totalUsers) *
+                            : (dashboardData.totalGifts /
+                              dashboardData.totalAttendees) *
                             100
                           }%`,
                       }}
@@ -938,6 +1081,7 @@ const Dashboard = () => {
                   </div>
                 </div>
 
+                {/* Pending */}
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
                     <span className="text-orange-500 flex items-center">
@@ -945,18 +1089,19 @@ const Dashboard = () => {
                       Pending
                     </span>
                     <span className="text-gray-800 font-bold">
-                      {dashboardData.totalUsers - dashboardData.gifts}
+                      {dashboardData.totalAttendees - dashboardData.totalGifts}
                     </span>
                   </div>
+
                   <div className="w-full bg-gray-200 rounded-full h-2">
                     <div
                       className="bg-gradient-to-r from-orange-400 to-orange-500 h-2 rounded-full transition-all duration-1000"
                       style={{
-                        width: `${dashboardData.totalUsers === 0
+                        width: `${dashboardData.totalAttendees === 0
                             ? 0
-                            : ((dashboardData.totalUsers -
-                              dashboardData.gifts) /
-                              dashboardData.totalUsers) *
+                            : ((dashboardData.totalAttendees -
+                              dashboardData.totalGifts) /
+                              dashboardData.totalAttendees) *
                             100
                           }%`,
                       }}
@@ -968,10 +1113,11 @@ const Dashboard = () => {
               <div className="mt-4 text-center">
                 <p className="text-xs text-gray-500">
                   Completion:{" "}
-                  {dashboardData.totalUsers === 0
+                  {dashboardData.totalAttendees === 0
                     ? "0%"
                     : (
-                      (dashboardData.gifts / dashboardData.totalUsers) *
+                      (dashboardData.totalGifts /
+                        dashboardData.totalAttendees) *
                       100
                     ).toFixed(1) + "%"}
                 </p>
@@ -1036,6 +1182,11 @@ const Dashboard = () => {
                     </th>
                     <th className="px-8 py-6 text-center">
                       <span className="text-base font-semibold text-gray-700 uppercase tracking-wider">
+                        Verified
+                      </span>
+                    </th>
+                    <th className="px-8 py-6 text-center">
+                      <span className="text-base font-semibold text-gray-700 uppercase tracking-wider">
                         Actions
                       </span>
                     </th>
@@ -1090,6 +1241,45 @@ const Dashboard = () => {
                           </code>
                         </td>
 
+                        {/* Verified Checkbox */}
+                        <td className="px-8 py-6">
+  <div className="flex justify-center">
+    <label className="inline-flex items-center cursor-pointer">
+
+      {/* CHECKBOX (Uses Member_ID here!) */}
+      <input
+        type="checkbox"
+        checked={user.IsVerified_Member || false}
+        onChange={(e) =>
+          handleVerificationToggle(user.userId, e.target.checked)
+        }
+        className="hidden"
+      />
+
+      {/* Toggle UI */}
+      <div
+        className={`w-14 h-7 flex items-center rounded-full p-1 cursor-pointer transition-all duration-300 ${
+          user.IsVerified_Member ? "bg-green-500" : "bg-gray-300"
+        }`}
+      >
+        <div
+          className={`bg-white w-5 h-5 rounded-full shadow-md transform transition-transform duration-300 ${
+            user.IsVerified_Member ? "translate-x-7" : "translate-x-0"
+          }`}
+        />
+      </div>
+
+      <span
+        className={`ml-3 text-sm font-medium ${
+          user.IsVerified_Member ? "text-green-600" : "text-gray-500"
+        }`}
+      >
+        {user.IsVerified_Member ? "Verified" : "Unverified"}
+      </span>
+    </label>
+  </div>
+</td>
+
                         {/* Actions */}
                         <td className="px-8 py-6">
                           <div className="flex justify-center space-x-3">
@@ -1117,7 +1307,7 @@ const Dashboard = () => {
                     ))
                   ) : (
                     <tr>
-                      <td colSpan="4" className="px-8 py-20 text-center">
+                      <td colSpan="5" className="px-8 py-20 text-center">
                         <div className="flex flex-col items-center justify-center max-w-md mx-auto">
                           <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-6">
                             <FaUserCircle className="text-gray-400 text-5xl" />
@@ -1142,96 +1332,97 @@ const Dashboard = () => {
               </table>
             </div>
           </div>
-
-          {/* Pagination - Modern Style */}
-          {totalPages > 1 && (
-            <div className="flex flex-col sm:flex-row justify-between items-center mt-8 pt-6 border-t border-gray-200 space-y-4 sm:space-y-0">
-              <div className="text-gray-600 text-lg">
-                Showing{" "}
-                <span className="font-semibold text-gray-900">
-                  {indexOfFirst + 1}-
-                  {Math.min(indexOfLast, filteredUsers.length)}
-                </span>{" "}
-                of{" "}
-                <span className="font-semibold text-gray-900">
-                  {filteredUsers.length}
-                </span>{" "}
-                participants
-              </div>
-
-              <div className="flex items-center space-x-2">
-                <button
-                  onClick={() => setCurrentPage((c) => Math.max(c - 1, 1))}
-                  disabled={currentPage === 1}
-                  className="px-5 py-2.5 border-2 border-gray-300 rounded-xl text-base font-semibold text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center"
-                >
-                  <svg
-                    className="w-5 h-5 mr-2"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M15 19l-7-7 7-7"
-                    />
-                  </svg>
-                  Previous
-                </button>
-
-                <div className="flex items-center space-x-1">
-                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                    const page =
-                      currentPage <= 3
-                        ? i + 1
-                        : currentPage >= totalPages - 2
-                          ? totalPages - 4 + i
-                          : currentPage - 2 + i;
-                    return (
-                      <button
-                        key={page}
-                        onClick={() => setCurrentPage(page)}
-                        className={`w-12 h-12 rounded-xl text-base font-semibold transition-all duration-200 ${currentPage === page
-                            ? "bg-blue-600 text-white shadow-lg"
-                            : "text-gray-700 hover:bg-gray-100"
-                          }`}
-                      >
-                        {page}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                <button
-                  onClick={() =>
-                    setCurrentPage((c) => Math.min(c + 1, totalPages))
-                  }
-                  disabled={currentPage === totalPages}
-                  className="px-5 py-2.5 border-2 border-gray-300 rounded-xl text-base font-semibold text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center"
-                >
-                  Next
-                  <svg
-                    className="w-5 h-5 ml-2"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M9 5l7 7-7 7"
-                    />
-                  </svg>
-                </button>
-              </div>
-            </div>
-          )}
         </div>
       </div>
+
+      {/* Pagination - Modern Style */}
+      {totalPages > 1 && (
+        <div className="flex flex-col sm:flex-row justify-between items-center mt-8 pt-6 border-t border-gray-200 space-y-4 sm:space-y-0">
+          <div className="text-gray-600 text-lg">
+            Showing{" "}
+            <span className="font-semibold text-gray-900">
+              {indexOfFirst + 1}-
+              {Math.min(indexOfLast, filteredUsers.length)}
+            </span>{" "}
+            of{" "}
+            <span className="font-semibold text-gray-900">
+              {filteredUsers.length}
+            </span>{" "}
+            participants
+          </div>
+
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={() => setCurrentPage((c) => Math.max(c - 1, 1))}
+              disabled={currentPage === 1}
+              className="px-5 py-2.5 border-2 border-gray-300 rounded-xl text-base font-semibold text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center"
+            >
+              <svg
+                className="w-5 h-5 mr-2"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M15 19l-7-7 7-7"
+                />
+              </svg>
+              Previous
+            </button>
+
+            <div className="flex items-center space-x-1">
+              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                const page =
+                  currentPage <= 3
+                    ? i + 1
+                    : currentPage >= totalPages - 2
+                      ? totalPages - 4 + i
+                      : currentPage - 2 + i;
+                return (
+                  <button
+                    key={page}
+                    onClick={() => setCurrentPage(page)}
+                    className={`w-12 h-12 rounded-xl text-base font-semibold transition-all duration-200 ${currentPage === page
+                        ? "bg-blue-600 text-white shadow-lg"
+                        : "text-gray-700 hover:bg-gray-100"
+                      }`}
+                  >
+                    {page}
+                  </button>
+                );
+              })}
+            </div>
+
+            <button
+              onClick={() =>
+                setCurrentPage((c) => Math.min(c + 1, totalPages))
+              }
+              disabled={currentPage === totalPages}
+              className="px-5 py-2.5 border-2 border-gray-300 rounded-xl text-base font-semibold text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center"
+            >
+              Next
+              <svg
+                className="w-5 h-5 ml-2"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 5l7 7-7 7"
+                />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
     </div>
+      
   );
 };
 

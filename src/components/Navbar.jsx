@@ -4,11 +4,15 @@ import {
   User,
   LogIn,
   Menu,
-  X
+  X,
+  LogOut,
+  CheckCircle,
+  XCircle
 } from 'lucide-react';
 import Login from '../pages/Auth/Login';
 import { useNavigate } from "react-router-dom";
 import Logo from "../assets/Logo.png"
+import axios from "axios";
 
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -16,9 +20,22 @@ const Navbar = () => {
     isOpen: false,
     type: 'login' // 'login' or 'register'
   });
+  const [toast, setToast] = useState({
+    show: false,
+    message: '',
+    type: 'success' // 'success' or 'error'
+  });
 
   const openLogin = () => setAuthModal({ isOpen: true, type: 'login' });
   const closeAuth = () => setAuthModal({ isOpen: false, type: 'login' });
+
+  const showToast = (message, type = 'success') => {
+    setToast({ show: true, message, type });
+    // Auto hide after 3 seconds
+    setTimeout(() => {
+      setToast({ show: false, message: '', type: 'success' });
+    }, 3000);
+  };
 
   const toggleMenu = () => {
     setIsMenuOpen(!isMenuOpen);
@@ -26,16 +43,56 @@ const Navbar = () => {
 
   const navigate = useNavigate();
 
+  const storedUser = localStorage.getItem("userProfile");
+  const userName = storedUser ? JSON.parse(storedUser).name : "";
+
   const isLoggedIn = localStorage.getItem("isLoggedIn") === "true";
 
-const navItems = [
-  { name: 'Home', path: "/" },
-  { name: 'About Us', path: "/about" },
-  { name: 'Contact', path: "/contact" },
-  ...(isLoggedIn ? [{ name: 'Dashboard', path: "/dashboard" }] : [])
-];
+  const handleLogout = async () => {
+    try {
+      const storedUser = localStorage.getItem("userProfile");
+      const email = storedUser ? JSON.parse(storedUser).email : "";
 
+      const token = localStorage.getItem("userToken");
 
+      const response = await axios.post(
+        "https://api.regeve.in/api/admin/logout",
+        { Email: email },   // remove this if API doesn't need email
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      console.log("Logout API Success:", response.data);
+
+      // Show success message
+      showToast('Logged out successfully!', 'success');
+
+      // Wait a moment for the toast to show, then proceed with logout
+      setTimeout(() => {
+        localStorage.removeItem("isLoggedIn");
+        localStorage.removeItem("userToken");
+        localStorage.removeItem("userProfile");
+        window.location.reload();
+      }, 1000);
+
+    } catch (error) {
+      console.error("Logout error:", error);
+      console.log("Server says:", error.response?.data);
+      
+      // Show error message
+      showToast('Logout failed. Please try again.', 'error');
+    }
+  };
+
+  const navItems = [
+    { name: 'Home', path: "/" },
+    { name: 'About Us', path: "/about" },
+    { name: 'Contact', path: "/contact" },
+    ...(isLoggedIn ? [{ name: 'Dashboard', path: "/dashboard" }] : [])
+  ];
 
   const menuVariants = {
     closed: {
@@ -67,9 +124,35 @@ const navItems = [
     }
   };
 
+  const toastVariants = {
+    hidden: {
+      opacity: 0,
+      y: -100,
+      scale: 0.8
+    },
+    visible: {
+      opacity: 1,
+      y: 0,
+      scale: 1,
+      transition: {
+        type: "spring",
+        stiffness: 300,
+        damping: 25
+      }
+    },
+    exit: {
+      opacity: 0,
+      y: -100,
+      scale: 0.8,
+      transition: {
+        duration: 0.2
+      }
+    }
+  };
+
   return (
     <>
-      <nav className="fixed top-0 left-0 right-0 bg-white/80 backdrop-blur-md border-b border-gray-200 z-40">
+      <nav className="fixed top-0 left-0 right-0 bg-white/90 backdrop-blur-md border-b border-gray-200 z-40 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             {/* Logo */}
@@ -81,7 +164,6 @@ const navItems = [
               onClick={() => navigate("/")}
             >
               <div className="relative">
-                {/* Logo with gradient text */}
                 <div className="flex items-center space-x-2">
                   <img
                     src={Logo}
@@ -101,36 +183,63 @@ const navItems = [
                 <motion.button
                   key={item.name}
                   onClick={() => navigate(item.path)}
-                  className="relative flex items-center space-x-1 cursor-pointer text-gray-700 hover:text-blue-600  transition-colors duration-200 font-medium group"
+                  className="relative flex items-center space-x-1 cursor-pointer text-gray-700 hover:text-blue-600 transition-colors duration-200 font-medium group px-3 py-2 rounded-lg hover:bg-blue-50"
                   initial={{ opacity: 0, y: -10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.5, delay: index * 0.1 }}
                 >
                   <span>{item.name}</span>
-                  
                 </motion.button>
               ))}
             </div>
 
             {/* Desktop Auth Buttons */}
             <div className="hidden md:flex items-center space-x-4">
-              {!isLoggedIn &&( 
+              {isLoggedIn ? (
+                <motion.div
+                  className="flex items-center space-x-3"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.5, delay: 0.3 }}
+                >
+                  {/* USER GREETING */}
+                  <div className="flex items-center space-x-2 bg-gradient-to-r from-blue-50 to-cyan-50 px-4 py-2 rounded-lg border border-blue-100">
+                    <User className="w-4 h-4 text-blue-600" />
+                    <span className="text-sm font-medium text-blue-800">
+                      {userName}
+                    </span>
+                  </div>
+
+                  {/* LOGOUT BUTTON */}
+                  <motion.button
+                    onClick={handleLogout}
+                    className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-lg hover:from-red-600 hover:to-red-700 transition-all duration-200 font-medium shadow-sm"
+                    whileHover={{ scale: 1.05, shadow: "0 4px 12px rgba(239, 68, 68, 0.3)" }}
+                    whileTap={{ scale: 0.95 }}
+                  >
+                    <LogOut className="w-4 h-4" />
+                    <span>Logout</span>
+                  </motion.button>
+                </motion.div>
+              ) : (
                 <motion.button
-                onClick={openLogin}
-                className="flex items-center space-x-1 px-4 py-2 text-gray-700 hover:text-blue-600 transition-colors duration-200 font-medium"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.5, delay: 0.3 }}
-              >
-                <LogIn className="w-4 h-4" />
-                <span>Login</span>
-              </motion.button>
+                  onClick={openLogin}
+                  className="flex items-center space-x-2 px-6 py-2 bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-lg hover:from-blue-700 hover:to-cyan-700 transition-all duration-200 font-medium shadow-sm"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.5, delay: 0.3 }}
+                  whileHover={{ scale: 1.05, shadow: "0 4px 12px rgba(37, 99, 235, 0.3)" }}
+                  whileTap={{ scale: 0.95 }}
+                >
+                  <LogIn className="w-4 h-4" />
+                  <span>Login</span>
+                </motion.button>
               )}
             </div>
 
             {/* Mobile Menu Button */}
             <motion.button
-              className="md:hidden p-2 rounded-lg text-gray-700 hover:bg-gradient-to-r hover:from-green-600 hover:to-emerald-600 hover:text-white transition-all duration-200"
+              className="md:hidden p-2 rounded-lg text-gray-700 hover:bg-gradient-to-r hover:from-blue-600 hover:to-cyan-600 hover:text-white transition-all duration-200"
               onClick={toggleMenu}
               whileTap={{ scale: 0.95 }}
             >
@@ -142,13 +251,13 @@ const navItems = [
           <AnimatePresence>
             {isMenuOpen && (
               <motion.div
-                className="md:hidden bg-white border-t border-gray-200"
+                className="md:hidden bg-white/95 backdrop-blur-md border-t border-gray-200 shadow-lg"
                 initial="closed"
                 animate="open"
                 exit="closed"
                 variants={menuVariants}
               >
-                <div className="py-4 space-y-4">
+                <div className="py-4 space-y-3">
                   {navItems.map((item, index) => (
                     <motion.button
                       key={item.name}
@@ -156,7 +265,7 @@ const navItems = [
                         navigate(item.path);
                         setIsMenuOpen(false);
                       }}
-                      className="w-full flex items-center space-x-3 px-4 py-3 text-gray-700 hover:bg-gradient-to-r hover:from-purple-600 hover:to-pink-600 hover:text-white rounded-lg transition-all duration-200 font-medium text-left"
+                      className="w-full flex items-center space-x-3 px-4 py-3 text-gray-700 hover:bg-gradient-to-r hover:from-blue-600 hover:to-cyan-600 hover:text-white rounded-lg transition-all duration-200 font-medium text-left mx-2"
                       variants={itemVariants}
                       transition={{ delay: index * 0.1 }}
                     >
@@ -165,19 +274,45 @@ const navItems = [
                   ))}
 
                   <div className="border-t border-gray-200 pt-4 px-4 space-y-3">
-                    <motion.button
-                      onClick={() => {
-                        openLogin();
-                        setIsMenuOpen(false);
-                      }}
-                      className="w-full flex items-center justify-center space-x-2 px-4 py-3 text-gray-700 border border-gray-300 rounded-lg hover:bg-gradient-to-r hover:from-blue-600 hover:to-cyan-600 hover:text-white hover:border-transparent transition-all duration-200 font-medium"
-                      variants={itemVariants}
-                      transition={{ delay: 0.3 }}
-                    >
-                      <LogIn className="w-4 h-4" />
-                      <span>Login</span>
-                    </motion.button>
-                   
+                    {isLoggedIn ? (
+                      <>
+                        <motion.div
+                          className="w-full flex items-center justify-between px-4 py-3 bg-gradient-to-r from-blue-50 to-cyan-50 rounded-lg border border-blue-100 mx-2"
+                          variants={itemVariants}
+                          transition={{ delay: 0.3 }}
+                        >
+                          <div className="flex items-center space-x-2">
+                            <User className="w-4 h-4 text-blue-600" />
+                            <span className="text-blue-800 font-medium">{userName}</span>
+                          </div>
+                        </motion.div>
+                        <motion.button
+                          onClick={() => {
+                            handleLogout();
+                            setIsMenuOpen(false);
+                          }}
+                          className="w-full flex items-center justify-center space-x-2 px-4 py-3 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-lg hover:from-red-600 hover:to-red-700 transition-all duration-200 font-medium mx-2"
+                          variants={itemVariants}
+                          transition={{ delay: 0.4 }}
+                        >
+                          <LogOut className="w-4 h-4" />
+                          <span>Logout</span>
+                        </motion.button>
+                      </>
+                    ) : (
+                      <motion.button
+                        onClick={() => {
+                          openLogin();
+                          setIsMenuOpen(false);
+                        }}
+                        className="w-full flex items-center justify-center space-x-2 px-4 py-3 bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-lg hover:from-blue-700 hover:to-cyan-700 transition-all duration-200 font-medium mx-2"
+                        variants={itemVariants}
+                        transition={{ delay: 0.3 }}
+                      >
+                        <LogIn className="w-4 h-4" />
+                        <span>Login</span>
+                      </motion.button>
+                    )}
                   </div>
                 </div>
               </motion.div>
@@ -186,15 +321,43 @@ const navItems = [
         </div>
       </nav>
 
+      {/* Toast Notification */}
+      <AnimatePresence>
+        {toast.show && (
+          <motion.div
+            className="fixed top-20 left-1/2 transform -translate-x-1/2 z-50"
+            variants={toastVariants}
+            initial="hidden"
+            animate="visible"
+            exit="exit"
+          >
+            <div className={`flex items-center space-x-2 px-6 py-3 rounded-lg shadow-lg border ${
+              toast.type === 'success' 
+                ? 'bg-green-50 border-green-200 text-green-800' 
+                : 'bg-red-50 border-red-200 text-red-800'
+            }`}>
+              {toast.type === 'success' ? (
+                <CheckCircle className="w-5 h-5" />
+              ) : (
+                <XCircle className="w-5 h-5" />
+              )}
+              <span className="font-medium">{toast.message}</span>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Auth Modals */}
       <AnimatePresence>
         {authModal.isOpen && authModal.type === 'login' && (
           <Login
             onClose={closeAuth}
-           
+            onLoginSuccess={() => {
+              closeAuth();
+              // The page will refresh due to localStorage change
+            }}
           />
         )}
-       
       </AnimatePresence>
     </>
   );
