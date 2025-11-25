@@ -1,22 +1,24 @@
 import axios from "axios";
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import Logo from "../assets/form-logo.png"
+import Logo from "../assets/form-logo.png";
 
 export default function EventForm() {
   const defaultForm = {
     Name: "",
-    Address: "",
     Age: "",
     Gender: "",
     Company_ID: "",
     Phone_Number: "",
     WhatsApp_Number: "",
     Email: "",
-    Adult_Count: "",
-    Children_Count: "",
+    Adult_Count: "0", // Default to 1 for self
+    Children_Count: "0",
     Veg_Count: "",
     Non_Veg_Count: "",
+    Travel_Mode: "", // New field for travel mode
+    Pickup_Location: "", // New field for pickup location
+    Self: "1",
   };
 
   const navigate = useNavigate();
@@ -24,21 +26,61 @@ export default function EventForm() {
   const [form, setForm] = useState(defaultForm);
   const [photo, setPhoto] = useState(null);
 
+  // For company ID suggestions
+  const [searchResults, setSearchResults] = useState([]);
+
   // Popup state
   const [showPopup, setShowPopup] = useState(false);
   const [memberData, setMemberData] = useState(null);
 
+  // Pickup locations data
+  const pickupLocations = [
+    "Office - Main Gate",
+    "Office - Parking Lot",
+    "Company - Reception",
+    "Company - North Entrance",
+    "Viman Nagar",
+    "Kharadi",
+    "Hadapsar",
+  ];
+
   const handleChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+
+    // Company ID logic
+    if (name === "Company_ID") {
+      const numericValue = value.replace(/\D/g, "").slice(0, 8);
+      setForm({ ...form, [name]: numericValue });
+
+      if (numericValue.length >= 3) {
+        axios
+          .get(`https://api.regeve.in/api/get-all-basf-staff/${numericValue}`)
+          .then((res) => {
+            if (res.data.data) {
+              setSearchResults([res.data.data]);
+            } else {
+              setSearchResults([]);
+            }
+          })
+          .catch(() => setSearchResults([]));
+      } else {
+        setSearchResults([]);
+      }
+
+      return; // Keep return ONLY for Company ID
+    }
+
+    // ✅ For all other fields update normally
+    setForm({ ...form, [name]: value });
   };
 
   const handlePhoto = (e) => {
     setPhoto(e.target.files[0]);
   };
 
-  const uploadPhoto = async () => {
+  const uploadPhoto = async (file) => {
     const fd = new FormData();
-    fd.append("files", photo);
+    fd.append("files", file);
 
     const res = await axios.post("https://api.regeve.in/api/upload", fd);
     return res.data[0].id;
@@ -49,10 +91,12 @@ export default function EventForm() {
 
     try {
       const totalPersons =
-        Number(form.Adult_Count || 0) + Number(form.Children_Count || 0);
+        Number(form.Self) +
+        Number(form.Adult_Count) +
+        Number(form.Children_Count);
 
       const totalFoodCount =
-        Number(form.Veg_Count || 0) + Number(form.Non_Veg_Count || 0);
+        Number(form.Veg_Count) + Number(form.Non_Veg_Count);
 
       if (totalPersons !== totalFoodCount) {
         alert(
@@ -105,16 +149,6 @@ export default function EventForm() {
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="text-center mb-6 sm:mb-8 relative">
-          {/* Logo */}
-          {/* <div className="flex justify-center mb-4">
-            <img
-              src={Logo}
-              alt="Event Logo"
-             className="w-32 sm:w-40 md:w-48"
-
-            />
-          </div> */}
-
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2 sm:mb-3">
             Event Registration Form
           </h1>
@@ -122,10 +156,25 @@ export default function EventForm() {
             Please fill in your details below
           </p>
 
-          {/* Go Home Button - Fixed on right side */}
+          {/* Go Home Button */}
           <button
             onClick={() => navigate("/")}
-            className="fixed top-6 right-6 z-50 bg-gradient-to-br from-blue-600 to-cyan-700 hover:from-blue-700 hover:to-cyan-800 text-white px-5 py-2.5 rounded-lg shadow-lg cursor-pointer transition-all duration-200 ease-in-out transform hover:scale-105 font-medium text-sm border border-blue-500"
+            className="
+                        sm:fixed sm:top-6 sm:right-6
+                        sm:bg-gradient-to-br sm:from-blue-600 sm:to-cyan-700
+                        sm:hover:from-blue-700 sm:hover:to-cyan-800
+                        sm:border sm:border-blue-500 sm:text-white
+
+                        block sm:inline-block mx-auto sm:mx-0
+                        w-full sm:w-auto text-center
+                        mt-4 sm:mt-0
+                        px-5 py-2.5
+                        rounded-lg shadow-lg cursor-pointer
+                        transition-all duration-200
+                        text-sm font-medium
+                        bg-blue-600 sm:bg-gradient-to-br
+                        text-white
+                      "
           >
             ← Go Home
           </button>
@@ -134,8 +183,58 @@ export default function EventForm() {
         {/* Form Container */}
         <div className="bg-white rounded-xl sm:rounded-2xl shadow-lg sm:shadow-xl border border-gray-200 overflow-hidden">
           <form onSubmit={handleSubmit} className="p-4 sm:p-6 lg:px-8">
-            {/* ------- YOUR ORIGINAL FULL FORM UI (NO CHANGES) ------- */}
-            {/* (I am not modifying anything here, using your exact UI code) */}
+            {/* Company ID - Moved to top */}
+            <div className="mb-6 sm:mb-8">
+              <div className="flex items-center mb-4 sm:mb-6">
+                <div className="w-1.5 h-6 sm:h-8 bg-blue-600 rounded-full mr-3 sm:mr-4"></div>
+                <h2 className="text-lg sm:text-xl font-semibold text-gray-900">
+                  Company Identification
+                </h2>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 sm:gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1 sm:mb-2">
+                    Company ID *
+                  </label>
+                  <input
+                    name="Company_ID"
+                    value={form.Company_ID}
+                    onChange={handleChange}
+                    className="w-full px-3 sm:px-4 py-2.5 sm:py-3 text-sm sm:text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
+                    placeholder="Enter 8-digit Company ID"
+                    required
+                    pattern="[0-9]{8}"
+                    maxLength={8}
+                    minLength={8}
+                    title="Please enter exactly 8 digits"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Must be exactly 8 digits
+                  </p>
+                  {searchResults.length > 0 && (
+                    <ul className="mt-2 border rounded-lg bg-white shadow-md max-h-40 overflow-y-auto">
+                      {searchResults.map((item) => (
+                        <li
+                          key={item.id}
+                          onClick={() => {
+                            setForm({
+                              ...form,
+                              Company_ID: item.Company_ID,
+                              Name: item.Name,
+                            });
+                            setSearchResults([]);
+                          }}
+                          className="px-3 py-2 cursor-pointer hover:bg-blue-100 border-b last:border-b-0"
+                        >
+                          <strong>{item.Company_ID}</strong> — {item.Name}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </div>
+            </div>
 
             {/* Personal Information */}
             <div className="mb-8 sm:mb-10">
@@ -202,19 +301,58 @@ export default function EventForm() {
                     </div>
                   </div>
 
+                  {/* Travel Mode */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1 sm:mb-2">
-                      Company ID
+                      Travel Mode *
                     </label>
-                    <input
-                      name="Company_ID"
-                      value={form.Company_ID}
-                      onChange={handleChange}
-                      className="w-full px-3 sm:px-4 py-2.5 sm:py-3 text-sm sm:text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
-                      placeholder="Enter company ID"
-                    />
+                    <div className="relative">
+                      <select
+                        name="Travel_Mode"
+                        onChange={handleChange}
+                        value={form.Travel_Mode}
+                        className="w-full px-3 sm:px-4 py-2.5 sm:py-3 text-sm sm:text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200 appearance-none bg-white cursor-pointer"
+                        required
+                      >
+                        <option value="">Select Travel Mode</option>
+                        <option value="Self">Self</option>
+                        <option value="Company Bus">Company Bus</option>
+                      </select>
+                    </div>
                   </div>
                 </div>
+
+                {/* Pickup Location - Only show when Company is selected */}
+                {form.Travel_Mode === "Company Bus" && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1 sm:mb-2">
+                      Pickup Location *
+                    </label>
+                    <div className="relative w-full mb-4 sm:mb-0">
+                      <input
+                        name="Pickup_Location"
+                        value={form.Pickup_Location}
+                        onChange={handleChange}
+                        className="w-full px-3 sm:px-4 py-2.5 sm:py-3 text-sm sm:text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
+                        placeholder="Pickup Location"
+                        type="text"
+                        required                        
+                      />
+
+                      {/* Custom dropdown arrow */}
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                        <svg
+                          width="16"
+                          height="16"
+                          viewBox="0 0 20 20"
+                          fill="gray"
+                        >
+                          <path d="M5 7l5 5 5-5" />
+                        </svg>
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -248,7 +386,7 @@ export default function EventForm() {
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1 sm:mb-2">
-                      WhatsApp Number
+                      WhatsApp Number *
                     </label>
                     <input
                       name="WhatsApp_Number"
@@ -278,21 +416,6 @@ export default function EventForm() {
                     required
                   />
                 </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1 sm:mb-2">
-                    Address *
-                  </label>
-                  <input
-                    name="Address"
-                    value={form.Address}
-                    onChange={handleChange}
-                    className="w-full px-3 sm:px-4 py-2.5 sm:py-3 text-sm sm:text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
-                    placeholder="Enter your complete address"
-                    required
-                    minLength={5}
-                  />
-                </div>
               </div>
             </div>
 
@@ -301,26 +424,54 @@ export default function EventForm() {
               <div className="flex items-center mb-4 sm:mb-6">
                 <div className="w-1.5 h-6 sm:h-8 bg-purple-600 rounded-full mr-3 sm:mr-4"></div>
                 <h2 className="text-lg sm:text-xl font-semibold text-gray-900">
-                  Family Member & Food Preference
+                  Family Members & Food Preference
                 </h2>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+                {/* Self Count */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1 sm:mb-2">
-                    Adults
+                    Self Count *
+                  </label>
+                  <input
+                    name="Self"
+                    value={form.Self}
+                    onChange={handleChange}
+                    className="w-full px-3 sm:px-4 py-2.5 sm:py-3 text-sm sm:text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
+                    placeholder="Self Count"
+                    type="number"
+                    required
+                    min={1}
+                    max={1}
+                    readOnly
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Always 1 (yourself)
+                  </p>
+                </div>
+
+                {/* Adult Count (Additional Adults) */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1 sm:mb-2">
+                    Additional Adults
                   </label>
                   <input
                     name="Adult_Count"
                     value={form.Adult_Count}
                     onChange={handleChange}
                     className="w-full px-3 sm:px-4 py-2.5 sm:py-3 text-sm sm:text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
-                    placeholder="Adult Count"
+                    placeholder="Additional Adults"
                     type="number"
                     required
                     min={0}
                   />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Other adults besides yourself
+                  </p>
                 </div>
+
+                {/* Children Count */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1 sm:mb-2">
                     Children
@@ -337,9 +488,10 @@ export default function EventForm() {
                   />
                 </div>
 
+                {/* Veg Count */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1 sm:mb-2">
-                    Veg
+                    Veg Count *
                   </label>
                   <div className="relative">
                     <input
@@ -354,9 +506,11 @@ export default function EventForm() {
                     />
                   </div>
                 </div>
+
+                {/* Non-Veg Count */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1 sm:mb-2">
-                    Non-Veg
+                    Non-Veg Count *
                   </label>
                   <div>
                     <input

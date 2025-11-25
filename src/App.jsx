@@ -21,12 +21,14 @@ import HelpCenter from './components/HelpCenter';
 import PrivacyPolicy from './components/PrivacyPolicy';
 import RegisterForm from './pages/Auth/RegisterForm';
 import MemberDashBoard from './pages/Scan/MemberDashBoard';
+import QRCodeForm from './components/QRCodeFom/QRCodeForm';
 
 export default function App() {
   const location = useLocation();
 
   const hideLayout =
     location.pathname === "/event-form" ||
+    location.pathname === "/eventform-qr" ||
     location.pathname === "/scanDashboard" ||
     location.pathname === "/luckydraw" ||
     location.pathname === "/regeve-admin" ||
@@ -55,6 +57,7 @@ export default function App() {
         <Route path='/help' element={<HelpCenter />} />
         <Route path='/privacy' element={<PrivacyPolicy />} />
         <Route path="/scanDashboard" element={<MemberDashBoard/>}/>
+        <Route path='/eventform-qr'element={<QRCodeForm/>}/>
       </Routes>
 
       {!hideLayout && <Footer />}

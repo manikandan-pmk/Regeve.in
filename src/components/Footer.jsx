@@ -77,13 +77,13 @@ const Footer = () => {
   const contactInfo = [
     {
       icon: MapPin,
-      text: '243/3, Arcot Rd, Vadapalani, Chennai, Tamil Nadu 600026',
+      text: 'Vadapalani, Chennai, Tamil Nadu 600026',
       gradient: 'hover:text-green-600'
     },
     {
       icon: Phone,
-      text: '+91 9884030207',
-      href: 'tel:+919884030207',
+      text: '+91 8608889999',
+      href: 'tel: 044 4213 4213',
       gradient: 'hover:text-blue-600'
     },
     {

@@ -17,6 +17,13 @@ import { useNavigate } from "react-router-dom";
 ----------------------------------------------------- */
 const ViewPopup = ({ user, onClose }) => {
   if (!user) return null;
+  const formatDate = (date) => {
+    if (!date) return "N/A";
+    return new Date(date).toLocaleString("en-IN", {
+      dateStyle: "medium",
+      timeStyle: "short",
+    });
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-md animate-fadeIn">
@@ -91,6 +98,12 @@ const ViewPopup = ({ user, onClose }) => {
                 </h4>
                 <div className="space-y-3 text-sm">
                   <div className="flex justify-between">
+                    <span className="text-black">Self:</span>
+                    <span className="font-semibold text-black">
+                      {user.self || 0}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
                     <span className="text-black">Adults:</span>
                     <span className="font-semibold text-black">
                       {user.adultcount || 0}
@@ -105,7 +118,9 @@ const ViewPopup = ({ user, onClose }) => {
                   <div className="flex justify-between">
                     <span className="text-black">Total:</span>
                     <span className="font-semibold text-black">
-                      {(user.adultcount || 0) + (user.childrencount || 0)}
+                      {(user.adultcount || 0) +
+                        (user.childrencount || 0) +
+                        (user.self || 0)}
                     </span>
                   </div>
                   <div className="border-t border-green-200 pt-2 mt-2">
@@ -145,6 +160,36 @@ const ViewPopup = ({ user, onClose }) => {
                   ["Email", user.email, "📧"],
                   ["Phone", user.phone, "📞"],
                   ["WhatsApp", user.whatsapp, "💬"],
+                  ["Travel Mode", user.travelmode, "🚌"],
+                  ["Pickup Location", user.pickuplocation, "📍"],
+                  [
+                    "Present",
+                    user.isPresent ? "Yes" : "No",
+                    user.isPresent ? "🟢" : "🔴",
+                  ],
+
+                  [
+                    "Gift Received",
+                    user.isGiftReceived ? "Yes" : "No",
+                    user.isGiftReceived ? "🟢" : "🔴",
+                  ],
+                  [
+                    "Lucky Draw Winner",
+                    user.isWinned ? "Yes" : "No",
+                    user.isWinned ? "🟢" : "🔴",
+                  ],
+                  [
+                    "Registration Date",
+                    formatDate(user.registrationDate),
+                    "📅",
+                  ],
+                  [
+                    "Last Updated",
+                    user.updatedDate === user.registrationDate
+                      ? "N/A"
+                      : formatDate(user.updatedDate),
+                    "⏱️",
+                  ],
                 ].map(([label, value, icon], i) => (
                   <div
                     key={i}
@@ -162,21 +207,6 @@ const ViewPopup = ({ user, onClose }) => {
                   </div>
                 ))}
               </div>
-
-              {/* Address - Full Width */}
-              <div className="mt-6 group">
-                <div className="p-5 bg-white rounded-2xl shadow-sm border border-gray-200 hover:shadow-md transition-all duration-200">
-                  <div className="flex items-center mb-2">
-                    <span className="text-lg mr-2">🏠</span>
-                    <p className="text-sm uppercase tracking-wide text-gray-500 font-semibold">
-                      Address
-                    </p>
-                  </div>
-                  <p className="text-base font-medium text-gray-800 leading-relaxed">
-                    {user.address || "N/A"}
-                  </p>
-                </div>
-              </div>
             </div>
 
             {/* Additional Information */}
@@ -190,6 +220,7 @@ const ViewPopup = ({ user, onClose }) => {
                 {[
                   ["Vegetarian Count", user.vegcount, "🥗"],
                   ["Non-Veg Count", user.nonvegcount, "🍗"],
+                  ["Self", user.self, "👥"],
                   ["Adult Count", user.adultcount],
                   ["Children Count", user.childrencount],
                 ].map(([label, value, icon], i) => (
@@ -248,7 +279,6 @@ const EditPopup = ({ user, onClose, onSaved }) => {
   const [form, setForm] = useState({
     Name: "",
     Member_ID: "",
-    Address: "",
     Age: "",
     Gender: "",
     Phone_Number: "",
@@ -261,6 +291,9 @@ const EditPopup = ({ user, onClose, onSaved }) => {
     Company_ID: "",
     Food: "",
     IsGiftReceived: false,
+    Self: "",
+    Travel_Mode: "",
+    Pickup_Location: "",
   });
 
   const [photoFile, setPhotoFile] = useState(null);
@@ -273,7 +306,6 @@ const EditPopup = ({ user, onClose, onSaved }) => {
     setForm({
       Name: user.name || "",
       Member_ID: user.userId || "",
-      Address: user.address || "",
       Age: user.age || "",
       Gender: user.gender || "",
       Phone_Number: user.phone || "",
@@ -285,6 +317,9 @@ const EditPopup = ({ user, onClose, onSaved }) => {
       Veg_Count: user.vegcount || "",
       Non_Veg_Count: user.nonvegcount || "",
       IsGiftReceived: user.isGiftReceived || false,
+      Self: user.self || "",
+      Travel_Mode: user.travelmode || "",
+      Pickup_Location: user.pickuplocation || "",
     });
   }, [user]);
 
@@ -301,6 +336,27 @@ const EditPopup = ({ user, onClose, onSaved }) => {
   const handleSave = async () => {
     setSaving(true);
     setError(null);
+    const totalPeople =
+      (Number(form.Self) || 0) +
+      (Number(form.Adult_Count) || 0) +
+      (Number(form.Children_Count) || 0);
+
+    const totalFood =
+      (Number(form.Veg_Count) || 0) + (Number(form.Non_Veg_Count) || 0);
+
+    if (totalPeople !== totalFood) {
+      setSaving(false);
+      setError(
+        `People count (${totalPeople}) must equal Food count (${totalFood}).`
+      );
+      return;
+    }
+
+    if (form.Travel_Mode === "Company Bus" && !form.Pickup_Location.trim()) {
+      setSaving(false);
+      setError("Pickup Location is required when Travel Mode is Company Bus.");
+      return;
+    }
 
     try {
       let uploadedPhoto = null;
@@ -323,7 +379,6 @@ const EditPopup = ({ user, onClose, onSaved }) => {
       const payload = {
         Name: form.Name,
         Member_ID: form.Member_ID,
-        Address: form.Address,
         Age: Number(form.Age) || 0,
         Gender: form.Gender,
         Phone_Number: form.Phone_Number ? Number(form.Phone_Number) : null,
@@ -339,18 +394,21 @@ const EditPopup = ({ user, onClose, onSaved }) => {
         Food: form.Food,
         IsWinned: form.IsWinned,
         IsGiftReceived: form.IsGiftReceived === true ? true : false,
+        Self: form.Self,
+        Travel_Mode: form.Travel_Mode,
+        Pickup_Location: form.Pickup_Location,
       };
 
-      if (uploadedPhoto) {
-        payload.Photo = uploadedPhoto.id;
-      }
+      if (uploadedPhoto) payload.Photo = uploadedPhoto.id;
 
       await axios.put(`https://api.regeve.in/api/event-forms/${user.userId}`, {
         data: payload,
       });
 
       setSaving(false);
-      onSaved();
+      onSaved(
+        uploadedPhoto ? `https://api.regeve.in${uploadedPhoto.url}` : null
+      );
     } catch (err) {
       console.error("Update error:", err);
       setSaving(false);
@@ -362,278 +420,269 @@ const EditPopup = ({ user, onClose, onSaved }) => {
 
   if (!user) return null;
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-md animate-fadeIn">
-      <div
-        className="absolute inset-0 bg-black/50 transition-opacity duration-300"
-        onClick={onClose}
-      ></div>
+  /* ----------------------------------------- */
+  /* ----------- UI RETURN BELOW ------------- */
+  /* ----------------------------------------- */
 
-      <div className="relative bg-white rounded-3xl shadow-2xl border border-gray-200 max-w-6xl w-full max-h-[95vh] overflow-y-auto animate-slideUp transform transition-all duration-300">
-        {/* Header */}
-        <div className="sticky top-0 z-10 flex justify-between items-center px-8 py-6 border-b border-gray-200 bg-gradient-to-r from-green-50 to-emerald-50 rounded-t-3xl">
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-fadeIn">
+      {/* BG overlay */}
+      <div
+        className="absolute inset-0 bg-black/60 transition-opacity"
+        onClick={onClose}
+      />
+
+      {/* Popup */}
+      <div className="relative bg-white rounded-3xl shadow-2xl border border-gray-200 max-w-6xl w-full max-h-[95vh] overflow-y-auto animate-slideUp">
+        {/* HEADER */}
+        <div className="sticky top-0 flex justify-between items-center px-8 py-6 bg-gradient-to-r from-green-100 to-green-50 border-b border-gray-200 rounded-t-3xl">
           <div>
-            <h2 className="text-3xl font-bold text-gray-800">
+            <h2 className="text-3xl font-bold text-gray-900">
               Edit Participant
             </h2>
-            <p className="text-gray-600  mt-1 text-lg">
+            <p className="text-gray-600 mt-1 text-lg">
               Update participant information
             </p>
           </div>
+
           <button
             onClick={onClose}
-            className="p-3 rounded-2xl cursor-pointer hover:bg-red-50 text-red-500 hover:text-red-600 transition-all duration-200 transform hover:scale-110 shadow-sm hover:shadow-md"
+            className="p-3 rounded-full hover:bg-red-100 text-red-600 transition-all duration-200"
           >
-            <FaTimes size={24} />
+            <FaTimes size={26} />
           </button>
         </div>
 
-        {/* Content */}
-        <div className="flex flex-col xl:flex-row gap-8 p-8">
-          {/* Left Side - Photo Upload */}
+        {/* CONTENT */}
+        <div className="flex flex-col xl:flex-row gap-10 p-8">
+          {/* LEFT SIDE */}
           <div className="w-full xl:w-1/3 flex flex-col items-center">
-            <div className="w-64 h-64 rounded-3xl overflow-hidden border-4 border-white shadow-2xl ring-4 ring-green-100 transform hover:scale-105 transition-transform duration-300">
+            {/* Profile Photo */}
+            <div className="w-60 h-60 rounded-3xl overflow-hidden shadow-xl ring-4 ring-green-200 border border-gray-100">
               <img
                 src={
-                  photoFile ? URL.createObjectURL(photoFile) : user.userImage
+                  photoFile ? URL.createObjectURL(photoFile) : `${user.userImage}?t=${Date.now()}`
+
                 }
-                className="w-full h-full object-cover"
                 alt="Profile"
+                className="w-full h-full object-cover"
               />
             </div>
 
-            {/* File Upload Section */}
+            {/* Photo Upload */}
             <div className="mt-8 w-full max-w-xs">
-              <label className="block text-lg font-semibold text-gray-700 mb-4 text-center">
+              <label className="block text-lg font-semibold text-gray-700 mb-3 text-center">
                 Update Profile Photo
               </label>
-              <div className="relative">
+
+              <label className="cursor-pointer block">
                 <input
                   type="file"
                   accept="image/*"
                   onChange={handleFile}
-                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                  id="photo-upload"
+                  className="hidden"
                 />
-                <label
-                  htmlFor="photo-upload"
-                  className="block w-full px-6 py-4 bg-gradient-to-r from-blue-500 to-blue-600 text-white text-center font-semibold rounded-2xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200 cursor-pointer"
-                >
+
+                <div className="px-6 py-4 bg-blue-600 hover:bg-blue-700 text-white text-center font-semibold rounded-2xl shadow-lg">
                   Choose New Photo
-                </label>
-              </div>
+                </div>
+              </label>
+
               {photoFile && (
-                <div className="mt-4 p-4 bg-green-50 rounded-2xl border border-green-200">
-                  <p className="text-green-700 font-medium text-center">
-                    Selected:{" "}
-                    <span className="font-bold">{photoFile.name}</span>
-                  </p>
-                  <p className="text-green-600 text-sm text-center mt-1">
-                    Photo will be updated when you save changes
+                <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-2xl">
+                  <p className="text-green-700 text-center font-medium">
+                    Selected: <b>{photoFile.name}</b>
                   </p>
                 </div>
               )}
             </div>
 
-            {/* Current Info Summary */}
-            <div className="mt-8 w-full max-w-xs">
-              <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-2xl p-6 shadow-lg border border-purple-100">
-                <h4 className="font-bold text-purple-800 text-lg mb-4 text-center">
-                  Current Summary
-                </h4>
-                <div className="space-y-3 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-purple-700">Adults:</span>
-                    <span className="font-semibold text-purple-900">
-                      {user.adultcount || 0}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-purple-700">Children:</span>
-                    <span className="font-semibold text-purple-900">
-                      {user.childrencount || 0}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-purple-700">Veg:</span>
-                    <span className="font-semibold text-purple-900">
-                      {user.vegcount || 0}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-purple-700">Non-Veg:</span>
-                    <span className="font-semibold text-purple-900">
-                      {user.nonvegcount || 0}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-            {/* Gift Received Toggle */}
-            <div className="flex mt-2  items-center justify-between px-9 py-4 bg-white rounded-2xl shadow-sm border border-gray-200 hover:shadow-md transition-all duration-200">
-              <label className="text-sm font-semibold text-gray-700 flex items-center">
-                <span className="text-lg mr-2">🎁</span>
-                Gift Received
-              </label>
+            {/* Gift Switch */}
+            <div className="mt-6 flex items-center justify-between w-full max-w-xs bg-white border border-gray-200 p-4 rounded-2xl shadow-sm">
+              <span className="text-gray-700 font-semibold flex items-center">
+                🎁 Gift Received
+              </span>
 
-              <label className="inline-flex items-center cursor-pointer">
+              <label className="flex items-center cursor-pointer">
                 <input
                   type="checkbox"
                   checked={form.IsGiftReceived}
                   onChange={(e) =>
-                    setForm((prev) => ({
-                      ...prev,
-                      IsGiftReceived: e.target.checked,
-                    }))
+                    setForm((p) => ({ ...p, IsGiftReceived: e.target.checked }))
                   }
                   className="hidden"
                 />
 
                 <div
-                  className={`w-14 h-7 flex items-center rounded-full p-1 transition-all duration-300 ${
+                  className={`w-14 h-7 rounded-full flex items-center p-1 transition ${
                     form.IsGiftReceived ? "bg-green-500" : "bg-gray-300"
                   }`}
                 >
                   <div
-                    className={`bg-white w-5 h-5 rounded-full shadow-md transform transition-transform duration-300 ${
+                    className={`bg-white w-6 h-6 rounded-full shadow-md transform transition ${
                       form.IsGiftReceived ? "translate-x-7" : "translate-x-0"
                     }`}
-                  />
+                  ></div>
                 </div>
-
-                <span
-                  className={`ml-3 text-sm font-medium ${
-                    form.IsGiftReceived ? "text-green-600" : "text-gray-500"
-                  }`}
-                >
-                  {form.IsGiftReceived ? "Received" : "Pending"}
-                </span>
               </label>
             </div>
           </div>
 
-          {/* Right Side - Form */}
+          {/* RIGHT SIDE FORM */}
           <div className="flex-1">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {[
                 ["Full Name", "Name", "text", "👤"],
-                ["Member ID", "Member_ID", "text", "🆔"],
+                ["Member ID", "Member_ID", "text", "🆔", true],
                 ["Phone Number", "Phone_Number", "tel", "📞"],
                 ["WhatsApp Number", "WhatsApp_Number", "tel", "💬"],
                 ["Email Address", "Email", "email", "📧"],
-                ["Company ID", "Company_ID", "text", "🏢"],
+                ["Company ID", "Company_ID", "text", "🏢", true],
                 ["Age", "Age", "number", "🎂"],
-                ["Gender", "Gender", "text", "⚥"],
+                ["Gender", "Gender", "select", "⚥"],
+                ["Travel Mode", "Travel_Mode", "select", "🚌"],
+
+                ...(form.Travel_Mode === "Company Bus"
+                  ? [["Pickup Location", "Pickup_Location", "text", "📍"]]
+                  : []),
+
+                ["Self", "Self", "text", "👥", true],
                 ["Adult Count", "Adult_Count", "number"],
                 ["Children Count", "Children_Count", "number"],
                 ["Veg Count", "Veg_Count", "number", "🥗"],
                 ["Non-Veg Count", "Non_Veg_Count", "number", "🍗"],
-              ].map(([label, field, type, icon]) => (
-                <div key={field} className="group">
-                  <label className="flex items-center text-sm font-semibold text-gray-700 mb-2">
-                    <span className="text-lg mr-2">{icon}</span>
+              ].map(([label, field, type, icon, readOnly]) => (
+                <div key={field}>
+                  <label className="flex items-center text-sm font-semibold mb-2 text-gray-700">
+                    <span className="mr-2 text-lg">{icon}</span>
                     {label}
                   </label>
-                  <input
-                    type={type}
-                    name={field}
-                    value={form[field]}
-                    onChange={handleChange}
-                    className="w-full border-2 border-gray-200 px-4 py-3.5 rounded-2xl shadow-sm focus:ring-4 focus:ring-blue-200 focus:border-blue-500 transition-all duration-200 group-hover:border-blue-300"
-                    placeholder={`Enter ${label.toLowerCase()}`}
-                  />
+
+                  {field === "Gender" ? (
+                    <SelectBox
+                      name="Gender"
+                      value={form.Gender}
+                      onChange={handleChange}
+                      options={["Male", "Female", "Others"]}
+                    />
+                  ) : field === "Travel_Mode" ? (
+                    <SelectBox
+                      name="Travel_Mode"
+                      value={form.Travel_Mode}
+                      onChange={handleChange}
+                      options={["Self", "Company Bus"]}
+                    />
+                  ) : (
+                    <input
+                      type={type}
+                      name={field}
+                      disabled={readOnly}
+                      value={form[field]}
+                      onChange={readOnly ? undefined : handleChange}
+                      className={`w-full px-4 py-3.5 rounded-2xl border-2 shadow-sm transition ${
+                        readOnly
+                          ? "bg-gray-100 border-gray-300 cursor-not-allowed"
+                          : "border-gray-200 focus:ring-4 focus:ring-blue-200 focus:border-blue-500"
+                      }`}
+                      placeholder={`Enter ${label}`}
+                    />
+                  )}
                 </div>
               ))}
-
-              {/* Address - Full Width */}
-              <div className="lg:col-span-2 group">
-                <label className="flex items-center text-sm font-semibold text-gray-700 mb-2">
-                  <span className="text-lg mr-2">🏠</span>
-                  Address
-                </label>
-                <textarea
-                  name="Address"
-                  value={form.Address}
-                  onChange={handleChange}
-                  className="w-full border-2 border-gray-200 px-4 py-3.5 rounded-2xl shadow-sm focus:ring-4 focus:ring-blue-200 focus:border-blue-500 transition-all duration-200 group-hover:border-blue-300 resize-vertical"
-                  rows={4}
-                  placeholder="Enter complete address"
-                ></textarea>
-              </div>
             </div>
 
-            {/* Error Message */}
+            {/* Error */}
             {error && (
-              <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-2xl animate-shake">
-                <p className="text-red-700 font-medium text-center">{error}</p>
+              <div className="mt-6 p-4 bg-red-50 text-red-700 border border-red-200 rounded-xl text-center font-medium">
+                {error}
               </div>
             )}
 
-            {/* Action Buttons */}
-            <div className="mt-8 flex flex-col sm:flex-row gap-4 justify-end pt-6 border-t border-gray-200">
+            {/* Buttons */}
+            <div className="mt-10 flex justify-end gap-4 border-t pt-6">
               <button
                 onClick={onClose}
                 disabled={saving}
-                className="px-8 py-3.5 bg-gradient-to-r cursor-pointer from-gray-500 to-gray-600 text-white font-semibold rounded-2xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200 disabled:opacity-50 disabled:transform-none disabled:cursor-not-allowed"
+                className="px-8 py-3.5 bg-gray-600 hover:bg-gray-700 text-white font-semibold rounded-2xl shadow-md transition disabled:opacity-50"
               >
                 Cancel
               </button>
+
               <button
                 onClick={handleSave}
                 disabled={saving}
-                className="px-8 py-3.5 bg-gradient-to-r cursor-pointer from-green-500 to-green-600 text-white font-semibold rounded-2xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200 disabled:opacity-50 disabled:transform-none disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                className="px-8 py-3.5 bg-gradient-to-r from-green-500 to-green-600 text-white font-semibold rounded-2xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200 cursor-pointer disabled:opacity-50 disabled:transform-none disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {saving ? (
-                  <>
-                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    Updating...
-                  </>
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                 ) : (
-                  <>
-                    <FaEdit className="w-4 h-4" />
-                    Update Participant
-                  </>
+                  <FaEdit />
                 )}
+                {saving ? "Updating..." : "Update Participant"}
               </button>
             </div>
           </div>
         </div>
       </div>
 
+      {/* Animations */}
       <style>{`
-        .animate-fadeIn { animation: fadeIn 0.3s ease-out; }
-        .animate-slideUp { animation: slideUp 0.4s ease-out; }
-        .animate-shake { animation: shake 0.5s ease-in-out; }
+        .animate-fadeIn { animation: fadeIn 0.25s ease-out; }
+        .animate-slideUp { animation: slideUp 0.35s ease-out; }
+
         @keyframes fadeIn {
           from { opacity: 0; }
           to { opacity: 1; }
         }
+
         @keyframes slideUp {
-          0% { transform: translateY(30px) scale(0.9); opacity: 0; }
-          100% { transform: translateY(0) scale(1); opacity: 1; }
-        }
-        @keyframes shake {
-          0%, 100% { transform: translateX(0); }
-          25% { transform: translateX(-5px); }
-          75% { transform: translateX(5px); }
+          0% { opacity: 0; transform: translateY(20px); }
+          100% { opacity: 1; transform: translateY(0); }
         }
       `}</style>
     </div>
   );
 };
+
+/* SMALL COMPONENTS */
+const SummaryRow = ({ label, value }) => (
+  <div className="flex justify-between">
+    <span className="text-purple-700">{label}:</span>
+    <span className="font-semibold text-purple-900">{value || 0}</span>
+  </div>
+);
+
+const SelectBox = ({ name, value, onChange, options }) => (
+  <select
+    name={name}
+    value={value}
+    onChange={onChange}
+    className="w-full border-2 border-gray-200 px-4 py-3.5 rounded-2xl shadow-sm bg-white focus:ring-4 focus:ring-blue-200 focus:border-blue-500 transition"
+  >
+    <option value="">Select {name.replace("_", " ")}</option>
+    {options.map((v) => (
+      <option key={v} value={v}>
+        {v}
+      </option>
+    ))}
+  </select>
+);
+
 // Dashboard.jsx
 
 const Dashboard = () => {
   // ----------------------------- STATES -----------------------------
   const [users, setUsers] = useState([]);
   const [dashboardData, setDashboardData] = useState({
-    totalUsers: 0,
+    totalRegisteredUsers: 0,
     totalMembers: 0,
     totalNonVeg: 0,
     totalVeg: 0,
     totalGifts: 0,
     totalForms: 0, // ➕ added
     totalPresent: 0,
+    verifiedNotPresentVeg: 0,
+    verifiedNotPresentNonVeg: 0,
   });
 
   const [searchTerm, setSearchTerm] = useState("");
@@ -656,7 +705,9 @@ const Dashboard = () => {
   // ----------------------------- FETCH API -----------------------------
   const fetchData = async () => {
     try {
-      const response = await axios.get("https://api.regeve.in/api/event-forms");
+      const response = await axios.get(
+        "https://api.regeve.in/api/event-forms?populate=*&fields=*"
+      );
       const data = response.data?.data || [];
 
       const formatted = data.map((item) => ({
@@ -671,21 +722,23 @@ const Dashboard = () => {
         phone: item.Phone_Number,
         whatsapp: item.WhatsApp_Number,
         email: item.Email,
-        address: item.Address,
         companyId: item.Company_ID,
-
+        pickuplocation: item.Pickup_Location,
+        travelmode: item.Travel_Mode,
+        self: item.Self,
         adultcount: Number(item.Adult_Count) || 0,
         childrencount: Number(item.Children_Count) || 0,
         vegcount: Number(item.Veg_Count) || 0,
         nonvegcount: Number(item.Non_Veg_Count) || 0,
-
         isPresent: item.IsPresent === true,
         IsVerified_Member: item.IsVerified_Member === true,
-
         isGiftReceived:
           item.IsGiftReceived === true ||
           item.IsGiftReceived === 1 ||
           item.IsGiftReceived === "true",
+        registrationDate: item.createdAt,
+        updatedDate: item.updatedAt,
+        checkInTime: item.CheckIn_Time || null, // safe (if doesn't exist)
 
         raw: item,
       }));
@@ -695,8 +748,10 @@ const Dashboard = () => {
       // -----------------------------
       // TOTAL REGISTERED USERS
       // -----------------------------
+      const totalRegisteredUsers = formatted.length;
+
       // ONLY VERIFIED USERS ARE COUNTED AS REGISTERED
-      const totalRegistered = formatted.filter(
+      const totalAdminverfied = formatted.filter(
         (u) => u.IsVerified_Member === true
       ).length;
 
@@ -704,6 +759,22 @@ const Dashboard = () => {
       // PRESENT USERS ONLY
       // -----------------------------
       const presentUsers = formatted.filter((u) => u.isPresent);
+
+      // VERIFIED BUT NOT PRESENT (THIS WAS MISSING)
+      const verifiedNotPresent = formatted.filter(
+        (u) => u.IsVerified_Member === true && u.isPresent === false
+      );
+
+      // FOOD COUNTS FOR VERIFIED NOT PRESENT
+      const verifiedNotPresentVeg = verifiedNotPresent.reduce(
+        (sum, u) => sum + u.vegcount,
+        0
+      );
+
+      const verifiedNotPresentNonVeg = verifiedNotPresent.reduce(
+        (sum, u) => sum + u.nonvegcount,
+        0
+      );
 
       // -----------------------------
       // GIFTS
@@ -736,13 +807,16 @@ const Dashboard = () => {
 
       // UPDATE DASHBOARD
       setDashboardData({
-        totalRegistered,
+        totalRegisteredUsers,
+        totalAdminverfied,
         totalAttendees,
         totalAdults,
         totalChildren,
         totalVeg,
         totalNonVeg,
         totalGifts,
+        verifiedNotPresentVeg,
+        verifiedNotPresentNonVeg,
       });
     } catch (err) {
       console.log("API Error:", err);
@@ -812,9 +886,18 @@ const Dashboard = () => {
   };
 
   // Called by EditPopup on successful save
-  const handleAfterEdit = async () => {
+  const handleAfterEdit = async (newPhotoUrl) => {
     setEditUser(null);
-    await fetchData(); // refresh table after edit
+    if (newPhotoUrl) {
+      setUsers((prev) =>
+        prev.map((u) =>
+          u.id === editUser.id ? { ...u, userImage: newPhotoUrl } : u
+        )
+      );
+    }
+
+    // 2) After updating UI, fetch actual updated data
+    fetchData(); // refresh table after edit
   };
 
   const handleCloseView = () => {
@@ -863,7 +946,7 @@ const Dashboard = () => {
       </div>
 
       {/* ---------------- STATS CARDS (LIVE DATA INSERTED) ---------------- */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 mb-8">
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-3 mb-8">
         {/* TOTAL REGISTERED USERS */}
         <div className="bg-gradient-to-br from-white to-blue-50 rounded-3xl p-6 shadow-2xl border border-blue-100 transform hover:scale-105 transition-all duration-300">
           <div className="flex items-start justify-between">
@@ -875,14 +958,53 @@ const Dashboard = () => {
                   </div>
                   <div>
                     <p className="text-blue-600 font-semibold text-lg">
-                      Registered Users
+                      Admin Verified Users
                     </p>
                     <h3 className="text-4xl font-bold text-gray-800 mt-1">
-                      {dashboardData.totalRegistered}
+                      {dashboardData.totalAdminverfied}
                     </h3>
                   </div>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+        {/* VERIFIED NOT PRESENT - FOOD COUNT */}
+        <div className="bg-gradient-to-br from-white to-orange-50 rounded-3xl p-6 shadow-2xl border border-orange-200 transform hover:scale-105 transition-all duration-300">
+          <div className="flex items-center space-x-4 mb-4">
+            <div className="p-4 bg-orange-500/20 rounded-2xl shadow-inner">
+              <FaUtensils className="text-orange-600 text-2xl" />
+            </div>
+
+            <div>
+              <p className="text-orange-600 font-semibold text-lg">
+                Food Count (Admin Verified, Not Present)
+              </p>
+              <h3 className="text-xl font-bold text-gray-800 mt-1 animate-pulse">
+                {dashboardData.verifiedNotPresentVeg +
+                  dashboardData.verifiedNotPresentNonVeg}{" "}
+                Head
+              </h3>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-6 mt-6">
+            {/* Veg Count */}
+            <div className="bg-white/80 rounded-2xl p-4 shadow-lg border border-green-200 text-center">
+              <span className="text-3xl">🥗</span>
+              <p className="text-2xl font-bold text-green-700 mt-2">
+                {dashboardData.verifiedNotPresentVeg}
+              </p>
+              <p className="text-sm text-green-700 font-medium">Veg</p>
+            </div>
+
+            {/* Non-Veg Count */}
+            <div className="bg-white/80 rounded-2xl p-4 shadow-lg border border-red-200 text-center">
+              <span className="text-3xl">🍗</span>
+              <p className="text-2xl font-bold text-red-700 mt-2">
+                {dashboardData.verifiedNotPresentNonVeg}
+              </p>
+              <p className="text-sm text-red-700 font-medium">Non-Veg</p>
             </div>
           </div>
         </div>
@@ -928,10 +1050,10 @@ const Dashboard = () => {
                         stroke="url(#blueGradient)"
                         strokeWidth="3"
                         strokeDasharray={`${
-                          dashboardData.totalRegistered === 0
+                          dashboardData.totalAdminverfied === 0
                             ? 0
                             : (dashboardData.totalAttendees /
-                                dashboardData.totalRegistered) *
+                                dashboardData.totalAdminverfied) *
                               100
                         }, 100`}
                         className="transition-all duration-1000 ease-out"
@@ -955,11 +1077,11 @@ const Dashboard = () => {
                   {/* Percentage */}
                   <div className="absolute inset-0 flex items-center justify-center">
                     <span className="text-sm font-bold text-blue-600">
-                      {dashboardData.totalRegistered === 0
+                      {dashboardData.totalAdminverfied === 0
                         ? 0
                         : (
                             (dashboardData.totalAttendees /
-                              dashboardData.totalRegistered) *
+                              dashboardData.totalAdminverfied) *
                             100
                           ).toFixed(0)}
                       %
@@ -971,7 +1093,7 @@ const Dashboard = () => {
               {/* Capacity label */}
               <p className="text-sm text-gray-600 text-center">
                 Capacity • {dashboardData.totalAttendees}/
-                {dashboardData.totalRegistered}
+                {dashboardData.totalAdminverfied}
               </p>
             </div>
           </div>
@@ -988,8 +1110,9 @@ const Dashboard = () => {
                   <p className="text-green-600 font-semibold text-lg">
                     Food Distribution
                   </p>
-                  <h3 className="text-4xl font-bold text-gray-800 mt-1 animate-pulse">
-                    {dashboardData.totalAdults + dashboardData.totalChildren}
+                  <h3 className="text-xl font-bold text-gray-800 mt-1 animate-pulse">
+                    {dashboardData.totalAdults + dashboardData.totalChildren}{" "}
+                    Head
                   </h3>
                 </div>
               </div>
@@ -1132,7 +1255,7 @@ const Dashboard = () => {
           <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-8">
             <div className="mb-6 lg:mb-0">
               <h2 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
-                Participant Management
+                Participant Management ({dashboardData.totalRegisteredUsers})
               </h2>
               <p className="text-gray-500 mt-2 text-lg">
                 Manage and track all event participants in real-time
@@ -1215,7 +1338,7 @@ const Dashboard = () => {
                             <div className="w-12 h-12 bg-gradient-to-br from-gray-100 to-gray-200 rounded-xl flex items-center justify-center shadow-inner">
                               <span className="w-8 h-8 rounded-full">
                                 <img
-                                  src={user.userImage}
+                                  src={`${user.userImage}?t=${Date.now()}`}
                                   alt={user.name}
                                   className="w-8 h-8 rounded-full object-cover"
                                 />

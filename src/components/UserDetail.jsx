@@ -314,7 +314,8 @@ const UserDetail = () => {
   const getTotalGuests = () => {
     const adults = parseInt(getFieldValue("Adult_Count") || 0);
     const children = parseInt(getFieldValue("Children_Count") || 0);
-    return adults + children; // ✅ This is correct
+    const self = parseInt(getFieldValue("Self") || 1);
+    return adults + children + self; // ✅ This is correct
   };
 
   // ADD THIS MISSING FUNCTION
@@ -601,7 +602,7 @@ const UserDetail = () => {
         Phone_Number: editedMember.Phone_Number?.trim(),
         WhatsApp_Number: editedMember.WhatsApp_Number?.trim(),
         Email: editedMember.Email?.trim(),
-        Address: editedMember.Address?.trim(),
+        Self: editedMember.Self?.trim() || 1,
         Adult_Count: editedMember.Adult_Count,
         Children_Count: editedMember.Children_Count,
         Veg_Count: editedMember.Veg_Count,
@@ -701,7 +702,9 @@ const UserDetail = () => {
                 >
                   {member.Photo?.url && !imageError ? (
                     <img
-                      src={`https://api.regeve.in${member.Photo.url}`}
+                      src={`https://api.regeve.in${
+                        member.Photo.url
+                      }?t=${Date.now()}`}
                       alt="Profile"
                       className="w-28 h-28 object-cover rounded-full border-4 border-indigo-200 shadow-md"
                       onError={() => setImageError(true)}
@@ -870,6 +873,14 @@ const UserDetail = () => {
                   icon={FaUsers}
                   iconColor="text-teal-600"
                   iconBgColor="bg-teal-100"
+                  label="Self"
+                  value={getFieldValue("Self")}
+                  isEditing={false} // 🔒 ALWAYS non-editable
+                />
+                <CountInputCard
+                  icon={FaUsers}
+                  iconColor="text-teal-600"
+                  iconBgColor="bg-teal-100"
                   label="Adults"
                   value={getFieldValue("Adult_Count")}
                   isEditing={isEditing}
@@ -972,53 +983,7 @@ const UserDetail = () => {
                 </div>
               </div>
             </div>
-
-            {/* Personal Info */}
-            <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100">
-              <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center">
-                <FaUser className="mr-3 text-indigo-600" />
-                Personal Details
-              </h2>
-
-              <div className="space-y-4">
-                <EditableField
-                  label="Age"
-                  value={getFieldValue("Age")}
-                  fieldName="Age"
-                  isEditing={isEditing}
-                  onFieldChange={handleFieldChange}
-                  type="number"
-                  placeholder="Enter age"
-                  min="0"
-                  max="120"
-                  validation={validateAge}
-                />
-
-                <EditableField
-                  label="Gender"
-                  value={getFieldValue("Gender")}
-                  fieldName="Gender"
-                  isEditing={isEditing}
-                  onFieldChange={handleFieldChange}
-                  options={[
-                    { value: "", label: "Select gender" },
-                    { value: "Male", label: "Male" },
-                    { value: "Female", label: "Female" },
-                    { value: "Other", label: "Other" },
-                  ]}
-                />
-
-                <EditableField
-                  label="Company ID"
-                  value={getFieldValue("Company_ID")}
-                  fieldName="Company_ID"
-                  isEditing={isEditing}
-                  onFieldChange={handleFieldChange}
-                  placeholder="Enter Company ID"
-                  validation={validateCompanyId}
-                />
-              </div>
-            </div>
+            
           </div>
 
           {/* RIGHT SIDE */}
@@ -1033,7 +998,6 @@ const UserDetail = () => {
                 icon={FaPhoneAlt}
                 label="Phone Number"
                 value={getFieldValue("Phone_Number")}
-                onClick={() => handleCall(getFieldValue("Phone_Number"))}
                 buttonText="Call"
                 iconColor="text-indigo-600"
                 isEditing={isEditing}
@@ -1049,7 +1013,6 @@ const UserDetail = () => {
                 icon={FaWhatsapp}
                 label="WhatsApp Number"
                 value={getFieldValue("WhatsApp_Number")}
-                onClick={() => handleWhatsApp(getFieldValue("WhatsApp_Number"))}
                 buttonText="WhatsApp"
                 iconColor="text-green-600"
                 isEditing={isEditing}
@@ -1065,7 +1028,6 @@ const UserDetail = () => {
                 icon={FaEnvelope}
                 label="Email Address"
                 value={getFieldValue("Email")}
-                onClick={() => handleEmail(getFieldValue("Email"))}
                 buttonText="Email"
                 iconColor="text-indigo-600"
                 isEditing={isEditing}
@@ -1075,19 +1037,6 @@ const UserDetail = () => {
                 placeholder="name@company.com"
                 validation={validateEmail}
                 actionDisabled={!getFieldValue("Email")}
-              />
-
-              <ContactDetailItem
-                icon={FaMapMarkerAlt}
-                label="Address"
-                value={getFieldValue("Address")}
-                iconColor="text-indigo-600"
-                isEditing={isEditing}
-                fieldName="Address"
-                onFieldChange={handleFieldChange}
-                type="text"
-                placeholder="Enter full address"
-                actionDisabled={true}
               />
             </div>
           </div>
