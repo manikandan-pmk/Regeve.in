@@ -22,12 +22,14 @@ import PrivacyPolicy from './components/PrivacyPolicy';
 import RegisterForm from './pages/Auth/RegisterForm';
 import MemberDashBoard from './pages/Scan/MemberDashBoard';
 import QRCodeForm from './components/QRCodeFom/QRCodeForm';
+import GiftStatusPage from './pages/GiftStatusPage';
 
 export default function App() {
   const location = useLocation();
 
   const hideLayout =
     location.pathname === "/event-form" ||
+    location.pathname === "/giftstatus" ||
     location.pathname === "/eventform-qr" ||
     location.pathname === "/scanDashboard" ||
     location.pathname === "/luckydraw" ||
@@ -58,6 +60,8 @@ export default function App() {
         <Route path='/privacy' element={<PrivacyPolicy />} />
         <Route path="/scanDashboard" element={<MemberDashBoard/>}/>
         <Route path='/eventform-qr'element={<QRCodeForm/>}/>
+        <Route path='/giftstatus'element={<GiftStatusPage/>}/>
+
       </Routes>
 
       {!hideLayout && <Footer />}

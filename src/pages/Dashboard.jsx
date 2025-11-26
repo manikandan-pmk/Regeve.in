@@ -57,7 +57,7 @@ const ViewPopup = ({ user, onClose }) => {
           <div className="w-full xl:w-1/3 flex flex-col items-center">
             <div className="w-64 h-64 rounded-3xl overflow-hidden border-4 border-white shadow-2xl ring-4 ring-blue-100">
               <img
-                src={user.userImage}
+                src={`${user.userImage}?t=${Date.now()}`}
                 className="w-full h-full object-cover"
                 alt="Profile"
               />
@@ -939,6 +939,7 @@ const Dashboard = () => {
           item.IsGiftReceived === 1 ||
           item.IsGiftReceived === "true",
         IsVerified_Member: item.IsVerified_Member === true,
+        self: Number(item.Self) || 1,
       }));
 
       const totalAdminverfied = formatted.filter(
@@ -946,9 +947,10 @@ const Dashboard = () => {
       ).length;
 
       const presentUsers = formatted.filter((u) => u.isPresent);
+      const totalSelf = presentUsers.reduce((sum, u) => sum + (u.self || 0), 0);
 
       const verifiedNotPresent = formatted.filter(
-        (u) => u.IsVerified_Member === true && u.isPresent === false
+        (u) => u.IsVerified_Member === true
       );
 
       const verifiedNotPresentVeg = verifiedNotPresent.reduce(
@@ -985,6 +987,7 @@ const Dashboard = () => {
 
       setDashboardData((prev) => ({
         ...prev,
+        totalSelf,
         totalAdminverfied,
         totalAttendees,
         totalAdults,
@@ -1031,6 +1034,7 @@ const Dashboard = () => {
 
   const handleEdit = (user) => {
     setEditUser(user);
+    fetchData();
   };
 
   // Called by EditPopup on successful save
@@ -1091,40 +1095,62 @@ const Dashboard = () => {
       </div>
 
       {/* ---------------- STATS CARDS (LIVE DATA INSERTED) ---------------- */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-3 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-5 gap-5 mb-8 overflow-visible">
         {/* TOTAL REGISTERED USERS */}
-        <div className="bg-gradient-to-br from-white to-blue-50 rounded-3xl p-6 shadow-2xl border border-blue-100 transform hover:scale-105 transition-all duration-300">
-          <div className="flex items-start justify-between">
-            <div className="flex-1">
-              <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center space-x-4">
-                  <div className="p-4 bg-blue-500/20 rounded-2xl shadow-inner">
-                    <FaUsers className="text-blue-600 text-2xl" />
-                  </div>
-                  <div>
-                    <p className="text-blue-600 font-semibold text-lg">
-                      Admin Verified Users
-                    </p>
-                    <h3 className="text-4xl font-bold text-gray-800 mt-1">
-                      {dashboardData.totalAdminverfied}
-                    </h3>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-        {/* VERIFIED NOT PRESENT - FOOD COUNT */}
-        <div className="bg-gradient-to-br from-white to-orange-50 rounded-3xl p-6 shadow-2xl border border-orange-200 transform hover:scale-105 transition-all duration-300">
-          <div className="flex items-center space-x-4 mb-4">
-            <div className="p-4 bg-orange-500/20 rounded-2xl shadow-inner">
-              <FaUtensils className="text-orange-600 text-2xl" />
+        <div
+          className="bg-gradient-to-br from-white to-blue-50 rounded-3xl p-6 shadow-2xl 
+                  border border-blue-100 transform transform-gpu hover:scale-105 
+                  transition-all duration-300 flex flex-col justify-between"
+        >
+          <div className="flex items-start space-x-4">
+            <div className="p-4 bg-blue-500/20 rounded-2xl shadow-inner">
+              <FaUsers className="text-blue-600 text-xl" />
             </div>
 
             <div>
-              <p className="text-orange-600 font-semibold text-lg">
+              <p className="text-blue-600 font-semibold text-base">
+                Admin Verified Users
+              </p>
+              <h3 className="text-3xl font-bold text-gray-800 mt-1">
+                {dashboardData.totalAdminverfied}
+              </h3>
+            </div>
+          </div>
+
+          <div className="mt-6">
+            <button
+              onClick={() => {
+                const link = document.createElement("a");
+                link.href =
+                  "https://api.regeve.in/api/event-forms/export-verified";
+                link.setAttribute("download", "verified-users.xlsx");
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+              }}
+              className="px-2 py-1 ml-12 bg-gray-600 text-white rounded-xl shadow-lg text-sm font-semibold"
+            >
+              📄 Export
+            </button>
+          </div>
+        </div>
+
+        {/* VERIFIED NOT PRESENT - FOOD COUNT */}
+        <div
+          className="bg-gradient-to-br from-white to-orange-50 rounded-3xl p-6 shadow-2xl 
+                  border border-orange-200 transform transform-gpu hover:scale-105 
+                  transition-all duration-300"
+        >
+          <div className="flex items-center space-x-4 mb-4">
+            <div className="p-4 bg-orange-500/20 rounded-2xl shadow-inner">
+              <FaUtensils className="text-orange-600 text-xl" />
+            </div>
+
+            <div>
+              <p className="text-orange-600 font-semibold text-base">
                 Food Count (Admin Verified, Not Present)
               </p>
+
               <h3 className="text-xl font-bold text-gray-800 mt-1 animate-pulse">
                 {dashboardData.verifiedNotPresentVeg +
                   dashboardData.verifiedNotPresentNonVeg}{" "}
@@ -1134,135 +1160,149 @@ const Dashboard = () => {
           </div>
 
           <div className="grid grid-cols-2 gap-6 mt-6">
-            {/* Veg Count */}
             <div className="bg-white/80 rounded-2xl p-4 shadow-lg border border-green-200 text-center">
-              <span className="text-3xl">🥗</span>
-              <p className="text-2xl font-bold text-green-700 mt-2">
+              <span className="text-2xl">🥗</span>
+              <p className="text-xl font-bold text-green-700 mt-2">
                 {dashboardData.verifiedNotPresentVeg}
               </p>
-              <p className="text-sm text-green-700 font-medium">Veg</p>
+              <p className="text-xs text-green-700 font-medium">Veg</p>
             </div>
 
-            {/* Non-Veg Count */}
             <div className="bg-white/80 rounded-2xl p-4 shadow-lg border border-red-200 text-center">
-              <span className="text-3xl">🍗</span>
-              <p className="text-2xl font-bold text-red-700 mt-2">
+              <span className="text-2xl">🍗</span>
+              <p className="text-xl font-bold text-red-700 mt-2">
                 {dashboardData.verifiedNotPresentNonVeg}
               </p>
-              <p className="text-sm text-red-700 font-medium">Non-Veg</p>
+              <p className="text-xs text-red-700 font-medium">Non-Veg</p>
             </div>
           </div>
         </div>
 
-        {/* TOTAL ATTENDEES WITH CIRCLE PROGRESS — DYNAMIC CAPACITY */}
-        <div className="bg-gradient-to-br from-white to-blue-50 rounded-3xl p-6 shadow-2xl border border-blue-100 transform hover:scale-105 transition-all duration-300">
+        {/* TOTAL ATTENDEES WITH CIRCLE PROGRESS */}
+        <div
+          className="bg-gradient-to-br from-white to-blue-50 rounded-3xl p-6 shadow-2xl 
+                  border border-blue-100 transform transform-gpu hover:scale-105 
+                  transition-all duration-300 flex flex-col justify-between"
+        >
           <div className="flex items-start justify-between">
-            <div className="flex-1">
-              <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center space-x-4">
-                  <div className="p-4 bg-blue-500/20 rounded-2xl shadow-inner">
-                    <FaUsers className="text-blue-600 text-2xl" />
-                  </div>
-                  <div>
-                    <p className="text-blue-600 font-semibold text-lg">
-                      Total Attendees
-                    </p>
-                    <h3 className="text-4xl font-bold text-gray-800 mt-1">
-                      {dashboardData.totalAttendees}
-                    </h3>
-                  </div>
+            <div>
+              <div className="flex items-center space-x-4">
+                <div className="p-4 bg-blue-500/20 rounded-2xl shadow-inner">
+                  <FaUsers className="text-blue-600 text-xl" />
                 </div>
 
-                {/* Circle Progress */}
-                <div className="relative">
-                  <div className="w-20 h-20 rounded-full flex items-center justify-center">
-                    <svg
-                      className="w-20 h-20 transform -rotate-90"
-                      viewBox="0 0 36 36"
-                    >
-                      {/* Background circle */}
-                      <path
-                        d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                        fill="none"
-                        stroke="#E5E7EB"
-                        strokeWidth="3"
-                      />
-
-                      {/* Progress circle */}
-                      <path
-                        d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                        fill="none"
-                        stroke="url(#blueGradient)"
-                        strokeWidth="3"
-                        strokeDasharray={`${
-                          dashboardData.totalAdminverfied === 0
-                            ? 0
-                            : (dashboardData.totalAttendees /
-                                dashboardData.totalAdminverfied) *
-                              100
-                        }, 100`}
-                        className="transition-all duration-1000 ease-out"
-                      />
-
-                      <defs>
-                        <linearGradient
-                          id="blueGradient"
-                          x1="0%"
-                          y1="0%"
-                          x2="100%"
-                          y2="0%"
-                        >
-                          <stop offset="0%" stopColor="#3B82F6" />
-                          <stop offset="100%" stopColor="#1D4ED8" />
-                        </linearGradient>
-                      </defs>
-                    </svg>
-                  </div>
-
-                  {/* Percentage */}
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <span className="text-sm font-bold text-blue-600">
-                      {dashboardData.totalAdminverfied === 0
-                        ? 0
-                        : (
-                            (dashboardData.totalAttendees /
-                              dashboardData.totalAdminverfied) *
-                            100
-                          ).toFixed(0)}
-                      %
-                    </span>
-                  </div>
+                <div>
+                  <p className="text-blue-600 font-semibold text-base">
+                    Total Attendees
+                  </p>
+                  <h3 className="text-3xl font-bold text-gray-800 mt-1">
+                    {dashboardData.totalAttendees}
+                  </h3>
                 </div>
               </div>
-
-              {/* Capacity label */}
-              <p className="text-sm text-gray-600 text-center">
-                Capacity • {dashboardData.totalAttendees}/
-                {dashboardData.totalAdminverfied}
-              </p>
             </div>
+
+            {/* FIXED CIRCLE PROGRESS INSIDE CARD */}
+            <div className="relative flex items-center justify-center w-20 h-20 shrink-0">
+              <svg
+                className="w-16 h-16 transform -rotate-90"
+                viewBox="0 0 36 36"
+              >
+                <path
+                  d="M18 2.0845 a15.9155 15.9155 0 0 1 0 31.831 a15.9155 15.9155 0 0 1 0 -31.831"
+                  fill="none"
+                  stroke="#E5E7EB"
+                  strokeWidth="3"
+                />
+                <path
+                  d="M18 2.0845 a15.9155 15.9155 0 0 1 0 31.831 a15.9155 15.9155 0 0 1 0 -31.831"
+                  fill="none"
+                  stroke="url(#blueGradient)"
+                  strokeWidth="3"
+                  strokeDasharray={`${
+                    dashboardData.totalAdminverfied === 0
+                      ? 0
+                      : (dashboardData.totalAttendees /
+                          dashboardData.totalAdminverfied) *
+                        100
+                  }, 100`}
+                  className="transition-all duration-1000 ease-out"
+                />
+
+                <defs>
+                  <linearGradient
+                    id="blueGradient"
+                    x1="0%"
+                    y1="0%"
+                    x2="100%"
+                    y2="0%"
+                  >
+                    <stop offset="0%" stopColor="#3B82F6" />
+                    <stop offset="100%" stopColor="#1D4ED8" />
+                  </linearGradient>
+                </defs>
+              </svg>
+
+              <div className="absolute text-xs font-bold text-blue-700">
+                {dashboardData.totalAdminverfied === 0
+                  ? 0
+                  : (
+                      (dashboardData.totalAttendees /
+                        dashboardData.totalAdminverfied) *
+                      100
+                    ).toFixed(0)}
+                %
+              </div>
+            </div>
+          </div>
+
+          <p className="text-xs text-gray-600 text-center mt-4">
+            Capacity • {dashboardData.totalAttendees}/
+            {dashboardData.totalAdminverfied}
+          </p>
+
+          <div className="mt-6">
+            <button
+              onClick={() => {
+                const link = document.createElement("a");
+                link.href =
+                  "https://api.regeve.in/api/event-forms/export-present";
+                link.setAttribute("download", "present-users.xlsx");
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+              }}
+              className="px-2 py-1 ml-12 bg-gray-600 text-white rounded-xl shadow-lg text-sm font-semibold"
+            >
+              📄 Export
+            </button>
           </div>
         </div>
 
-        <div className="bg-gradient-to-br from-white to-green-50 rounded-3xl p-6 shadow-2xl border border-green-100 transform hover:scale-105 transition-all duration-300">
+        <div className="bg-gradient-to-br transform-gpu from-white to-green-50 rounded-3xl p-6 shadow-2xl border border-green-100 transform hover:scale-105 transition-all duration-300">
           <div className="flex items-start justify-between">
             <div className="flex-1">
               <div className="flex items-center space-x-4 mb-6">
                 <div className="p-4 bg-green-500/20 rounded-2xl shadow-inner">
-                  <FaUtensils className="text-green-600 text-2xl" />
+                  <FaUtensils className="text-green-600 text-xl" />
                 </div>
+
                 <div>
-                  <p className="text-green-600 font-semibold text-lg">
+                  <p className="text-green-600 font-semibold text-base">
                     Food Distribution
                   </p>
-                  <h3 className="text-xl font-bold text-gray-800 mt-1 animate-pulse">
-                    {dashboardData.totalAdults + dashboardData.totalChildren}{" "}
+
+                  <h3 className="text-2xl font-bold text-gray-800 mt-1 animate-pulse">
+                    {dashboardData.totalAdults +
+                      dashboardData.totalChildren +
+                      dashboardData.totalSelf}{" "}
                     Head
                   </h3>
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
+                {/* Veg */}
                 <div className="bg-white/80 rounded-2xl p-4 shadow-lg border border-green-200 transform hover:scale-105 transition-all duration-200">
                   <div className="text-center">
                     <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-2">
@@ -1270,15 +1310,18 @@ const Dashboard = () => {
                         🥗
                       </span>
                     </div>
-                    <p className="text-2xl font-bold text-green-600">
+
+                    <p className="text-xl font-bold text-green-600">
                       {dashboardData.totalVeg}
                     </p>
+
                     <p className="text-xs text-green-700 font-medium mt-1">
                       Vegetarian
                     </p>
                   </div>
                 </div>
 
+                {/* Non-Veg */}
                 <div className="bg-white/80 rounded-2xl p-4 shadow-lg border border-orange-200 transform hover:scale-105 transition-all duration-200">
                   <div className="text-center">
                     <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-2">
@@ -1286,9 +1329,11 @@ const Dashboard = () => {
                         🍗
                       </span>
                     </div>
-                    <p className="text-2xl font-bold text-orange-600">
+
+                    <p className="text-xl font-bold text-orange-600">
                       {dashboardData.totalNonVeg}
                     </p>
+
                     <p className="text-xs text-orange-700 font-medium mt-1">
                       Non-Veg
                     </p>
@@ -1300,18 +1345,20 @@ const Dashboard = () => {
         </div>
 
         {/* GIFTS */}
-        <div className="bg-gradient-to-br from-white to-purple-50 rounded-3xl p-6 shadow-2xl border border-purple-100 transform hover:scale-105 transition-all duration-300">
+        <div className="bg-gradient-to-br transform-gpu from-white to-purple-50 rounded-3xl p-6 shadow-2xl border border-purple-100 transform hover:scale-105 transition-all duration-300">
           <div className="flex items-start justify-between">
             <div className="flex-1">
               <div className="flex items-center space-x-4 mb-6">
                 <div className="p-4 bg-purple-500/20 rounded-2xl shadow-inner">
-                  <FaGift className="text-purple-600 text-2xl" />
+                  <FaGift className="text-purple-600 text-xl" />
                 </div>
+
                 <div>
-                  <p className="text-purple-600 font-semibold text-lg">
+                  <p className="text-purple-600 font-semibold text-base">
                     Gifts Distributed
                   </p>
-                  <h3 className="text-4xl font-bold text-gray-800 mt-1">
+
+                  <h3 className="text-3xl font-bold text-gray-800 mt-1">
                     {dashboardData.totalGifts}
                   </h3>
                 </div>
@@ -1325,6 +1372,7 @@ const Dashboard = () => {
                       <div className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></div>
                       Delivered
                     </span>
+
                     <span className="text-gray-800 font-bold">
                       {dashboardData.totalGifts}
                     </span>
@@ -1353,6 +1401,7 @@ const Dashboard = () => {
                       <div className="w-2 h-2 bg-orange-500 rounded-full mr-2"></div>
                       Pending
                     </span>
+
                     <span className="text-gray-800 font-bold">
                       {dashboardData.totalAttendees - dashboardData.totalGifts}
                     </span>

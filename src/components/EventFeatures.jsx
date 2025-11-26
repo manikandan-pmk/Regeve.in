@@ -192,14 +192,6 @@ const EventFeatures = () => {
                                     {feature.description}
                                 </p>
 
-                                {/* Learn More Link */}
-                                <div className="flex items-center text-sm font-semibold">
-                                    <span className={`${feature.textColor} group-hover:underline transition-all duration-300`}>
-                                        Learn more
-                                    </span>
-                                    <ArrowRight className={`w-4 h-4 ml-2 ${feature.textColor} transform group-hover:translate-x-1 transition-transform duration-300`} />
-                                </div>
-
                                 {/* Hover Border Effect */}
                                 <div className={`absolute bottom-0 left-0 w-0 h-1 bg-gradient-to-r ${feature.color} group-hover:w-full transition-all duration-500`} />
                             </motion.div>

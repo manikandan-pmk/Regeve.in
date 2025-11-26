@@ -265,6 +265,9 @@ const UserDetail = () => {
   const [photoPreview, setPhotoPreview] = useState("");
   const [photoError, setPhotoError] = useState("");
 
+  //edit option
+  const isEditAllowed = localStorage.getItem("edit") === "true";
+
   // 🔔 Send scan event when user opens via QR code
   useEffect(() => {
     if (!Member_ID) return;
@@ -304,7 +307,6 @@ const UserDetail = () => {
     loadMember();
   }, [Member_ID]);
 
-  
   useEffect(() => {
     const interval = setInterval(async () => {
       try {
@@ -316,7 +318,7 @@ const UserDetail = () => {
       } catch (err) {
         console.error("Auto-refresh error:", err);
       }
-    }, 2000); // 🔥 refresh every 2 seconds
+    }, 60000); // 🔥 refresh every 2 seconds
 
     return () => clearInterval(interval); // cleanup
   }, [Member_ID]);
@@ -746,7 +748,7 @@ const UserDetail = () => {
 
               {/* Name and Meta */}
               <div className="min-w-0">
-                <h1 className="text-3xl sm:text-4xl font-extrabold text-gray-900 truncate mb-1">
+                <h1 className="text-3xl sm:text-4xl font-extrabold text-gray-900 mb-1 break-words leading-tight w-full">
                   {isEditing && (
                     <div className="py-3 border-b border-gray-100 flex items-center justify-between">
                       <label className="text-sm font-medium text-gray-600 flex items-center gap-2">
@@ -895,14 +897,15 @@ const UserDetail = () => {
                     </button>
                   </>
                 ) : (
-                  <button
-                    onClick={handleEditToggle}
-                    className="flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl font-semibold hover:bg-indigo-700 transition-all duration-300 shadow-lg"
-                    title="Edit Profile"
-                  >
-                    <FaEdit />
-                    <span className="hidden sm:inline">Edit</span>
-                  </button>
+                  isEditAllowed && ( // ⭐ show only if localStorage.edit === "true"
+                    <button
+                      onClick={handleEditToggle}
+                      className="flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl font-semibold hover:bg-indigo-700 transition-all duration-300 shadow-lg"
+                    >
+                      <FaEdit />
+                      <span className="hidden sm:inline">Edit</span>
+                    </button>
+                  )
                 )}
               </div>
             </div>
