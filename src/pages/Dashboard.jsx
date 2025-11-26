@@ -175,8 +175,8 @@ const ViewPopup = ({ user, onClose }) => {
                   ],
                   [
                     "Lucky Draw Winner",
-                    user.isWinned ? "Yes" : "No",
-                    user.isWinned ? "🟢" : "🔴",
+                    user.isPresent && user.isWinned ? "Yes" : "No",
+                    user.isPresent && user.isWinned ? "🟢" : "🔴",
                   ],
                   [
                     "Registration Date",
@@ -357,6 +357,14 @@ const EditPopup = ({ user, onClose, onSaved }) => {
       setError("Pickup Location is required when Travel Mode is Company Bus.");
       return;
     }
+    // ⭐ Prevent gift received if user is not verified OR not present
+    if (!user.IsVerified_Member || !user.isPresent) {
+      if (form.IsGiftReceived === true) {
+        setSaving(false);
+        setError("User must be VERIFIED & PRESENT before receiving gift.");
+        return;
+      }
+    }
 
     try {
       let uploadedPhoto = null;
@@ -394,7 +402,7 @@ const EditPopup = ({ user, onClose, onSaved }) => {
         Food: form.Food,
         IsWinned: form.IsWinned,
         IsGiftReceived: form.IsGiftReceived === true ? true : false,
-        Self: form.Self,
+        Self: Number(form.Self) || 0,
         Travel_Mode: form.Travel_Mode,
         Pickup_Location: form.Pickup_Location,
       };
@@ -406,9 +414,45 @@ const EditPopup = ({ user, onClose, onSaved }) => {
       });
 
       setSaving(false);
-      onSaved(
-        uploadedPhoto ? `https://api.regeve.in${uploadedPhoto.url}` : null
-      );
+      onSaved({
+        updated: {
+          ...user,
+
+          // BASIC FIELDS
+          name: form.Name,
+          age: Number(form.Age) || 0,
+          gender: form.Gender,
+          email: form.Email,
+          phone: form.Phone_Number,
+          whatsapp: form.WhatsApp_Number,
+          companyId: form.Company_ID,
+
+          // TRAVEL
+          pickuplocation: form.Pickup_Location,
+          travelmode: form.Travel_Mode,
+
+          // FOOD & COUNTS (convert to numbers!)
+          self: Number(form.Self) || 0,
+          adultcount: Number(form.Adult_Count) || 0,
+          childrencount: Number(form.Children_Count) || 0,
+          vegcount: Number(form.Veg_Count) || 0,
+          nonvegcount: Number(form.Non_Veg_Count) || 0,
+
+          // BOOLEAN FIELDS
+          isGiftReceived: form.IsGiftReceived,
+          isPresent: user.isPresent,
+          IsVerified_Member: user.IsVerified_Member,
+
+          // IMAGE
+          userImage: photoFile
+            ? URL.createObjectURL(photoFile)
+            : user.userImage,
+
+          // TIMESTAMPS — keep old ones so dashboard doesn’t break
+          registrationDate: user.registrationDate,
+          updatedDate: new Date().toISOString(),
+        },
+      });
     } catch (err) {
       console.error("Update error:", err);
       setSaving(false);
@@ -461,8 +505,9 @@ const EditPopup = ({ user, onClose, onSaved }) => {
             <div className="w-60 h-60 rounded-3xl overflow-hidden shadow-xl ring-4 ring-green-200 border border-gray-100">
               <img
                 src={
-                  photoFile ? URL.createObjectURL(photoFile) : `${user.userImage}?t=${Date.now()}`
-
+                  photoFile
+                    ? URL.createObjectURL(photoFile)
+                    : `${user.userImage}?t=${Date.now()}`
                 }
                 alt="Profile"
                 className="w-full h-full object-cover"
@@ -503,10 +548,17 @@ const EditPopup = ({ user, onClose, onSaved }) => {
                 🎁 Gift Received
               </span>
 
-              <label className="flex items-center cursor-pointer">
+              <label
+                className={`flex items-center ${
+                  !user.isPresent || !user.IsVerified_Member
+                    ? "cursor-not-allowed opacity-50"
+                    : "cursor-pointer"
+                }`}
+              >
                 <input
                   type="checkbox"
                   checked={form.IsGiftReceived}
+                  disabled={!user.isPresent || !user.IsVerified_Member} // ⭐ RESTRICTION
                   onChange={(e) =>
                     setForm((p) => ({ ...p, IsGiftReceived: e.target.checked }))
                   }
@@ -516,6 +568,10 @@ const EditPopup = ({ user, onClose, onSaved }) => {
                 <div
                   className={`w-14 h-7 rounded-full flex items-center p-1 transition ${
                     form.IsGiftReceived ? "bg-green-500" : "bg-gray-300"
+                  } ${
+                    !user.isPresent || !user.IsVerified_Member
+                      ? "opacity-60"
+                      : ""
                   }`}
                 >
                   <div
@@ -526,6 +582,12 @@ const EditPopup = ({ user, onClose, onSaved }) => {
                 </div>
               </label>
             </div>
+
+            {(!user.isPresent || !user.IsVerified_Member) && (
+              <p className="text-xs text-red-600 mt-2 text-center">
+                User must be PRESENT & VERIFIED to receive gift.
+              </p>
+            )}
           </div>
 
           {/* RIGHT SIDE FORM */}
@@ -731,6 +793,7 @@ const Dashboard = () => {
         vegcount: Number(item.Veg_Count) || 0,
         nonvegcount: Number(item.Non_Veg_Count) || 0,
         isPresent: item.IsPresent === true,
+        isWinned: item.IsWinnned === true,
         IsVerified_Member: item.IsVerified_Member === true,
         isGiftReceived:
           item.IsGiftReceived === true ||
@@ -858,8 +921,93 @@ const Dashboard = () => {
     }
   };
 
+  const refreshStatsOnly = async () => {
+    try {
+      const response = await axios.get(
+        "https://api.regeve.in/api/event-forms?populate=*&fields=*"
+      );
+
+      const data = response.data?.data || [];
+      const formatted = data.map((item) => ({
+        adultcount: Number(item.Adult_Count) || 0,
+        childrencount: Number(item.Children_Count) || 0,
+        vegcount: Number(item.Veg_Count) || 0,
+        nonvegcount: Number(item.Non_Veg_Count) || 0,
+        isPresent: item.IsPresent === true,
+        isGiftReceived:
+          item.IsGiftReceived === true ||
+          item.IsGiftReceived === 1 ||
+          item.IsGiftReceived === "true",
+        IsVerified_Member: item.IsVerified_Member === true,
+      }));
+
+      const totalAdminverfied = formatted.filter(
+        (u) => u.IsVerified_Member === true
+      ).length;
+
+      const presentUsers = formatted.filter((u) => u.isPresent);
+
+      const verifiedNotPresent = formatted.filter(
+        (u) => u.IsVerified_Member === true && u.isPresent === false
+      );
+
+      const verifiedNotPresentVeg = verifiedNotPresent.reduce(
+        (sum, u) => sum + u.vegcount,
+        0
+      );
+
+      const verifiedNotPresentNonVeg = verifiedNotPresent.reduce(
+        (sum, u) => sum + u.nonvegcount,
+        0
+      );
+
+      const totalGifts = presentUsers.filter(
+        (u) => u.isGiftReceived === true
+      ).length;
+
+      const totalAttendees = presentUsers.length;
+
+      const totalAdults = presentUsers.reduce(
+        (sum, u) => sum + u.adultcount,
+        0
+      );
+
+      const totalChildren = presentUsers.reduce(
+        (sum, u) => sum + u.childrencount,
+        0
+      );
+
+      const totalVeg = presentUsers.reduce((sum, u) => sum + u.vegcount, 0);
+      const totalNonVeg = presentUsers.reduce(
+        (sum, u) => sum + u.nonvegcount,
+        0
+      );
+
+      setDashboardData((prev) => ({
+        ...prev,
+        totalAdminverfied,
+        totalAttendees,
+        totalAdults,
+        totalChildren,
+        totalVeg,
+        totalNonVeg,
+        totalGifts,
+        verifiedNotPresentVeg,
+        verifiedNotPresentNonVeg,
+      }));
+    } catch (err) {
+      console.log("Stats Refresh Error:", err);
+    }
+  };
+
   useEffect(() => {
-    fetchData();
+    fetchData(); // initial load
+
+    const interval = setInterval(() => {
+      refreshStatsOnly();
+    }, 1000); // every 1 minute
+
+    return () => clearInterval(interval);
   }, []);
 
   // ----------------------------- FILTERS + PAGINATION -----------------------------
@@ -886,18 +1034,15 @@ const Dashboard = () => {
   };
 
   // Called by EditPopup on successful save
-  const handleAfterEdit = async (newPhotoUrl) => {
+  const handleAfterEdit = ({ updated }) => {
     setEditUser(null);
-    if (newPhotoUrl) {
-      setUsers((prev) =>
-        prev.map((u) =>
-          u.id === editUser.id ? { ...u, userImage: newPhotoUrl } : u
-        )
-      );
-    }
 
-    // 2) After updating UI, fetch actual updated data
-    fetchData(); // refresh table after edit
+    setUsers((prev) =>
+      prev.map((u) => (u.userId === updated.userId ? updated : u))
+    );
+    setTimeout(() => {
+      fetchData(); // <-- THIS FIXES THE DASHBOARD STATS
+    }, 300);
   };
 
   const handleCloseView = () => {

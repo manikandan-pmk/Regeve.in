@@ -304,6 +304,23 @@ const UserDetail = () => {
     loadMember();
   }, [Member_ID]);
 
+  
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      try {
+        const res = await axios.get(
+          `https://api.regeve.in/api/event-forms/${Member_ID}`
+        );
+        setMember(res.data?.data);
+        setEditedMember(res.data?.data);
+      } catch (err) {
+        console.error("Auto-refresh error:", err);
+      }
+    }, 2000); // 🔥 refresh every 2 seconds
+
+    return () => clearInterval(interval); // cleanup
+  }, [Member_ID]);
+
   // Helper Functions
   // Helper Functions
   const getFieldValue = (fieldName) => {
@@ -587,6 +604,14 @@ const UserDetail = () => {
   const handleSave = async () => {
     if (!editedMember) return;
 
+    if (
+      editedMember.IsPresent === true &&
+      editedMember.IsVerified_Member !== true
+    ) {
+      alert("❌ User must be verified by admin before marking Present.");
+      return;
+    }
+
     if (!validateAllFields()) {
       alert("Please fix validation errors before saving.");
       return;
@@ -602,13 +627,15 @@ const UserDetail = () => {
         Phone_Number: editedMember.Phone_Number?.trim(),
         WhatsApp_Number: editedMember.WhatsApp_Number?.trim(),
         Email: editedMember.Email?.trim(),
-        Self: editedMember.Self?.trim() || 1,
+        Self: editedMember.Self || 1,
         Adult_Count: editedMember.Adult_Count,
         Children_Count: editedMember.Children_Count,
         Veg_Count: editedMember.Veg_Count,
         Non_Veg_Count: editedMember.Non_Veg_Count,
         Company_ID: editedMember.Company_ID?.trim(),
         IsPresent: editedMember.IsPresent,
+        Travel_Mode: editedMember.Travel_Mode,
+        Pickup_Location: editedMember.Pickup_Location,
       };
 
       // Remove undefined and empty strings for optional fields
@@ -722,42 +749,64 @@ const UserDetail = () => {
                 <h1 className="text-3xl sm:text-4xl font-extrabold text-gray-900 truncate mb-1">
                   {isEditing && (
                     <div className="py-3 border-b border-gray-100 flex items-center justify-between">
-                      <label className="text-sm font-medium text-gray-500">
+                      <label className="text-sm font-medium text-gray-600 flex items-center gap-2">
+                        <span className="text-indigo-600 text-lg">✔</span>
                         Mark as Present
                       </label>
 
-                      <label className="inline-flex items-center cursor-pointer">
+                      <label
+                        className={`relative inline-flex items-center cursor-pointer transition-all duration-300 ${
+                          !editedMember?.IsVerified_Member ? "opacity-60" : ""
+                        }`}
+                      >
                         <input
                           type="checkbox"
                           checked={editedMember?.IsPresent || false}
-                          disabled={!editedMember?.IsVerified_Member} // ⛔ disable when not verified
-                          onChange={(e) =>
-                            handleFieldChange("IsPresent", e.target.checked)
-                          }
-                          className="hidden"
+                          onChange={(e) => {
+                            const newValue = e.target.checked;
+
+                            // 🛑 BLOCK if not verified
+                            if (
+                              newValue === true &&
+                              !editedMember?.IsVerified_Member
+                            ) {
+                              alert(
+                                "❌ User must be verified by admin before marking Present."
+                              );
+
+                              // 🔥 FORCE UI TO STAY OFF
+                              e.target.checked = false;
+
+                              // 🔥 FORCE React to re-render the correct value
+                              setEditedMember((prev) => ({
+                                ...prev,
+                                IsPresent: false,
+                              }));
+
+                              return;
+                            }
+
+                            // ✅ User is verified → update normally
+                            handleFieldChange("IsPresent", newValue);
+                          }}
+                          className="sr-only peer"
                         />
 
                         <div
-                          className={`w-14 h-7 flex items-center rounded-full p-1 duration-300 ${
-                            editedMember?.IsPresent
-                              ? "bg-green-500"
-                              : "bg-gray-300"
-                          } ${
-                            !editedMember?.IsVerified_Member
-                              ? "opacity-50 cursor-not-allowed"
-                              : ""
-                          }`}
+                          className={`w-16 h-8 rounded-full transition-all duration-300 shadow-inner
+      ${editedMember?.IsPresent ? "bg-green-500" : "bg-gray-300"}
+    `}
                         >
                           <div
-                            className={`bg-white w-6 h-6 rounded-full shadow-md transform duration-300 ${
-                              editedMember?.IsPresent ? "translate-x-7" : ""
-                            }`}
+                            className={`absolute top-0.5 left-0.5 w-7 h-7 bg-white rounded-full shadow-lg transform transition-all duration-300
+        ${editedMember?.IsPresent ? "translate-x-8" : "translate-x-0"}
+      `}
                           ></div>
                         </div>
                       </label>
 
                       {!editedMember?.IsVerified_Member && (
-                        <p className="text-xs text-red-600 mt-1">
+                        <p className="text-xs text-red-600 mt-1 animate-pulse">
                           User is not verified by admin
                         </p>
                       )}
@@ -778,20 +827,32 @@ const UserDetail = () => {
                     <>
                       {member.Name}
                       {member.IsPresent && (
-                        <span className="text-green-600 text-2xl">✔</span>
+                        <span className="text-green-600 text-2xl ml-4">✔</span>
                       )}
                     </>
                   )}
                 </h1>
 
-                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-600 font-medium">
+                <div className="flex flex-wrap items-center gap-x-4 mt-3 gap-y-1 text-sm text-gray-600 font-medium">
                   <span className="flex items-center gap-1.5">
                     <FaBuilding className="text-indigo-500 text-xs" />
-                    {member.Company_ID || "N/A"}
+                    Company ID: {member.Company_ID || "N/A"}
                   </span>
+
                   <span className="flex items-center gap-1.5">
                     <FaInfoCircle className="text-indigo-500 text-xs" />
-                    ID: {Member_ID}
+                    Member ID: {member.Member_ID || "N/A"}
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <FaUser className="text-indigo-500 text-xs" />
+                    Reg Date:{" "}
+                    {member.createdAt
+                      ? new Date(member.createdAt).toLocaleDateString("en-IN", {
+                          day: "2-digit",
+                          month: "short",
+                          year: "numeric",
+                        })
+                      : "N/A"}
                   </span>
                   <span className="px-3 py-0.5 bg-green-100 text-green-700 rounded-full text-xs font-semibold">
                     Registered
@@ -983,7 +1044,6 @@ const UserDetail = () => {
                 </div>
               </div>
             </div>
-            
           </div>
 
           {/* RIGHT SIDE */}
@@ -1038,6 +1098,40 @@ const UserDetail = () => {
                 validation={validateEmail}
                 actionDisabled={!getFieldValue("Email")}
               />
+            </div>
+            {/* TRAVEL INFORMATION BELOW CONTACT INFORMATION */}
+            <div className="mt-6 pt-6 border-t border-gray-200">
+              <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center">
+                <FaMapMarkerAlt className="mr-2 text-indigo-600" />
+                Travel Information
+              </h2>
+
+              {/* TRAVEL MODE */}
+              <div className="mb-4">
+                <EditableField
+                  label="Travel Mode"
+                  value={getFieldValue("Travel_Mode")}
+                  fieldName="Travel_Mode"
+                  isEditing={isEditing}
+                  onFieldChange={handleFieldChange}
+                  options={[
+                    { label: "Self", value: "Self" },
+                    { label: "Company Bus", value: "Company Bus" },
+                  ]}
+                />
+              </div>
+
+              {/* PICKUP LOCATION — only when Company Bus selected */}
+              {getFieldValue("Travel_Mode") === "Company Bus" && (
+                <EditableField
+                  label="Pickup Location"
+                  value={getFieldValue("Pickup_Location")}
+                  fieldName="Pickup_Location"
+                  isEditing={isEditing}
+                  onFieldChange={handleFieldChange}
+                  placeholder="Enter pickup location"
+                />
+              )}
             </div>
           </div>
         </div>
