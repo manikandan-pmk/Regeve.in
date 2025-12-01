@@ -26,7 +26,7 @@ import GiftStatusPage from './pages/GiftStatusPage';
 import QRRedirect from './pages/QRRedirect';
 import ElectionHome from './pages/Election/ElectionHome';
 import CandidateDashboard from './pages/Election/CandidateDashboard';
-import ElectionDashboard from './pages/Election/ElectionDashboard ';
+// import ElectionDashboard from './pages/Election/ElectionDashboard ';
 import ParticipationForm from './pages/Election/ParticipationForm';
 
 export default function App() {
@@ -40,7 +40,7 @@ export default function App() {
     location.pathname === "/luckydraw" ||
     location.pathname === "/regeve-admin" ||
     location.pathname === "/dashboard" ||
-    location.pathname.startsWith("/member-details/");
+    location.pathname.startsWith("/member-details/"); 
 
   return (
     <div className="max-w-full overflow-x-hidden">
@@ -69,7 +69,7 @@ export default function App() {
         <Route path="/qr/:memberId" element={<QRRedirect />} />
         <Route path='/electionhome' element={<ElectionHome />} />
         <Route path='/candidate-dashboard' element={<CandidateDashboard />} />
-        <Route path='election-dashboard' element={<ElectionDashboard />} />
+        {/* <Route path='election-dashboard' element={<ElectionDashboard />} /> */}
         <Route path='participationForm' element={<ParticipationForm />} />
       </Routes>
 

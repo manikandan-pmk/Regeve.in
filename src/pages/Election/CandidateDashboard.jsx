@@ -3,6 +3,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Link } from "react-router-dom";
 import axios from "axios";
+import ElectionDashboard from "./ElectionDashboard ";
 
 const API_URL = "http://localhost:1337";
 
@@ -16,6 +17,8 @@ const CandidateDashboard = ({ token = null }) => {
   const [selectedCandidate, setSelectedCandidate] = useState(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState(null);
+  const [editingCandidate,setEditingCandidate] = useState(null);
+  const [isEditing, setIsediting] = useState(false);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -914,8 +917,12 @@ const CandidateDashboard = ({ token = null }) => {
           </div>
         </div>
       )}
+      <div className=" border-t border-slate-200 pt-">
+        <ElectionDashboard />
+      </div>
     </div>
+    
   );
 };
-
+ 
 export default CandidateDashboard;
