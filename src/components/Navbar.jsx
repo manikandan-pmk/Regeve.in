@@ -15,6 +15,8 @@ import Logo from "../assets/Logo.png";
 import axios from "axios";
 
 const Navbar = () => {
+  const [openDropdown, setOpenDropdown] = useState(null);
+
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [authModal, setAuthModal] = useState({
     isOpen: false,
@@ -85,7 +87,17 @@ const Navbar = () => {
     { name: "Home", path: "/" },
     { name: "About Us", path: "/about" },
     { name: "Contact", path: "/contact" },
-    {name:" Election ",path:"/electionhome"},
+    {
+      name: "Services",
+      dropdown: true,
+      items: [
+        { name: "Event Registration", path: "/service/registration" },
+        { name: "Lucky Draw System", path: "/service/luckydraw-system-page" },
+        { name: "Food Management", path: "/service/food-management" },
+        { name: "Event Dashboard", path: "/service/dashboard-system-page" },
+        {name: "Election Management", path: "/electionManagementplatform"},
+      ],
+    },
     ...(isLoggedIn ? [{ name: "Dashboard", path: "/dashboard" }] : []),
   ];
 
@@ -170,18 +182,60 @@ const Navbar = () => {
 
             {/* Desktop Navigation */}
             <div className="hidden md:flex items-center space-x-8">
-              {navItems.map((item, index) => (
-                <motion.button
-                  key={item.name}
-                  onClick={() => navigate(item.path)}
-                  className="relative flex items-center space-x-1 cursor-pointer text-gray-700 hover:text-blue-600 transition-colors duration-200 font-medium group px-3 py-2 rounded-lg hover:bg-blue-50"
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.5, delay: index * 0.1 }}
-                >
-                  <span>{item.name}</span>
-                </motion.button>
-              ))}
+              {navItems.map((item, index) =>
+                item.dropdown ? (
+                  <div
+                    key={item.name}
+                    className="relative"
+                    onMouseEnter={() => setOpenDropdown(item.name)}
+                    onMouseLeave={() => setOpenDropdown(null)}
+                  >
+                    <button
+                      onClick={() =>
+                        setOpenDropdown(
+                          openDropdown === item.name ? null : item.name
+                        )
+                      }
+                      className="flex items-center space-x-1 cursor-pointer text-gray-700 hover:text-blue-600 transition-colors duration-200 font-medium px-3 py-2 rounded-lg hover:bg-blue-50"
+                    >
+                      <span>{item.name}</span>
+                    </button>
+
+                    {/* DROPDOWN */}
+                    <div
+                      className={`absolute left-0 mt-2  w-56 bg-white border border-gray-200 shadow-lg rounded-lg transition-all duration-200 ${
+                        openDropdown === item.name
+                          ? "opacity-100 visible"
+                          : "opacity-0 invisible"
+                      }`}
+                    >
+                      {item.items.map((sub, i) => (
+                        <button
+                          key={sub.name}
+                          onClick={() => {
+                            navigate(sub.path);
+                            setOpenDropdown(null);
+                          }}
+                          className="w-full text-left px-4 cursor-pointer py-2 text-gray-700 hover:bg-blue-600 hover:text-white transition-colors duration-150 rounded-lg"
+                        >
+                          {sub.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <motion.button
+                    key={item.name}
+                    onClick={() => navigate(item.path)}
+                    className="relative flex items-center space-x-1 cursor-pointer text-gray-700 hover:text-blue-600 transition-colors duration-200 font-medium group px-3 py-2 rounded-lg hover:bg-blue-50"
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.5, delay: index * 0.1 }}
+                  >
+                    <span>{item.name}</span>
+                  </motion.button>
+                )
+              )}
             </div>
 
             {/* Desktop Auth Buttons */}
@@ -259,20 +313,41 @@ const Navbar = () => {
                 variants={menuVariants}
               >
                 <div className="py-4 space-y-3">
-                  {navItems.map((item, index) => (
-                    <motion.button
-                      key={item.name}
-                      onClick={() => {
-                        navigate(item.path);
-                        setIsMenuOpen(false);
-                      }}
-                      className="w-full flex items-center space-x-3 px-4 py-3 text-gray-700 hover:bg-gradient-to-r hover:from-blue-600 hover:to-cyan-600 hover:text-white rounded-lg transition-all duration-200 font-medium text-left mx-2"
-                      variants={itemVariants}
-                      transition={{ delay: index * 0.1 }}
-                    >
-                      <span>{item.name}</span>
-                    </motion.button>
-                  ))}
+                  {navItems.map((item, index) =>
+                    item.dropdown ? (
+                      <div key={item.name} className="px-4">
+                        <div className="text-gray-700 font-semibold mb-2">
+                          {item.name}
+                        </div>
+
+                        {item.items.map((sub) => (
+                          <button
+                            key={sub.name}
+                            onClick={() => {
+                              navigate(sub.path);
+                              setIsMenuOpen(false);
+                            }}
+                            className="w-full flex items-center px-4 py-2 text-gray-600 hover:bg-blue-600 hover:text-white rounded-lg transition-all duration-200 mb-1"
+                          >
+                            {sub.name}
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <motion.button
+                        key={item.name}
+                        onClick={() => {
+                          navigate(item.path);
+                          setIsMenuOpen(false);
+                        }}
+                        className="w-full flex items-center space-x-3 px-4 py-3 text-gray-700 hover:bg-gradient-to-r hover:from-blue-600 hover:to-cyan-600 hover:text-white rounded-lg transition-all duration-200 font-medium text-left mx-2"
+                        variants={itemVariants}
+                        transition={{ delay: index * 0.1 }}
+                      >
+                        <span>{item.name}</span>
+                      </motion.button>
+                    )
+                  )}
 
                   <div className="border-t border-gray-200 pt-4 px-4 space-y-3">
                     {isLoggedIn ? (

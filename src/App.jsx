@@ -28,6 +28,7 @@ import ElectionHome from './pages/Election/ElectionHome';
 import CandidateDashboard from './pages/Election/CandidateDashboard';
 // import ElectionDashboard from './pages/Election/ElectionDashboard ';
 import ParticipationForm from './pages/Election/ParticipationForm';
+import ElectionManagementPlatform from './pages/Election/ElectionManagementPlatform';
 
 export default function App() {
   const location = useLocation();
@@ -40,7 +41,10 @@ export default function App() {
     location.pathname === "/luckydraw" ||
     location.pathname === "/regeve-admin" ||
     location.pathname === "/dashboard" ||
+    location.pathname === "/candidate-dashboard"||
+    location.pathname === "/participationForm"||
     location.pathname.startsWith("/member-details/"); 
+    
 
   return (
     <div className="max-w-full overflow-x-hidden">
@@ -70,7 +74,8 @@ export default function App() {
         <Route path='/electionhome' element={<ElectionHome />} />
         <Route path='/candidate-dashboard' element={<CandidateDashboard />} />
         {/* <Route path='election-dashboard' element={<ElectionDashboard />} /> */}
-        <Route path='participationForm' element={<ParticipationForm />} />
+        <Route path='/participationForm' element={<ParticipationForm />} />
+        <Route path='/electionManagementplatform' element={<ElectionManagementPlatform />} />
       </Routes>
 
       {!hideLayout && <Footer />}
