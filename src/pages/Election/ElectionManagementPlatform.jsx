@@ -20,8 +20,8 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import heroBg from "../../assets/election/vote1.jpg";
-import suiteBg from "../../assets/election/vote6.jpg";
+import heroBg from "../../assets/election/vote21.png";
+import suiteBg from "../../assets/election/vote22.png";
 
 const ElectionManagementPlatform = () => {
   const navigate = useNavigate();
@@ -112,30 +112,30 @@ const ElectionManagementPlatform = () => {
       {/* Hero Section */}
 
       <div
-        className="relative overflow-hidden bg-cover bg-center h-[550px]"
+        className="relative overflow-hidden bg-cover bg-center h-[650px]"
         style={{ backgroundImage: `url(${heroBg})` }}
       >
         <div className="absolute inset-0 bg-black/10" />
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24">
           <div className="text-center">
-            <div className="flex justify-center mb-6">
-              <div className="bg-white/20 backdrop-blur-sm rounded-full p-3">
+            <div className="flex justify-center mb-40">
+              {/* <div className="bg-white/20 backdrop-blur-sm rounded-full p-3">
                 <Trophy className="w-12 h-12 text-white" />
-              </div>
+              </div> */}
             </div>
-            <h1 className="text-4xl md:text-6xl font-bold text-white mb-6">
-              Modern Election Management
-              <span className="block text-3xl md:text-4xl font-normal mt-2">
+            <h1 className="text-4xl md:text-6xl font-bold text-white mb-10">
+              Welcome To Online Election  
+              {/* <span className="block text-3xl md:text-4xl font-normal mt-2">
                 For Every Organization
-              </span>
+              </span> */}
             </h1>
-            <p className="text-xl text-blue-100 max-w-3xl mx-auto mb-8">
+            {/* <p className="text-xl text-blue-100 max-w-3xl mx-auto mb-8">
               Enterprise-grade election software for corporations, universities,
               associations, and organizations worldwide. Secure, scalable, and
               simple to use.
-            </p>
+            </p> */}
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <button
+              {/* <button
                 onClick={() => navigate("/create-election")}
                 className="px-8 py-3.5 bg-white text-blue-600 rounded-xl font-semibold hover:bg-blue-50 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 cursor-pointer"
               >
@@ -146,7 +146,7 @@ const ElectionManagementPlatform = () => {
                 className="px-8 py-3.5 bg-transparent border-2 border-white text-white rounded-xl font-semibold hover:bg-white/10 transition-all duration-200 cursor-pointer"
               >
                 Request Demo
-              </button>
+              </button> */}
             </div>
           </div>
         </div>
