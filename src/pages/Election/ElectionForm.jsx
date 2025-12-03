@@ -330,16 +330,14 @@ const ElectionForm = () => {
 
             {/* Terms and Share */}
             <div className="pt-2">
-              {/* Checkbox for Terms (Was missing in original UI but present in logic) */}
-
               {/* Share Buttons */}
-              <div className="bg-gradient-to-r from-gray-50 to-white rounded-xl border border-gray-200 p-4 md:p-6 mb-6">
+              <div className="bg-gradient-to-r   from-gray-50 to-white rounded-xl border border-gray-200 p-4 md:p-6 mb-6">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                   <div className="flex items-start sm:items-center gap-3">
                     <div className="p-2 bg-white rounded-lg border border-gray-200 flex-shrink-0">
                       <Share2 className="w-5 h-5 text-gray-600" />
                     </div>
-                    <div className="flex-1">
+                    <div className="flex-1  ">
                       <h4 className="font-medium text-gray-800 text-sm md:text-base">
                         Invite Participants
                       </h4>
@@ -357,7 +355,7 @@ const ElectionForm = () => {
                       title="Share via WhatsApp"
                     >
                       <MessageSquare className="w-4 h-4 flex-shrink-0" />
-                      <span className="text-sm font-medium whitespace-nowrap">
+                      <span className="text-sm font-medium whitespace-nowrap cursor-pointer">
                         WhatsApp
                       </span>
                     </button>
@@ -369,7 +367,7 @@ const ElectionForm = () => {
                       title="Copy invitation link"
                     >
                       <Copy className="w-4 h-4 flex-shrink-0" />
-                      <span className="text-sm font-medium whitespace-nowrap">
+                      <span className="text-sm font-medium whitespace-nowrap cursor-pointer">
                         Copy Link
                       </span>
                     </button>
@@ -383,7 +381,7 @@ const ElectionForm = () => {
                 disabled={isSubmitting}
                 whileHover={{ scale: 1.01 }}
                 whileTap={{ scale: 0.99 }}
-                className="w-full py-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl font-bold text-lg shadow-lg hover:shadow-xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3"
+                className=" ml-0 sm:ml-40 w-full sm:w-60 py-4  bg-blue-600  text-white rounded-xl font-bold text-lg shadow-lg hover:shadow-xl transition-all duration-300  disabled:opacity-50 disabled:cursor-not-allowed  flex items-center justify-center gap-3"
               >
                 {isSubmitting ? (
                   <>
@@ -392,7 +390,7 @@ const ElectionForm = () => {
                   </>
                 ) : (
                   <>
-                    <Send className="w-5 h-5" />
+                    <Send className="w-5 h-5  " />
                     Submit Registration
                   </>
                 )}
