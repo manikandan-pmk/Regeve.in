@@ -12,7 +12,7 @@ import {
 import Img1 from "../assets/hero_section/img1.jpg";
 import Img2 from "../assets/hero_section/img2.jpg";
 import Img3 from "../assets/hero_section/img3.jpg";
-import Img4 from "../assets/election/vote4.jpg";
+import Img4 from "../assets/election/vote333.jpg";
 import { useNavigate } from "react-router-dom";
 
 const HeroSection = () => {
