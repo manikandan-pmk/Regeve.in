@@ -215,7 +215,7 @@ const Footer = () => {
               <Heart className="w-4 h-4 mx-1 text-red-500 fill-current" />
             </motion.div>{" "}
             for amazing event experiences.
-          </div>
+          </div>         
 
           {/* Social Links */}
           <div className="flex space-x-3">
