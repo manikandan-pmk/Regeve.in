@@ -1,4 +1,4 @@
- import React, { useState, memo } from "react";
+ import React, { useState, memo, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
   User,
@@ -11,10 +11,9 @@ import {
   Copy,
   Send,
   AlertCircle,
-  Link,
   Briefcase,
-  Building2,
-  MapPin,
+  Camera,
+  Upload,
 } from "lucide-react";
 import { toast, Toaster } from "react-hot-toast";
 
@@ -75,26 +74,51 @@ const InputField = memo(
   )
 );
 
-InputField.displayName = 'InputField';
+InputField.displayName = "InputField";
 
 const ElectionForm = () => {
   const [formData, setFormData] = useState({
     fullName: "",
     email: "",
     phone: "",
+    whatsapp_number: "",
+    gender: "",
     age: "",
-    organization: "",
-    department: "",
     position: "",
+    experience: "",
+    profilePhoto: null,
     agreesToTerms: false,
   });
 
+  const [profilePreview, setProfilePreview] = useState(null);
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
 
+  // Clean up object URL when component unmounts or photo changes
+  useEffect(() => {
+    return () => {
+      if (profilePreview) {
+        URL.revokeObjectURL(profilePreview);
+      }
+    };
+  }, [profilePreview]);
+
   const validateForm = () => {
     const newErrors = {};
+
+    if (!formData.whatsapp_number.trim())
+      newErrors.whatsapp_number = "whatsapp number is required";
+    else if (!/^\d{10}$/.test(formData.whatsapp_number))
+      newErrors.whatsapp_number = "WhatsApp number must be exactly 10 digits";
+
+    if (!formData.gender.trim()) newErrors.gender = " gender is required ";
+
+    if (!formData.experience.trim())
+      newErrors.experience = " experience is required ";
+
+    if (!formData.profilePhoto)
+      newErrors.profilePhoto = "Profile photo is required";
 
     if (!formData.fullName.trim()) newErrors.fullName = "Full name is required";
     if (!formData.email.trim()) newErrors.email = "Email is required";
@@ -102,13 +126,12 @@ const ElectionForm = () => {
       newErrors.email = "Invalid email format";
 
     if (!formData.phone.trim()) newErrors.phone = "Phone number is required";
+    else if (!/^\d{10}$/.test(formData.phone))
+      newErrors.phone = "Phone number must be exactly 10 digits";
 
     if (!formData.age) newErrors.age = "Age is required";
     else if (parseInt(formData.age) < 18)
       newErrors.age = "Must be 18+ years old";
-
-    if (!formData.organization.trim())
-      newErrors.organization = "Organization is required";
 
     if (!formData.agreesToTerms)
       newErrors.agreesToTerms = "You must agree to the terms";
@@ -147,6 +170,76 @@ const ElectionForm = () => {
     }
   };
 
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please select an image file");
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Image size should be less than 5MB");
+      return;
+    }
+
+    // Clean up previous object URL if exists
+    if (profilePreview) {
+      URL.revokeObjectURL(profilePreview);
+    }
+
+    // Create new object URL for preview
+    const objectUrl = URL.createObjectURL(file);
+    setProfilePreview(objectUrl);
+    
+    setFormData((prev) => ({ ...prev, profilePhoto: file }));
+    
+    // Clear error if exists
+    if (errors.profilePhoto) {
+      setErrors((prev) => ({ ...prev, profilePhoto: "" }));
+    }
+    
+    toast.success("Profile photo uploaded!");
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      const file = e.dataTransfer.files[0];
+      
+      // Validate file type
+      if (!file.type.startsWith("image/")) {
+        toast.error("Please drop an image file");
+        return;
+      }
+
+      // Clean up previous object URL if exists
+      if (profilePreview) {
+        URL.revokeObjectURL(profilePreview);
+      }
+
+      const objectUrl = URL.createObjectURL(file);
+      setProfilePreview(objectUrl);
+      setFormData((prev) => ({ ...prev, profilePhoto: file }));
+      
+      if (errors.profilePhoto) {
+        setErrors((prev) => ({ ...prev, profilePhoto: "" }));
+      }
+      
+      toast.success("Profile photo uploaded!");
+    }
+  };
+
   const handleCopyLink = () => {
     const link = `${window.location.origin}/election-invite/${Date.now()}`;
     navigator.clipboard.writeText(link);
@@ -156,10 +249,7 @@ const ElectionForm = () => {
   // Fixed WhatsApp share function - now only shares the invitation link
   const handleWhatsAppShare = () => {
     const text = `Join our corporate election! Register at: ${window.location.origin}/election-invite`;
-    window.open(
-      `https://wa.me/?text=${encodeURIComponent(text)}`,
-      "_blank"
-    );
+    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank");
   };
 
   // Success View
@@ -184,12 +274,22 @@ const ElectionForm = () => {
           <button
             onClick={() => {
               setIsSubmitted(false);
-              setFormData((prev) => ({
-                ...prev,
+              setFormData({
                 fullName: "",
                 email: "",
                 phone: "",
-              }));
+                whatsapp_number: "",
+                gender: "",
+                age: "",
+                position: "",
+                experience: "",
+                profilePhoto: null,
+                agreesToTerms: false,
+              });
+              if (profilePreview) {
+                URL.revokeObjectURL(profilePreview);
+                setProfilePreview(null);
+              }
             }}
             className="w-full mt-6 px-6 py-3 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-xl font-semibold hover:opacity-90"
           >
@@ -220,6 +320,92 @@ const ElectionForm = () => {
             </p>
           </div>
 
+          {/* Profile Photo Section - Compact and Centered */}
+          <div className="mb-10">
+            <div className="flex flex-col items-center">
+              {/* Compact Profile Photo Container */}
+              <div className="w-40 h-40 relative mb-6">
+                <div 
+                  className={`w-full h-full rounded-full overflow-hidden ${
+                    profilePreview ? '' : 'border-2 border-dashed border-blue-300 bg-blue-50'
+                  }`}
+                  onDragOver={handleDragOver}
+                  onDrop={handleDrop}
+                >
+                  {profilePreview ? (
+                    <div className="relative group">
+                      <img
+                        src={profilePreview}
+                        alt="Profile Preview"
+                        className="w-full h-full object-cover rounded-full"
+                      />
+                      <div className="absolute inset-0 bg-black bg-opacity-30 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-full flex items-center justify-center">
+                        <Camera className="w-8 h-8 text-white" />
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="w-full h-full flex flex-col items-center justify-center">
+                      <User className="w-16 h-16 text-blue-400 mb-2" />
+                      <p className="text-xs text-gray-500 text-center px-2">Upload Photo</p>
+                    </div>
+                  )}
+                  
+                  {/* Camera Button */}
+                  <label htmlFor="profile-upload" className="absolute -bottom-2 -right-2">
+                    <div className="bg-blue-600 hover:bg-blue-700 text-white p-3 rounded-full shadow-lg cursor-pointer transition-all duration-300 hover:scale-110">
+                      <Camera className="w-4 h-4" />
+                    </div>
+                    <input
+                      id="profile-upload"
+                      type="file"
+                      accept="image/*"
+                      onChange={handleFileChange}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
+              </div>
+
+              {/* Compact Upload Info */}
+              <div className="text-center space-y-3 max-w-xs">
+                <div>
+                  <label 
+                    htmlFor="profile-upload" 
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg cursor-pointer transition-colors duration-200"
+                  >
+                    <Upload className="w-4 h-4" />
+                    <span className="text-sm font-medium">
+                      {profilePreview ? 'Change Photo' : 'Upload Photo'}
+                    </span>
+                  </label>
+                </div>
+                
+                {formData.profilePhoto && (
+                  <p className="text-sm text-gray-600">
+                    <span className="font-medium">{formData.profilePhoto.name}</span>
+                  </p>
+                )}
+                
+                <p className="text-xs text-gray-400">
+                  Drag & drop or click to upload • JPG, PNG • Max 5MB
+                </p>
+              </div>
+
+              {errors.profilePhoto && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="mt-4 bg-red-50 border border-red-200 rounded-lg p-3 max-w-xs"
+                >
+                  <p className="text-red-500 text-sm flex items-center justify-center gap-2">
+                    <AlertCircle className="w-4 h-4" />
+                    {errors.profilePhoto}
+                  </p>
+                </motion.div>
+              )}
+            </div>
+          </div>
+
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Personal Information */}
             <div className="bg-gray-50 p-6 rounded-xl space-y-4">
@@ -233,7 +419,7 @@ const ElectionForm = () => {
                     label="Full Name"
                     name="fullName"
                     icon={User}
-                    placeholder="John Doe"
+                    placeholder="Enter your full name"
                     required
                     maxLength={50}
                     value={formData.fullName}
@@ -246,7 +432,7 @@ const ElectionForm = () => {
                   name="email"
                   type="email"
                   icon={Mail}
-                  placeholder="john@example.com"
+                  placeholder="Enter your email"
                   required
                   value={formData.email}
                   onChange={handleChange}
@@ -257,12 +443,24 @@ const ElectionForm = () => {
                   name="phone"
                   type="tel"
                   icon={Phone}
-                  placeholder="+1 (555) 123-4567"
+                  placeholder="+91 0000000000"
                   required
-                  maxLength={15}
+                  maxLength={10}
                   value={formData.phone}
                   onChange={handleChange}
                   error={errors.phone}
+                />
+                <InputField
+                  label="WhatsApp Number"
+                  name="whatsapp_number"
+                  type="tel"
+                  icon={Phone}
+                  placeholder="+91 0000000000"
+                  required
+                  maxLength={10}
+                  value={formData.whatsapp_number}
+                  onChange={handleChange}
+                  error={errors.whatsapp_number}
                 />
                 <div className="md:col-span-2">
                   <InputField
@@ -279,49 +477,54 @@ const ElectionForm = () => {
                   />
                 </div>
               </div>
-            </div>
 
-            {/* Organization Details */}
-            <div className="bg-gray-50 p-6 rounded-xl space-y-4">
-              <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
-                <Building2 className="w-5 h-5 text-blue-600" />
-                Organization Details
-              </h3>
+              <div className="space-y-2">
+                <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                  <User className="w-4 h-4 text-gray-500" />
+                  <span>
+                    Gender <span className="text-red-500">*</span>
+                  </span>
+                </label>
+
+                <select
+                  name="gender"
+                  value={formData.gender}
+                  onChange={handleChange}
+                  className={`w-full px-4 py-3 rounded-xl border-2 ${
+                    errors.gender
+                      ? "border-red-300 focus:border-red-500"
+                      : "border-gray-300 focus:border-blue-500"
+                  } focus:outline-none focus:ring-2 focus:ring-opacity-20 transition-all duration-200 bg-white`}
+                >
+                  <option value="">Select gender</option>
+                  <option value="male">Male</option>
+                  <option value="female">Female</option>
+                  <option value="other">Other</option>
+                </select>
+
+                {errors.gender && (
+                  <motion.p
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="text-red-500 text-sm flex items-center gap-1"
+                  >
+                    <AlertCircle className="w-4 h-4" /> {errors.gender}
+                  </motion.p>
+                )}
+              </div>
 
               <InputField
-                label="Organization/School"
-                name="organization"
-                icon={Building2}
-                placeholder="ABC Corporation"
+                label="Experience"
+                name="experience"
+                type="text"
+                icon={Briefcase}
+                placeholder="2 years / Fresher"
                 required
-                maxLength={80}
-                value={formData.organization}
+                maxLength={50}
+                value={formData.experience}
                 onChange={handleChange}
-                error={errors.organization}
+                error={errors.experience}
               />
-
-              <div className="grid md:grid-cols-2 gap-4">
-                <InputField
-                  label="Department"
-                  name="department"
-                  icon={MapPin}
-                  placeholder="Marketing"
-                  maxLength={50}
-                  value={formData.department}
-                  onChange={handleChange}
-                  error={errors.department}
-                />
-                <InputField
-                  label="Position"
-                  name="position"
-                  icon={Briefcase}
-                  placeholder="Manager"
-                  maxLength={50}
-                  value={formData.position}
-                  onChange={handleChange}
-                  error={errors.position}
-                />
-              </div>
             </div>
 
             {/* Terms and Share */}

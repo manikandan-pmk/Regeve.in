@@ -88,7 +88,7 @@ const Navbar = () => {
     { name: "About Us", path: "/about" },
     { name: "Contact", path: "/contact" },
     {
-      name: "Services",
+      name: "Our Services",
       dropdown: true,
       items: [
         { name: "Event Registration", path: "/service/registration" },

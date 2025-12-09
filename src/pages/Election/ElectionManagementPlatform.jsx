@@ -1,4 +1,4 @@
- import React from "react";
+import React from "react";
 import {
   Trophy,
   Users,
@@ -19,7 +19,12 @@ import suiteBg from "../../assets/election/vote666.jpg";
 
 // Helper Icons
 const Building = ({ className }) => (
-  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+  <svg
+    className={className}
+    fill="none"
+    stroke="currentColor"
+    viewBox="0 0 24 24"
+  >
     <path
       strokeLinecap="round"
       strokeLinejoin="round"
@@ -30,7 +35,12 @@ const Building = ({ className }) => (
 );
 
 const GraduationCap = ({ className }) => (
-  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+  <svg
+    className={className}
+    fill="none"
+    stroke="currentColor"
+    viewBox="0 0 24 24"
+  >
     <path d="M12 14l9-5-9-5-9 5 9 5z" />
     <path d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z" />
     <path
@@ -102,15 +112,30 @@ const ElectionManagementPlatform = () => {
   ];
 
   const stats = [
-    { label: "Elections Managed", value: "1,500+", icon: <Trophy className="w-5 h-5" /> },
-    { label: "Total Votes Cast", value: "100K+", icon: <Vote className="w-5 h-5" /> },
-    { label: "District Served", value: "10+", icon: <Cloud className="w-5 h-5" /> },
-    { label: "Client Satisfaction", value: "98.7%", icon: <Star className="w-5 h-5" /> },
+    {
+      label: "Elections Managed",
+      value: "1,500+",
+      icon: <Trophy className="w-5 h-5" />,
+    },
+    {
+      label: "Total Votes Cast",
+      value: "100K+",
+      icon: <Vote className="w-5 h-5" />,
+    },
+    {
+      label: "District Served",
+      value: "10+",
+      icon: <Cloud className="w-5 h-5" />,
+    },
+    {
+      label: "Client Satisfaction",
+      value: "98.7%",
+      icon: <Star className="w-5 h-5" />,
+    },
   ];
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
-
       {/* ⭐ HERO SECTION (Improved) */}
       <div className="relative h-[550px] md:h-[650px] w-full overflow-hidden">
         <img
@@ -151,7 +176,9 @@ const ElectionManagementPlatform = () => {
 
       {/* Features */}
       <div className="max-w-7xl mx-auto px-4 py-16">
-        <h2 className="text-center text-3xl font-bold mb-4">Why Choose Our Platform?</h2>
+        <h2 className="text-center text-3xl font-bold mb-4">
+          Why Choose Our Platform?
+        </h2>
         <p className="text-center text-gray-600 max-w-2xl mx-auto mb-12">
           Built with cutting-edge technology and designed for simplicity
         </p>
@@ -163,7 +190,9 @@ const ElectionManagementPlatform = () => {
               className="bg-white p-6 rounded-2xl border hover:shadow-lg transition-all"
             >
               <div className="flex gap-4">
-                <div className="p-3 bg-blue-50 rounded-xl text-blue-600">{f.icon}</div>
+                <div className="p-3 bg-blue-50 rounded-xl text-blue-600">
+                  {f.icon}
+                </div>
                 <div>
                   <h3 className="font-semibold">{f.title}</h3>
                   <p className="text-sm text-gray-600">{f.description}</p>
@@ -177,13 +206,14 @@ const ElectionManagementPlatform = () => {
       {/* Use Cases */}
       <div className="bg-gray-50/50 py-16">
         <div className="max-w-7xl mx-auto px-4">
-          <h2 className="text-center text-3xl font-bold mb-4">Who Uses Our Platform?</h2>
+          <h2 className="text-center text-3xl font-bold mb-4">
+            Who Uses Our Platform?
+          </h2>
           <p className="text-center text-gray-600 mb-12">
             Trusted by organizations of all sizes
           </p>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-
             {/* Cards Left */}
             <div className="space-y-6">
               {useCases.map((u, i) => (
@@ -219,7 +249,9 @@ const ElectionManagementPlatform = () => {
               <div className="absolute inset-0 bg-black/40" />
 
               <div className="relative z-20 flex flex-col items-center justify-center h-full text-center text-white px-6">
-                <h3 className="text-3xl font-bold mb-4">Complete Election Suite</h3>
+                <h3 className="text-3xl font-bold mb-4">
+                  Complete Election Suite
+                </h3>
                 <p className="text-blue-100 max-w-sm mb-4">
                   Everything you need to manage voting securely & efficiently.
                 </p>
@@ -229,24 +261,42 @@ const ElectionManagementPlatform = () => {
                 <p>✔ Voter Management</p>
               </div>
             </div>
-
           </div>
         </div>
       </div>
 
       {/* Process */}
       <div className="max-w-7xl mx-auto px-4 py-16">
-        <h2 className="text-center text-3xl font-bold mb-4">Simple 4-Step Process</h2>
-        <p className="text-center text-gray-600 mb-12">Get started in minutes</p>
+        <h2 className="text-center text-3xl font-bold mb-4">
+          Simple 4-Step Process
+        </h2>
+        <p className="text-center text-gray-600 mb-12">
+          Get started in minutes
+        </p>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {[
-            { step: 1, title: "Create Election", desc: "Set up election rules" },
-            { step: 2, title: "Add Voters", desc: "Import or add voters easily" },
-            { step: 3, title: "Configure Ballot", desc: "Add candidates & options" },
+            {
+              step: 1,
+              title: "Create Election",
+              desc: "Set up election rules",
+            },
+            {
+              step: 2,
+              title: "Add Voters",
+              desc: "Import or add voters easily",
+            },
+            {
+              step: 3,
+              title: "Configure Ballot",
+              desc: "Add candidates & options",
+            },
             { step: 4, title: "Launch & Monitor", desc: "Track votes live" },
           ].map((s, i) => (
-            <div key={i} className="bg-white p-6 rounded-2xl border text-center relative">
+            <div
+              key={i}
+              className="bg-white p-6 rounded-2xl border text-center relative"
+            >
               <div className="w-12 h-12 mx-auto bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-xl font-bold mb-4">
                 {s.step}
               </div>
@@ -259,7 +309,6 @@ const ElectionManagementPlatform = () => {
           ))}
         </div>
       </div>
-
     </div>
   );
 };
