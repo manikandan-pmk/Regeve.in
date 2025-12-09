@@ -1,605 +1,217 @@
- import React, { useState, memo, useEffect } from "react";
-import { motion } from "framer-motion";
-import {
-  User,
-  Mail,
-  Phone,
-  Calendar,
-  CheckCircle,
-  Share2,
-  MessageSquare,
-  Copy,
-  Send,
-  AlertCircle,
-  Briefcase,
-  Camera,
-  Upload,
-} from "lucide-react";
-import { toast, Toaster } from "react-hot-toast";
+import React, { useState } from "react";
+import axios from "axios";
 
-// Move InputField component outside to prevent recreation on every render
-const InputField = memo(
-  ({
-    label,
-    name,
-    type = "text",
-    icon: Icon,
-    placeholder,
-    required = false,
-    maxLength = 255,
-    value,
-    onChange,
-    error,
-  }) => (
-    <div className="space-y-2">
-      <label className="flex items-center justify-between text-sm font-medium text-gray-700">
-        <span className="flex items-center gap-2">
-          {Icon && <Icon className="w-4 h-4 text-gray-500" />}
-          {label}
-          {required && <span className="text-red-500">*</span>}
-        </span>
+const API_URL = "https://api.regeve.in/api/voter-registrations";
 
-        {type === "text" && (
-          <span className="text-xs text-gray-400">
-            {value?.length || 0}/{maxLength}
-          </span>
-        )}
-      </label>
-
-      <input
-        type={type}
-        name={name}
-        value={value}
-        onChange={onChange}
-        placeholder={placeholder}
-        maxLength={maxLength}
-        className={`w-full px-4 py-3 rounded-xl border-2 ${
-          error
-            ? "border-red-300 focus:border-red-500"
-            : "border-gray-300 focus:border-blue-500"
-        } focus:outline-none focus:ring-2 focus:ring-opacity-20 transition-all duration-200 bg-white`}
-      />
-
-      {error && (
-        <motion.p
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="text-red-500 text-sm flex items-center gap-1"
-        >
-          <AlertCircle className="w-4 h-4" />
-          {error}
-        </motion.p>
-      )}
-    </div>
-  )
-);
-
-InputField.displayName = "InputField";
-
-const ElectionForm = () => {
-  const [formData, setFormData] = useState({
-    fullName: "",
+export default function ElectionForm({ token = null }) {
+  const [form, setForm] = useState({
+    name: "",
     email: "",
-    phone: "",
+    phone_number: "",
     whatsapp_number: "",
-    gender: "",
     age: "",
-    position: "",
+    gender: "",
     experience: "",
-    profilePhoto: null,
-    agreesToTerms: false,
   });
 
-  const [profilePreview, setProfilePreview] = useState(null);
-  const [errors, setErrors] = useState({});
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isSubmitted, setIsSubmitted] = useState(false);
+  const [photos, setPhotos] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState(null);
 
-  // Clean up object URL when component unmounts or photo changes
-  useEffect(() => {
-    return () => {
-      if (profilePreview) {
-        URL.revokeObjectURL(profilePreview);
-      }
-    };
-  }, [profilePreview]);
-
-  const validateForm = () => {
-    const newErrors = {};
-
-    if (!formData.whatsapp_number.trim())
-      newErrors.whatsapp_number = "whatsapp number is required";
-    else if (!/^\d{10}$/.test(formData.whatsapp_number))
-      newErrors.whatsapp_number = "WhatsApp number must be exactly 10 digits";
-
-    if (!formData.gender.trim()) newErrors.gender = " gender is required ";
-
-    if (!formData.experience.trim())
-      newErrors.experience = " experience is required ";
-
-    if (!formData.profilePhoto)
-      newErrors.profilePhoto = "Profile photo is required";
-
-    if (!formData.fullName.trim()) newErrors.fullName = "Full name is required";
-    if (!formData.email.trim()) newErrors.email = "Email is required";
-    else if (!/^\S+@\S+\.\S+$/.test(formData.email))
-      newErrors.email = "Invalid email format";
-
-    if (!formData.phone.trim()) newErrors.phone = "Phone number is required";
-    else if (!/^\d{10}$/.test(formData.phone))
-      newErrors.phone = "Phone number must be exactly 10 digits";
-
-    if (!formData.age) newErrors.age = "Age is required";
-    else if (parseInt(formData.age) < 18)
-      newErrors.age = "Must be 18+ years old";
-
-    if (!formData.agreesToTerms)
-      newErrors.agreesToTerms = "You must agree to the terms";
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
-    if (!validateForm()) {
-      toast.error("Please fix the errors in the form");
-      return;
-    }
-
-    setIsSubmitting(true);
-
-    // Simulate API call
-    setTimeout(() => {
-      setIsSubmitting(false);
-      setIsSubmitted(true);
-      toast.success("Registration successful! Invitation sent.");
-    }, 1500);
-  };
-
-  const handleChange = (e) => {
-    const { name, value, type, checked } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: type === "checkbox" ? checked : value,
-    }));
-
-    if (errors[name]) {
-      setErrors((prev) => ({ ...prev, [name]: "" }));
-    }
-  };
-
-  const handleFileChange = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    // Validate file type
-    if (!file.type.startsWith("image/")) {
-      toast.error("Please select an image file");
-      return;
-    }
-
-    // Validate file size (max 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error("Image size should be less than 5MB");
-      return;
-    }
-
-    // Clean up previous object URL if exists
-    if (profilePreview) {
-      URL.revokeObjectURL(profilePreview);
-    }
-
-    // Create new object URL for preview
-    const objectUrl = URL.createObjectURL(file);
-    setProfilePreview(objectUrl);
-    
-    setFormData((prev) => ({ ...prev, profilePhoto: file }));
-    
-    // Clear error if exists
-    if (errors.profilePhoto) {
-      setErrors((prev) => ({ ...prev, profilePhoto: "" }));
-    }
-    
-    toast.success("Profile photo uploaded!");
-  };
-
-  const handleDragOver = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-  };
-
-  const handleDrop = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      const file = e.dataTransfer.files[0];
-      
-      // Validate file type
-      if (!file.type.startsWith("image/")) {
-        toast.error("Please drop an image file");
-        return;
-      }
-
-      // Clean up previous object URL if exists
-      if (profilePreview) {
-        URL.revokeObjectURL(profilePreview);
-      }
-
-      const objectUrl = URL.createObjectURL(file);
-      setProfilePreview(objectUrl);
-      setFormData((prev) => ({ ...prev, profilePhoto: file }));
-      
-      if (errors.profilePhoto) {
-        setErrors((prev) => ({ ...prev, profilePhoto: "" }));
-      }
-      
-      toast.success("Profile photo uploaded!");
-    }
-  };
-
-  const handleCopyLink = () => {
-    const link = `${window.location.origin}/election-invite/${Date.now()}`;
-    navigator.clipboard.writeText(link);
-    toast.success("Invitation link copied!");
-  };
-
-  // Fixed WhatsApp share function - now only shares the invitation link
-  const handleWhatsAppShare = () => {
-    const text = `Join our corporate election! Register at: ${window.location.origin}/election-invite`;
-    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank");
-  };
-
-  // Success View
-  if (isSubmitted) {
-    return (
-      <div className="min-h-screen pt-24 pb-12 bg-gradient-to-br from-blue-50 to-indigo-50 flex items-center justify-center p-4">
-        <Toaster position="top-right" />
-        <motion.div
-          initial={{ scale: 0.9, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full text-center"
-        >
-          <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-            <CheckCircle className="w-12 h-12 text-green-500" />
-          </div>
-          <h2 className="text-2xl font-bold text-gray-800 mb-3">
-            Registration Successful!
-          </h2>
-          <p className="text-gray-600 mb-6">
-            Your election invitation has been sent.
-          </p>
-          <button
-            onClick={() => {
-              setIsSubmitted(false);
-              setFormData({
-                fullName: "",
-                email: "",
-                phone: "",
-                whatsapp_number: "",
-                gender: "",
-                age: "",
-                position: "",
-                experience: "",
-                profilePhoto: null,
-                agreesToTerms: false,
-              });
-              if (profilePreview) {
-                URL.revokeObjectURL(profilePreview);
-                setProfilePreview(null);
-              }
-            }}
-            className="w-full mt-6 px-6 py-3 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-xl font-semibold hover:opacity-90"
-          >
-            Register Another
-          </button>
-        </motion.div>
-      </div>
-    );
+  function handleChange(e) {
+    const { name, value } = e.target;
+    setForm((prev) => ({ ...prev, [name]: value }));
   }
 
-  // Main Form View
+  function handleFiles(e) {
+    setPhotos(Array.from(e.target.files));
+  }
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    setLoading(true);
+    setMessage(null);
+
+    const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
+
+    try {
+      let uploadedMedia = [];
+
+      // Upload images to Strapi
+      if (photos.length > 0) {
+        const fd = new FormData();
+        photos.forEach((file) => fd.append("files", file));
+
+        const uploadResp = await axios.post(
+          "https://api.regeve.in/api/upload",
+          fd,
+          { headers: { "Content-Type": "multipart/form-data", ...authHeaders } }
+        );
+
+        uploadedMedia = uploadResp.data.map((file) => file.id);
+      }
+
+      // FINAL PAYLOAD - MUST MATCH STRAPI EXACTLY
+      const payload = {
+        data: {
+          name: form.name,
+          email: form.email,
+          Phone_Number: form.phone_number,
+          WhatsApp_Number: form.whatsapp_number,
+          age: Number(form.age),
+          gender: form.gender,
+          experience: form.experience,
+          photo: uploadedMedia, // <- multiple media IDs
+        },
+      };
+
+      await axios.post(API_URL, payload, {
+        headers: { "Content-Type": "application/json", ...authHeaders },
+      });
+
+      setMessage({
+        type: "success",
+        text: "Candidate submitted successfully.",
+      });
+
+      // Reset fields
+      setForm({
+        name: "",
+        email: "",
+        phone_number: "",
+        whatsapp_number: "",
+        age: "",
+        gender: "",
+        experience: "",
+      });
+      setPhotos([]);
+    } catch (err) {
+      console.error(err.response ? err.response.data : err);
+
+      setMessage({
+        type: "error",
+        text: "Failed to submit. Check console.",
+      });
+    }
+
+    setLoading(false);
+  }
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 px-4 pt-24 pb-12">
-      <Toaster position="top-right" />
+    <div className="max-w-3xl mx-auto p-6 bg-white shadow-xl rounded-lg my-10">
+      <h2 className="text-3xl font-bold text-center mb-2">Apply as a Candidate</h2>
 
-      <motion.div
-        initial={{ y: 20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        className="max-w-2xl mx-auto w-full"
-      >
-        <div className="bg-white rounded-2xl shadow-xl p-6 md:p-8">
-          <div className="mb-8 text-center">
-            <h1 className="text-3xl font-bold text-gray-800 mb-2">
-              Voter Registration
-            </h1>
-            <p className="text-gray-500">
-              Enter your details to participate in the upcoming election
-            </p>
-          </div>
-
-          {/* Profile Photo Section - Compact and Centered */}
-          <div className="mb-10">
-            <div className="flex flex-col items-center">
-              {/* Compact Profile Photo Container */}
-              <div className="w-40 h-40 relative mb-6">
-                <div 
-                  className={`w-full h-full rounded-full overflow-hidden ${
-                    profilePreview ? '' : 'border-2 border-dashed border-blue-300 bg-blue-50'
-                  }`}
-                  onDragOver={handleDragOver}
-                  onDrop={handleDrop}
-                >
-                  {profilePreview ? (
-                    <div className="relative group">
-                      <img
-                        src={profilePreview}
-                        alt="Profile Preview"
-                        className="w-full h-full object-cover rounded-full"
-                      />
-                      <div className="absolute inset-0 bg-black bg-opacity-30 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-full flex items-center justify-center">
-                        <Camera className="w-8 h-8 text-white" />
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="w-full h-full flex flex-col items-center justify-center">
-                      <User className="w-16 h-16 text-blue-400 mb-2" />
-                      <p className="text-xs text-gray-500 text-center px-2">Upload Photo</p>
-                    </div>
-                  )}
-                  
-                  {/* Camera Button */}
-                  <label htmlFor="profile-upload" className="absolute -bottom-2 -right-2">
-                    <div className="bg-blue-600 hover:bg-blue-700 text-white p-3 rounded-full shadow-lg cursor-pointer transition-all duration-300 hover:scale-110">
-                      <Camera className="w-4 h-4" />
-                    </div>
-                    <input
-                      id="profile-upload"
-                      type="file"
-                      accept="image/*"
-                      onChange={handleFileChange}
-                      className="hidden"
-                    />
-                  </label>
-                </div>
-              </div>
-
-              {/* Compact Upload Info */}
-              <div className="text-center space-y-3 max-w-xs">
-                <div>
-                  <label 
-                    htmlFor="profile-upload" 
-                    className="inline-flex items-center gap-2 px-4 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg cursor-pointer transition-colors duration-200"
-                  >
-                    <Upload className="w-4 h-4" />
-                    <span className="text-sm font-medium">
-                      {profilePreview ? 'Change Photo' : 'Upload Photo'}
-                    </span>
-                  </label>
-                </div>
-                
-                {formData.profilePhoto && (
-                  <p className="text-sm text-gray-600">
-                    <span className="font-medium">{formData.profilePhoto.name}</span>
-                  </p>
-                )}
-                
-                <p className="text-xs text-gray-400">
-                  Drag & drop or click to upload • JPG, PNG • Max 5MB
-                </p>
-              </div>
-
-              {errors.profilePhoto && (
-                <motion.div
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="mt-4 bg-red-50 border border-red-200 rounded-lg p-3 max-w-xs"
-                >
-                  <p className="text-red-500 text-sm flex items-center justify-center gap-2">
-                    <AlertCircle className="w-4 h-4" />
-                    {errors.profilePhoto}
-                  </p>
-                </motion.div>
-              )}
-            </div>
-          </div>
-
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Personal Information */}
-            <div className="bg-gray-50 p-6 rounded-xl space-y-4">
-              <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
-                <User className="w-5 h-5 text-blue-600" />
-                Personal Information
-              </h3>
-              <div className="grid md:grid-cols-2 gap-4">
-                <div className="md:col-span-2">
-                  <InputField
-                    label="Full Name"
-                    name="fullName"
-                    icon={User}
-                    placeholder="Enter your full name"
-                    required
-                    maxLength={50}
-                    value={formData.fullName}
-                    onChange={handleChange}
-                    error={errors.fullName}
-                  />
-                </div>
-                <InputField
-                  label="Email Address"
-                  name="email"
-                  type="email"
-                  icon={Mail}
-                  placeholder="Enter your email"
-                  required
-                  value={formData.email}
-                  onChange={handleChange}
-                  error={errors.email}
-                />
-                <InputField
-                  label="Phone Number"
-                  name="phone"
-                  type="tel"
-                  icon={Phone}
-                  placeholder="+91 0000000000"
-                  required
-                  maxLength={10}
-                  value={formData.phone}
-                  onChange={handleChange}
-                  error={errors.phone}
-                />
-                <InputField
-                  label="WhatsApp Number"
-                  name="whatsapp_number"
-                  type="tel"
-                  icon={Phone}
-                  placeholder="+91 0000000000"
-                  required
-                  maxLength={10}
-                  value={formData.whatsapp_number}
-                  onChange={handleChange}
-                  error={errors.whatsapp_number}
-                />
-                <div className="md:col-span-2">
-                  <InputField
-                    label="Age"
-                    name="age"
-                    type="number"
-                    icon={Calendar}
-                    placeholder="18"
-                    required
-                    maxLength={3}
-                    value={formData.age}
-                    onChange={handleChange}
-                    error={errors.age}
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
-                  <User className="w-4 h-4 text-gray-500" />
-                  <span>
-                    Gender <span className="text-red-500">*</span>
-                  </span>
-                </label>
-
-                <select
-                  name="gender"
-                  value={formData.gender}
-                  onChange={handleChange}
-                  className={`w-full px-4 py-3 rounded-xl border-2 ${
-                    errors.gender
-                      ? "border-red-300 focus:border-red-500"
-                      : "border-gray-300 focus:border-blue-500"
-                  } focus:outline-none focus:ring-2 focus:ring-opacity-20 transition-all duration-200 bg-white`}
-                >
-                  <option value="">Select gender</option>
-                  <option value="male">Male</option>
-                  <option value="female">Female</option>
-                  <option value="other">Other</option>
-                </select>
-
-                {errors.gender && (
-                  <motion.p
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="text-red-500 text-sm flex items-center gap-1"
-                  >
-                    <AlertCircle className="w-4 h-4" /> {errors.gender}
-                  </motion.p>
-                )}
-              </div>
-
-              <InputField
-                label="Experience"
-                name="experience"
-                type="text"
-                icon={Briefcase}
-                placeholder="2 years / Fresher"
-                required
-                maxLength={50}
-                value={formData.experience}
-                onChange={handleChange}
-                error={errors.experience}
-              />
-            </div>
-
-            {/* Terms and Share */}
-            <div className="pt-2">
-              {/* Share Buttons */}
-              <div className="bg-gradient-to-r   from-gray-50 to-white rounded-xl border border-gray-200 p-4 md:p-6 mb-6">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                  <div className="flex items-start sm:items-center gap-3">
-                    <div className="p-2 bg-white rounded-lg border border-gray-200 flex-shrink-0">
-                      <Share2 className="w-5 h-5 text-gray-600" />
-                    </div>
-                    <div className="flex-1  ">
-                      <h4 className="font-medium text-gray-800 text-sm md:text-base">
-                        Invite Participants
-                      </h4>
-                      <p className="text-xs text-gray-500 mt-0.5">
-                        Share registration with team
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col xs:flex-row gap-2 sm:gap-2">
-                    <button
-                      type="button"
-                      onClick={handleWhatsAppShare}
-                      className="flex items-center justify-center gap-2 px-4 py-3 sm:py-2 rounded-lg bg-green-500 hover:bg-green-600 text-white transition-colors shadow-sm hover:shadow active:scale-[0.98] min-h-[44px] sm:min-h-0"
-                      title="Share via WhatsApp"
-                    >
-                      <MessageSquare className="w-4 h-4 flex-shrink-0" />
-                      <span className="text-sm font-medium whitespace-nowrap cursor-pointer">
-                        WhatsApp
-                      </span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={handleCopyLink}
-                      className="flex items-center justify-center gap-2 px-4 py-3 sm:py-2 rounded-lg bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 transition-colors active:scale-[0.98] min-h-[44px] sm:min-h-0"
-                      title="Copy invitation link"
-                    >
-                      <Copy className="w-4 h-4 flex-shrink-0" />
-                      <span className="text-sm font-medium whitespace-nowrap cursor-pointer">
-                        Copy Link
-                      </span>
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Submit Button */}
-              <motion.button
-                type="submit"
-                disabled={isSubmitting}
-                whileHover={{ scale: 1.01 }}
-                whileTap={{ scale: 0.99 }}
-                className="ml-0 sm:ml-40 w-full sm:w-60 py-4 bg-blue-600 text-white rounded-xl font-bold text-lg shadow-lg hover:shadow-xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3"
-              >
-                {isSubmitting ? (
-                  <>
-                    <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    Processing...
-                  </>
-                ) : (
-                  <>
-                    <Send className="w-5 h-5" />
-                    Submit Registration
-                  </>
-                )}
-              </motion.button>
-            </div>
-          </form>
+      {message && (
+        <div
+          className={`p-4 mb-4 rounded-md ${
+            message.type === "success"
+              ? "bg-green-100 text-green-700"
+              : "bg-red-100 text-red-700"
+          }`}
+        >
+          {message.text}
         </div>
-      </motion.div>
+      )}
+
+      <form
+        onSubmit={handleSubmit}
+        className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4"
+      >
+        <div>
+          <label>Name</label>
+          <input
+            className="w-full px-3 py-2 border rounded-md"
+            name="name"
+            value={form.name}
+            onChange={handleChange}
+            required
+          />
+        </div>
+
+        <div>
+          <label>Email</label>
+          <input
+            className="w-full px-3 py-2 border rounded-md"
+            type="email"
+            name="email"
+            value={form.email}
+            onChange={handleChange}
+            required
+          />
+        </div>
+
+        <div>
+          <label>Phone Number</label>
+          <input
+            className="w-full px-3 py-2 border rounded-md"
+            name="phone_number"
+            value={form.phone_number}
+            onChange={handleChange}
+            required
+          />
+        </div>
+
+        <div>
+          <label>WhatsApp Number</label>
+          <input
+            className="w-full px-3 py-2 border rounded-md"
+            name="whatsapp_number"
+            value={form.whatsapp_number}
+            onChange={handleChange}
+          />
+        </div>
+
+        <div>
+          <label>Age</label>
+          <input
+            className="w-full px-3 py-2 border rounded-md"
+            type="number"
+            name="age"
+            value={form.age}
+            onChange={handleChange}
+          />
+        </div>
+
+        <div>
+          <label>Gender</label>
+          <select
+            className="w-full px-3 py-2 border rounded-md"
+            name="gender"
+            value={form.gender}
+            onChange={handleChange}
+          >
+            <option value="">Select</option>
+            <option>Male</option>
+            <option>Female</option>
+          </select>
+        </div>
+
+        <div className="md:col-span-2">
+          <label>Experience</label>
+          <textarea
+            className="w-full px-3 py-2 border rounded-md"
+            name="experience"
+            value={form.experience}
+            onChange={handleChange}
+          />
+        </div>
+
+        <div className="md:col-span-2">
+          <label>Photo(s)</label>
+          <input type="file" multiple accept="image/*" onChange={handleFiles} />
+        </div>
+
+        <div className="md:col-span-2">
+          <button
+            className={`w-full py-3 px-4 rounded-md text-white bg-blue-600 ${
+              loading ? "opacity-50 cursor-not-allowed" : "hover:bg-blue-700"
+            }`}
+            disabled={loading}
+          >
+            {loading ? "Submitting..." : "Submit Application"}
+          </button>
+        </div>
+      </form>
     </div>
   );
-};
-
-export default ElectionForm;
+}
