@@ -5,7 +5,7 @@ import { Link } from "react-router-dom";
 import axios from "axios";
 import ElectionDashboard from "./ElectionDashboard ";
 
-const API_URL = "http://localhost:1337";
+const API_URL = "https://api.regeve.in/api";
 
 const CandidateDashboard = ({ token = null }) => {
   const location = useLocation();
@@ -17,8 +17,15 @@ const CandidateDashboard = ({ token = null }) => {
   const [selectedCandidate, setSelectedCandidate] = useState(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState(null);
-  const [editingCandidate,setEditingCandidate] = useState(null);
+  const [editingCandidate, setEditingCandidate] = useState(null);
   const [isEditing, setIsediting] = useState(false);
+  const [sections, setSections] = useState([]);
+  const [newSectionName, setNewSectionName] = useState("");
+  const [showAddSection, setShowAddSection] = useState(false);
+  const [showWinnerPopup, setShowWinnerPopup] = useState(false);
+  const [selectedWinnerSection, setSelectedWinnerSection] = useState(null);
+  const [winners, setWinners] = useState({});
+  const [isFetchingCandidates, setIsFetchingCandidates] = useState(false);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -28,7 +35,7 @@ const CandidateDashboard = ({ token = null }) => {
     age: "",
     gender: "",
     position: "",
-    experience: "",
+    sectionId: null,
   });
   const navigate = useNavigate();
   const [photo, setPhoto] = useState(null);
@@ -45,12 +52,24 @@ const CandidateDashboard = ({ token = null }) => {
     electionName: "Untitled Election",
     electionType: "Custom",
     electionCategory: "Custom Election",
+    electionId: null,
   };
 
   const formModalRef = useRef(null);
   const detailsModalRef = useRef(null);
   const deleteModalRef = useRef(null);
+  const addSectionRef = useRef(null);
+  const winnerPopupRef = useRef(null);
 
+  // Fetch candidates from backend on component mount
+  useEffect(() => {
+    fetchCandidates();
+  }, [electionData.electionId]);
+
+  // Fetch sections from backend
+  useEffect(() => {
+    fetchSections();
+  }, []);
   // Click outside to close modals
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -76,20 +95,131 @@ const CandidateDashboard = ({ token = null }) => {
         setShowDeleteConfirm(false);
         setCandidateToDelete(null);
       }
+      if (
+        showAddSection &&
+        addSectionRef.current &&
+        !addSectionRef.current.contains(event.target)
+      ) {
+        setShowAddSection(false);
+        setNewSectionName("");
+      }
+      if (
+        showWinnerPopup &&
+        winnerPopupRef.current &&
+        !winnerPopupRef.current.contains(event.target)
+      ) {
+        setShowWinnerPopup(false);
+        setSelectedWinnerSection(null);
+      }
     };
 
     document.addEventListener("mousedown", handleClickOutside);
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
-  }, [showForm, showDetails, showDeleteConfirm]);
+  }, [
+    showForm,
+    showDetails,
+    showDeleteConfirm,
+    showAddSection,
+    showWinnerPopup,
+  ]);
+
+  // Fetch sections from backend
+  const fetchSections = async () => {
+    try {
+      const response = await axiosInstance.get("/election-candidate-positions");
+
+      console.log("API Response:", response.data); // Debug log
+
+      if (response.data && Array.isArray(response.data)) {
+        // If response.data is directly an array (no 'data' wrapper)
+        const sectionsData = response.data.map((section) => ({
+          id: section.id,
+          name: section.Position || "Unnamed Position",
+          isOpen: true,
+          position: section.Position || "Unnamed Position",
+          candidates: [],
+        }));
+        setSections(sectionsData);
+      } else if (response.data && Array.isArray(response.data.data)) {
+        // If response has 'data' wrapper
+        const sectionsData = response.data.data.map((section) => ({
+          id: section.id,
+          name: section.Position || "Unnamed Position",
+          isOpen: true,
+          position: section.Position || "Unnamed Position",
+          candidates: [],
+        }));
+        setSections(sectionsData);
+      } else {
+        console.log("Invalid response structure:", response.data);
+        setSections([]);
+      }
+    } catch (err) {
+      console.error("Error fetching sections:", err);
+      setSections([]);
+    }
+  };
+  // Fetch candidates from backend
+  const fetchCandidates = async () => {
+    if (!electionData.electionId) return;
+
+    setIsFetchingCandidates(true);
+    try {
+      const response = await axiosInstance.get("/candidates", {
+        params: {
+          "filters[election][id]": electionData.electionId,
+          populate: "*",
+        },
+      });
+
+      if (response.data && response.data.data) {
+        const candidatesData = response.data.data.map((candidate) => ({
+          id: candidate.id,
+          name: candidate.attributes.name,
+          email: candidate.attributes.email,
+          phone: candidate.attributes.phone_number,
+          whatsapp: candidate.attributes.whatsapp_number,
+          age: candidate.attributes.age,
+          gender: candidate.attributes.gender,
+          position: candidate.attributes.position,
+          photoUrl: candidate.attributes.photo?.data?.attributes?.url
+            ? `${API_URL}${candidate.attributes.photo.data.attributes.url}`
+            : null,
+          section: candidate.attributes.section?.data?.id || null,
+          appliedDate: new Date(
+            candidate.attributes.createdAt
+          ).toLocaleDateString(),
+          candidate_id: candidate.attributes.candidate_id,
+          experience: candidate.attributes.experience,
+        }));
+
+        setCandidates(candidatesData);
+
+        // Organize candidates by section
+        const sectionsWithCandidates = sections.map((section) => ({
+          ...section,
+          candidates: candidatesData.filter(
+            (candidate) => candidate.section === section.id
+          ),
+        }));
+        setSections(sectionsWithCandidates);
+      }
+    } catch (err) {
+      console.error("Error fetching candidates:", err);
+      setMessage({ type: "error", text: "Failed to fetch candidates." });
+    } finally {
+      setIsFetchingCandidates(false);
+    }
+  };
 
   // Upload files to Strapi
   async function uploadFiles(filesArray = []) {
     if (!filesArray || filesArray.length === 0) return [];
     const fd = new FormData();
     filesArray.forEach((file) => fd.append("files", file));
-    const uploadResp = await axiosInstance.post("/api/upload", fd, {
+    const uploadResp = await axiosInstance.post("/upload", fd, {
       headers: { "Content-Type": "multipart/form-data" },
     });
     return uploadResp.data || [];
@@ -110,72 +240,83 @@ const CandidateDashboard = ({ token = null }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-    setMessage(null);
 
     try {
       let uploadedMedia = [];
+      let photoId = null;
 
       if (photo) {
         const fd = new FormData();
         fd.append("files", photo);
 
-        const uploadResp = await axiosInstance.post("/api/upload", fd, {
+        const uploadResp = await axiosInstance.post("/upload", fd, {
           headers: { "Content-Type": "multipart/form-data" },
         });
 
         uploadedMedia = uploadResp.data;
+        if (uploadedMedia && uploadedMedia.length > 0) {
+          photoId = uploadedMedia[0].id;
+        }
       }
+
+      const selectedSection = sections.find(
+        (s) => s.id === parseInt(formData.sectionId)
+      );
 
       const payload = {
         data: {
-          Name: formData.name,
-          Email: formData.email,
-          Phone_Number: formData.phone_number
-            ? Number(formData.phone_number)
-            : null,
-          WhatsApp_Number: formData.whatsapp_number
-            ? Number(formData.whatsapp_number)
-            : null,
-          Age: formData.age ? Number(formData.age) : null,
-          Gender: formData.gender,
-          Position: formData.position,
-          Experience: formData.experience,
-          Photo: uploadedMedia.length
-            ? uploadedMedia.map((m) => ({ id: m.id }))
-            : [],
+          name: formData.name,
+          candidate_id: formData.candidate_id || `CAND-${Date.now()}`,
+          email: formData.email,
+          phone_number: Number(formData.phone_number) || null,
+          whatsApp_number: Number(formData.whatsapp_number) || null,
+          age: Number(formData.age) || null,
+          gender: formData.gender,
+          position: selectedSection
+            ? selectedSection.position
+            : formData.position,
+          photo: photoId,
+          election: electionData.electionId,
+          section: formData.sectionId,
         },
       };
 
-      await axiosInstance.post("/api/candidates", payload);
+      const response = await axiosInstance.post("/candidates", payload);
 
-      setMessage({
-        type: "success",
-        text: "Candidate submitted successfully.",
-      });
-
-      // Add to local state for immediate UI update
+      // Update local state with new candidate
       const newCandidate = {
-        id: Date.now(),
+        id: response.data.data.id,
         name: formData.name,
         email: formData.email,
         phone: formData.phone_number,
         whatsapp: formData.whatsapp_number,
         age: formData.age,
         gender: formData.gender,
-        position: formData.position,
-        experience: formData.experience,
-        electionId: electionData.electionName,
-        appliedDate: new Date().toLocaleDateString("en-US", {
-          year: "numeric",
-          month: "long",
-          day: "numeric",
-        }),
+        position: selectedSection
+          ? selectedSection.position
+          : formData.position,
         photoUrl: photo ? URL.createObjectURL(photo) : null,
+        section: parseInt(formData.sectionId),
+        appliedDate: new Date().toLocaleDateString(),
+        candidate_id: payload.data.candidate_id,
       };
+
+      // Update sections with new candidate
+      setSections(
+        sections.map((section) =>
+          section.id === parseInt(formData.sectionId)
+            ? { ...section, candidates: [...section.candidates, newCandidate] }
+            : section
+        )
+      );
 
       setCandidates((prev) => [...prev, newCandidate]);
 
-      // Reset form
+      setMessage({
+        type: "success",
+        text: "Candidate submitted successfully.",
+      });
+      setShowForm(false);
       setFormData({
         name: "",
         email: "",
@@ -184,22 +325,71 @@ const CandidateDashboard = ({ token = null }) => {
         age: "",
         gender: "",
         position: "",
-        experience: "",
+        sectionId: null,
       });
       setPhoto(null);
-      setShowForm(false);
     } catch (err) {
-      console.error(
-        "Failed to submit candidate:",
-        err.response ? err.response.data : err
-      );
+      console.error(err);
       setMessage({
         type: "error",
-        text: "Failed to submit candidate. Please try again.",
+        text: `Failed to submit candidate: ${
+          err.response?.data?.error?.message || err.message
+        }`,
       });
     }
 
     setLoading(false);
+  };
+
+  // Create new section (Election Position)
+  const handleAddSection = async () => {
+    if (!newSectionName.trim()) {
+      setMessage({ type: "error", text: "Please enter a section name." });
+      return;
+    }
+
+    try {
+      // ADD 'data' wrapper as per Strapi v4 REST API convention
+      const payload = {
+        data: {
+          Position: newSectionName.trim(),
+        },
+      };
+
+      console.log("Sending payload:", payload);
+
+      const response = await axiosInstance.post(
+        "/election-candidate-positions",
+        payload
+      );
+
+      console.log("Create response:", response.data);
+
+      // AFTER SUCCESS, REFETCH SECTIONS FROM BACKEND
+      await fetchSections();
+
+      setNewSectionName("");
+      setShowAddSection(false);
+
+      setMessage({
+        type: "success",
+        text: `New election position "${newSectionName}" created successfully.`,
+      });
+    } catch (err) {
+      console.error("Full error:", err);
+
+      // Better error logging
+      console.error("Error response:", err.response?.data);
+
+      setMessage({
+        type: "error",
+        text: `Failed to create position: ${
+          err.response?.data?.error?.message ||
+          err.response?.data?.message ||
+          err.message
+        }`,
+      });
+    }
   };
 
   const handleViewDetails = (candidate) => {
@@ -207,18 +397,66 @@ const CandidateDashboard = ({ token = null }) => {
     setShowDetails(true);
   };
 
-  const handleDeleteClick = (candidate) => {
+  const handleDeleteClick = async (candidate) => {
     setCandidateToDelete(candidate);
     setShowDeleteConfirm(true);
   };
 
-  const handleConfirmDelete = () => {
-    if (candidateToDelete) {
-      setCandidates((prev) =>
-        prev.filter((candidate) => candidate.id !== candidateToDelete.id)
+  const handleConfirmDelete = async () => {
+    if (!candidateToDelete) return;
+
+    try {
+      await axiosInstance.delete(`/candidates/${candidateToDelete.id}`);
+
+      // Remove candidate from sections
+      setSections(
+        sections.map((section) => ({
+          ...section,
+          candidates: section.candidates.filter(
+            (c) => c.id !== candidateToDelete.id
+          ),
+        }))
       );
-      setShowDeleteConfirm(false);
-      setCandidateToDelete(null);
+
+      // Remove candidate from main list
+      setCandidates((prev) =>
+        prev.filter((c) => c.id !== candidateToDelete.id)
+      );
+
+      setMessage({
+        type: "success",
+        text: "Candidate deleted successfully.",
+      });
+    } catch (err) {
+      console.error(err);
+      setMessage({ type: "error", text: "Failed to delete candidate." });
+    }
+
+    setShowDeleteConfirm(false);
+    setCandidateToDelete(null);
+  };
+
+  const handleDeleteSection = async (sectionId, e) => {
+    e.stopPropagation();
+
+    if (sections.length <= 1) {
+      setMessage({ type: "error", text: "Cannot delete the last section." });
+      return;
+    }
+
+    try {
+      await axiosInstance.delete(`/election-candidate-positions/${sectionId}`);
+      setSections(sections.filter((section) => section.id !== sectionId));
+
+      await fetchSections();
+
+      setMessage({
+        type: "success",
+        text: "Section deleted successfully.",
+      });
+    } catch (err) {
+      console.error(err);
+      setMessage({ type: "error", text: "Failed to delete section." });
     }
   };
 
@@ -230,6 +468,68 @@ const CandidateDashboard = ({ token = null }) => {
       .toUpperCase();
   };
 
+  const toggleSection = (sectionId) => {
+    setSections(
+      sections.map((section) =>
+        section.id === sectionId
+          ? { ...section, isOpen: !section.isOpen }
+          : section
+      )
+    );
+  };
+
+  const handleDeclareWinner = (sectionId) => {
+    const section = sections.find((s) => s.id === sectionId);
+    if (!section || section.candidates.length === 0) {
+      setMessage({
+        type: "error",
+        text: "No candidates in this section to declare as winner.",
+      });
+      return;
+    }
+    setSelectedWinnerSection(section);
+    setShowWinnerPopup(true);
+  };
+
+  const handleSelectWinner = async (candidate) => {
+    try {
+      // Update candidate as winner in backend
+      await axiosInstance.put(`/candidates/${candidate.id}`, {
+        data: {
+          is_winner: true,
+          winner_section: selectedWinnerSection.id,
+        },
+      });
+
+      // Update local state
+      setWinners((prev) => ({
+        ...prev,
+        [selectedWinnerSection.id]: candidate,
+      }));
+
+      setMessage({
+        type: "success",
+        text: `${candidate.name} declared as winner for ${selectedWinnerSection.name}`,
+      });
+
+      setShowWinnerPopup(false);
+      setSelectedWinnerSection(null);
+    } catch (err) {
+      console.error(err);
+      setMessage({ type: "error", text: "Failed to declare winner." });
+    }
+  };
+
+  const getWinnerForSection = (sectionId) => {
+    return winners[sectionId];
+  };
+
+  // Calculate total candidates across all sections
+  const totalCandidates = sections.reduce(
+    (total, section) => total + section.candidates.length,
+    0
+  );
+
   return (
     <div className="min-h-screen bg-slate-50 p-4 sm:p-6 lg:p-8">
       {/* Header Section */}
@@ -237,7 +537,7 @@ const CandidateDashboard = ({ token = null }) => {
         {/* Back Navigation */}
         <div className="mb-6">
           <Link
-            to="/"
+            to="/electionhome"
             className="inline-flex items-center gap-2 text-slate-600 hover:text-slate-800 transition-colors duration-200 group"
           >
             <svg
@@ -271,8 +571,13 @@ const CandidateDashboard = ({ token = null }) => {
                 </div>
                 <div className="w-px h-4 bg-slate-300"></div>
                 <span className="text-sm font-medium text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full">
-                  {candidates.length} Candidate
-                  {candidates.length !== 1 ? "s" : ""}
+                  {totalCandidates} Candidate
+                  {totalCandidates !== 1 ? "s" : ""}
+                </span>
+                <div className="w-px h-4 bg-slate-300"></div>
+                <span className="text-sm font-medium text-black bg-blue-200 px-3 py-1 rounded-full">
+                  {sections.length} Election Position
+                  {sections.length !== 1 ? "s" : ""}
                 </span>
               </div>
 
@@ -288,8 +593,8 @@ const CandidateDashboard = ({ token = null }) => {
             {/* Action Buttons */}
             <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
               <button
-                onClick={() => setShowForm(true)}
-                className="flex items-center justify-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-xl hover:bg-blue-700 transition-all duration-200 font-semibold shadow-sm hover:shadow-md min-w-[160px]"
+                onClick={() => setShowAddSection(true)}
+                className="flex items-center justify-center gap-2 bg-blue-500 text-white px-6 py-3 rounded-xl hover:bg- transition-all duration-200 font-semibold shadow-sm hover:shadow-md min-w-[160px]"
               >
                 <svg
                   className="w-5 h-5"
@@ -304,12 +609,12 @@ const CandidateDashboard = ({ token = null }) => {
                     d="M12 4v16m8-8H4"
                   />
                 </svg>
-                Add Candidate
+                Add Election Position
               </button>
 
               <button
                 onClick={() => navigate("/participationForm")}
-                className="flex items-center justify-center gap-2 bg-white text-slate-700 px-6 py-3 rounded-xl border border-slate-300 hover:border-slate-400 transition-all duration-200 font-semibold shadow-sm hover:shadow-md min-w-[160px]"
+                className="flex items-center justify-center gap-2 bg-amber-600 text-white px-6 py-3 rounded-xl hover:bg-amber-700 transition-all duration-200 font-semibold shadow-sm hover:shadow-md min-w-[160px]"
               >
                 <svg
                   className="w-5 h-5"
@@ -330,6 +635,49 @@ const CandidateDashboard = ({ token = null }) => {
           </div>
         </div>
 
+        {/* Add Section Modal */}
+        {showAddSection && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+            <div
+              ref={addSectionRef}
+              className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6"
+            >
+              <h3 className="text-lg font-semibold text-slate-900 mb-4">
+                Add New Election Position
+              </h3>
+              <p className="text-slate-600 text-sm mb-4">
+                The position name will be used for all candidates in this
+                section.
+              </p>
+              <input
+                type="text"
+                value={newSectionName}
+                onChange={(e) => setNewSectionName(e.target.value)}
+                placeholder="Enter position name (e.g., President, Secretary)"
+                className="w-full px-3 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 mb-4"
+                onKeyPress={(e) => e.key === "Enter" && handleAddSection()}
+              />
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setShowAddSection(false);
+                    setNewSectionName("");
+                  }}
+                  className="flex-1 px-4 py-2.5 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleAddSection}
+                  className="flex-1 px-4 py-2.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+                >
+                  Create Position
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Message Display */}
         {message && (
           <div
@@ -343,165 +691,320 @@ const CandidateDashboard = ({ token = null }) => {
           </div>
         )}
 
-        {/* Content Area */}
-        {candidates.length === 0 ? (
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-12 text-center">
-            <div className="max-w-md mx-auto">
-              <div className="w-20 h-20 bg-blue-50 rounded-2xl flex items-center justify-center mx-auto mb-6">
-                <svg
-                  className="w-10 h-10 text-blue-500"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"
-                  />
-                </svg>
-              </div>
-              <h3 className="text-2xl font-bold text-slate-900 mb-3">
-                No Candidates Yet
-              </h3>
-              <p className="text-slate-600 mb-8 leading-relaxed">
-                Start building your candidate list for{" "}
-                <strong className="text-blue-600">
-                  {electionData.electionName}
-                </strong>
-                . Add the first candidate to begin managing your election.
-              </p>
-              <button
-                onClick={() => setShowForm(true)}
-                className="bg-blue-600 text-white px-8 py-3 rounded-xl hover:bg-blue-700 transition-all duration-200 font-semibold inline-flex items-center gap-2 shadow-sm hover:shadow-md"
-              >
-                <svg
-                  className="w-5 h-5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 4v16m8-8H4"
-                  />
-                </svg>
-                Add First Candidate
-              </button>
-            </div>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-            {candidates.map((candidate) => (
-              <div
-                key={candidate.id}
-                className="bg-white rounded-xl shadow-sm border border-slate-200 hover:shadow-md transition-all duration-300 hover:border-slate-300 group"
-              >
-                <div className="p-5">
-                  {/* Candidate Header */}
-                  <div className="flex items-start gap-4 mb-4">
-                    {candidate.photoUrl ? (
-                      <img
-                        src={candidate.photoUrl}
-                        alt={candidate.name}
-                        className="w-12 h-12 rounded-lg object-cover border border-slate-200"
-                      />
-                    ) : (
-                      <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center">
-                        <span className="text-white font-semibold text-sm">
-                          {getInitials(candidate.name)}
-                        </span>
-                      </div>
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-slate-900 truncate mb-1">
-                        {candidate.name}
-                      </h3>
-                      <p className="text-blue-600 text-sm font-medium truncate">
-                        {candidate.position}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Candidate Details */}
-                  <div className="space-y-3 mb-4">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-slate-500">Email</span>
-                      <span className="font-medium text-slate-900 truncate max-w-[120px]">
-                        {candidate.email}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-slate-500">Phone</span>
-                      <span className="font-medium text-slate-900">
-                        {candidate.phone}
-                      </span>
-                    </div>
-                    {candidate.experience && (
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-slate-500">Experience</span>
-                        <span className="font-medium text-slate-900">
-                          {candidate.experience} years
-                        </span>
-                      </div>
-                    )}
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-slate-500">Applied</span>
-                      <span className="font-medium text-slate-900">
-                        {candidate.appliedDate}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Action Buttons - Medium Size */}
-                  <div className="flex gap-2 pt-4 border-t border-slate-100">
-                    <button
-                      onClick={() => handleViewDetails(candidate)}
-                      className="flex-1 bg-blue-600 text-white py-2.5 px-4 rounded-lg hover:bg-blue-700 transition-colors duration-200 font-medium text-sm flex items-center justify-center gap-2"
-                    >
-                      <svg
-                        className="w-4 h-4"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M14 5l7 7m0 0l-7 7m7-7H3"
-                        />
-                      </svg>
-                      View
-                    </button>
-                    <button
-                      onClick={() => handleDeleteClick(candidate)}
-                      className="flex-1 bg-red-600 text-white py-2.5 px-4 rounded-lg hover:bg-red-700 transition-colors duration-200 font-medium text-sm flex items-center justify-center gap-2"
-                    >
-                      <svg
-                        className="w-4 h-4"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                        />
-                      </svg>
-                      Delete
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))}
+        {/* Loading State */}
+        {isFetchingCandidates && (
+          <div className="mb-6 text-center py-8">
+            <div className="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-600 mb-2"></div>
+            <p className="text-slate-600">Loading candidates...</p>
           </div>
         )}
+
+        {/* Sections with Candidates */}
+        <div className="space-y-6">
+          {sections.length === 0 ? (
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-12 text-center">
+              <div className="max-w-md mx-auto">
+                <div className="w-20 h-20 bg-purple-50 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                  <svg
+                    className="w-10 h-10 text-purple-500"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
+                    />
+                  </svg>
+                </div>
+                <h3 className="text-2xl font-bold text-slate-900 mb-3">
+                  No Election Positions Yet
+                </h3>
+                <p className="text-slate-600 mb-8 leading-relaxed">
+                  Create your first election position for{" "}
+                  <strong className="text-purple-600">
+                    {electionData.electionName}
+                  </strong>
+                  . Each position will have its own section of candidates.
+                </p>
+                <button
+                  onClick={() => setShowAddSection(true)}
+                  className="bg-purple-600 text-white px-8 py-3 rounded-xl hover:bg-purple-700 transition-all duration-200 font-semibold inline-flex items-center gap-2 shadow-sm hover:shadow-md"
+                >
+                  <svg
+                    className="w-5 h-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 4v16m8-8H4"
+                    />
+                  </svg>
+                  Create First Position
+                </button>
+              </div>
+            </div>
+          ) : (
+            sections.map((section) => {
+              const winner = getWinnerForSection(section.id);
+
+              return (
+                <div
+                  key={section.id}
+                  className="bg-white rounded-xl shadow-sm border border-slate-200"
+                >
+                  {/* Section Header */}
+                  <div
+                    className="p-5 border-b border-slate-200 flex justify-between items-center cursor-pointer hover:bg-slate-50 transition-colors"
+                    onClick={() => toggleSection(section.id)}
+                  >
+                    <div className="flex items-center gap-3">
+                      <svg
+                        className={`w-5 h-5 transform transition-transform ${
+                          section.isOpen ? "rotate-90" : ""
+                        }`}
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M9 5l7 7-7 7"
+                        />
+                      </svg>
+                      <div>
+                        <h3 className="text-lg font-semibold text-slate-900">
+                          {section.name}
+                        </h3>
+                        <p className="text-sm text-slate-600">
+                          Position: {section.position}
+                        </p>
+                      </div>
+                      <span className="text-sm text-slate-500 bg-slate-100 px-3 py-1 rounded-full">
+                        {section.candidates.length} candidate
+                        {section.candidates.length !== 1 ? "s" : ""}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      {winner && (
+                        <div className="flex items-center gap-2 bg-emerald-50 text-emerald-700 px-3 py-1.5 rounded-lg">
+                          <svg
+                            className="w-4 h-4"
+                            fill="currentColor"
+                            viewBox="0 0 20 20"
+                          >
+                            <path
+                              fillRule="evenodd"
+                              d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                              clipRule="evenodd"
+                            />
+                          </svg>
+                          <span className="text-sm font-medium">
+                            Winner Selected
+                          </span>
+                        </div>
+                      )}
+
+                      {section.candidates.length > 0 && !winner && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeclareWinner(section.id);
+                          }}
+                          className="px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 transition-colors"
+                        >
+                          Declare Winner
+                        </button>
+                      )}
+
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setFormData((prev) => ({
+                            ...prev,
+                            sectionId: section.id,
+                            position: section.position, // Auto-fill position from section
+                          }));
+                          setShowForm(true);
+                        }}
+                        className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                      >
+                        Add Candidate
+                      </button>
+
+                      {sections.length > 1 && (
+                        <button
+                          onClick={(e) => handleDeleteSection(section.id, e)}
+                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          title="Delete position"
+                        >
+                          <svg
+                            className="w-4 h-4"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M6 18L18 6M6 6l12 12"
+                            />
+                          </svg>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Section Content (Collapsible) */}
+                  {section.isOpen && (
+                    <div className="p-5">
+                      {/* Winner Display */}
+                      {winner && (
+                        <div className="mb-6 p-4 bg-gradient-to-r from-emerald-50 to-green-50 border border-emerald-200 rounded-xl">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-4">
+                              <div className="relative">
+                                {winner.photoUrl ? (
+                                  <img
+                                    src={winner.photoUrl}
+                                    alt={winner.name}
+                                    className="w-16 h-16 rounded-xl object-cover border-2 border-emerald-400"
+                                  />
+                                ) : (
+                                  <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-emerald-500 to-green-600 flex items-center justify-center border-2 border-emerald-400">
+                                    <span className="text-white font-semibold text-lg">
+                                      {getInitials(winner.name)}
+                                    </span>
+                                  </div>
+                                )}
+                                <div className="absolute -top-2 -right-2 w-8 h-8 bg-emerald-500 rounded-full flex items-center justify-center">
+                                  <svg
+                                    className="w-4 h-4 text-white"
+                                    fill="currentColor"
+                                    viewBox="0 0 20 20"
+                                  >
+                                    <path
+                                      fillRule="evenodd"
+                                      d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                                      clipRule="evenodd"
+                                    />
+                                  </svg>
+                                </div>
+                              </div>
+                              <div>
+                                <h4 className="font-semibold text-emerald-900 text-lg">
+                                  Winner: {winner.name}
+                                </h4>
+                                <p className="text-emerald-700 text-sm">
+                                  {winner.position}
+                                </p>
+                                <p className="text-emerald-600 text-xs mt-1">
+                                  Winner of {section.name}
+                                </p>
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => handleViewDetails(winner)}
+                              className="px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 transition-colors"
+                            >
+                              View Profile
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {section.candidates.length === 0 ? (
+                        <div className="text-center py-8">
+                          <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <svg
+                              className="w-8 h-8 text-blue-500"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"
+                              />
+                            </svg>
+                          </div>
+                          <h4 className="text-lg font-medium text-slate-900 mb-2">
+                            No candidates for {section.position}
+                          </h4>
+                          
+                           
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                          {section.candidates.map((candidate) => (
+                            <div
+                              key={candidate.id}
+                              className="bg-slate-50 rounded-lg p-4 border border-slate-200 hover:border-blue-300 transition-colors hover:shadow-sm"
+                            >
+                              <div className="flex items-start gap-3 mb-3">
+                                {candidate.photoUrl ? (
+                                  <img
+                                    src={candidate.photoUrl}
+                                    alt={candidate.name}
+                                    className="w-12 h-12 rounded-lg object-cover"
+                                  />
+                                ) : (
+                                  <div className="w-12 h-12 bg-blue-500 rounded-lg flex items-center justify-center">
+                                    <span className="text-white font-medium text-sm">
+                                      {getInitials(candidate.name)}
+                                    </span>
+                                  </div>
+                                )}
+                                <div className="flex-1 min-w-0">
+                                  <h5 className="font-medium text-slate-900 truncate">
+                                    {candidate.name}
+                                  </h5>
+                                  <p className="text-sm text-blue-600 truncate">
+                                    {candidate.position}
+                                  </p>
+                                  {candidate.candidate_id && (
+                                    <p className="text-xs text-slate-500 mt-1">
+                                      ID: {candidate.candidate_id}
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => handleViewDetails(candidate)}
+                                  className="flex-1 text-sm bg-white border border-slate-300 text-slate-700 py-1.5 rounded hover:bg-slate-50 transition-colors"
+                                >
+                                  View
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteClick(candidate)}
+                                  className="flex-1 text-sm bg-red-600 text-white py-1.5 rounded hover:bg-red-700 transition-colors"
+                                >
+                                  Delete
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          )}
+        </div>
       </div>
 
       {/* Add Candidate Modal */}
@@ -519,8 +1022,8 @@ const CandidateDashboard = ({ token = null }) => {
                       Add New Candidate
                     </h2>
                     <p className="text-slate-600 text-sm mt-1">
-                      {electionData.electionName} •{" "}
-                      {electionData.electionCategory}
+                      {electionData.electionName} • Position:{" "}
+                      {formData.position}
                     </p>
                   </div>
                   <button
@@ -535,6 +1038,33 @@ const CandidateDashboard = ({ token = null }) => {
 
             <div className="p-6">
               <form onSubmit={handleSubmit} className="space-y-6">
+                {/* Section Selection */}
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Election Position *
+                  </label>
+                  <select
+                    name="sectionId"
+                    value={formData.sectionId || ""}
+                    onChange={handleInputChange}
+                    required
+                    className="w-full px-3 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                  >
+                    <option value="">Choose an election position</option>
+                    {sections.map((section) => (
+                      <option key={section.id} value={section.id}>
+                        {section.name} ({section.position})
+                      </option>
+                    ))}
+                  </select>
+                  {formData.sectionId && (
+                    <p className="text-sm text-slate-500 mt-2">
+                      All candidates in this position will have the same
+                      position title.
+                    </p>
+                  )}
+                </div>
+
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   {/* Personal Information */}
                   <div className="space-y-4">
@@ -618,9 +1148,6 @@ const CandidateDashboard = ({ token = null }) => {
                               <option value="Male">Male</option>
                               <option value="Female">Female</option>
                               <option value="Other">Other</option>
-                              <option value="Prefer not to say">
-                                Prefer not to say
-                              </option>
                             </select>
                           </div>
                         </div>
@@ -680,46 +1207,28 @@ const CandidateDashboard = ({ token = null }) => {
 
                         <div>
                           <label className="block text-sm font-medium text-slate-700 mb-2">
-                            Position *
+                            Position (Auto-filled from Election Position)
                           </label>
                           <input
                             type="text"
                             name="position"
                             value={formData.position}
-                            onChange={handleInputChange}
-                            required
-                            className="w-full px-3 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200 bg-white"
-                            placeholder="Enter position"
+                            readOnly
+                            className="w-full px-3 py-2.5 border border-slate-300 rounded-lg bg-slate-100 text-slate-600"
                           />
                         </div>
 
-                        <div className="grid grid-cols-2 gap-3">
-                          <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-2">
-                              Experience
-                            </label>
-                            <input
-                              type="text"
-                              name="experience"
-                              value={formData.experience}
-                              onChange={handleInputChange}
-                              className="w-full px-3 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200 bg-white"
-                              placeholder="Experience description"
-                            />
-                          </div>
-
-                          <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-2">
-                              Profile Photo
-                            </label>
-                            <input
-                              type="file"
-                              name="photo"
-                              onChange={handleInputChange}
-                              accept="image/*"
-                              className="w-full px-3 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200 bg-white file:mr-3 file:py-1 file:px-3 file:rounded file:border-0 file:text-xs file:font-medium file:bg-blue-500 file:text-white hover:file:bg-blue-600"
-                            />
-                          </div>
+                        <div>
+                          <label className="block text-sm font-medium text-slate-700 mb-2">
+                            Profile Photo
+                          </label>
+                          <input
+                            type="file"
+                            name="photo"
+                            onChange={handleInputChange}
+                            accept="image/*"
+                            className="w-full px-3 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200 bg-white file:mr-3 file:py-1 file:px-3 file:rounded file:border-0 file:text-xs file:font-medium file:bg-blue-500 file:text-white hover:file:bg-blue-600"
+                          />
                         </div>
                       </div>
                     </div>
@@ -743,6 +1252,96 @@ const CandidateDashboard = ({ token = null }) => {
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Winner Selection Popup */}
+      {showWinnerPopup && selectedWinnerSection && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div
+            ref={winnerPopupRef}
+            className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+          >
+            <div className="sticky top-0 bg-white border-b border-slate-200 z-10 rounded-t-2xl p-6">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h2 className="text-xl font-bold text-slate-900">
+                    Declare Winner
+                  </h2>
+                  <p className="text-slate-600 text-sm mt-1">
+                    Select the winner for {selectedWinnerSection.name}
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowWinnerPopup(false);
+                    setSelectedWinnerSection(null);
+                  }}
+                  className="w-8 h-8 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 transition-colors duration-200 flex items-center justify-center"
+                >
+                  ×
+                </button>
+              </div>
+            </div>
+
+            <div className="p-6">
+              <div className="space-y-4">
+                {selectedWinnerSection.candidates.map((candidate) => (
+                  <div
+                    key={candidate.id}
+                    className="flex items-center justify-between p-4 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
+                  >
+                    <div className="flex items-center gap-4">
+                      {candidate.photoUrl ? (
+                        <img
+                          src={candidate.photoUrl}
+                          alt={candidate.name}
+                          className="w-12 h-12 rounded-lg object-cover"
+                        />
+                      ) : (
+                        <div className="w-12 h-12 bg-blue-500 rounded-lg flex items-center justify-center">
+                          <span className="text-white font-medium">
+                            {getInitials(candidate.name)}
+                          </span>
+                        </div>
+                      )}
+                      <div>
+                        <h4 className="font-medium text-slate-900">
+                          {candidate.name}
+                        </h4>
+                        <p className="text-sm text-slate-600">
+                          {candidate.position}
+                        </p>
+                        {candidate.candidate_id && (
+                          <p className="text-xs text-slate-500">
+                            ID: {candidate.candidate_id}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => handleSelectWinner(candidate)}
+                      className="px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 transition-colors"
+                    >
+                      Select as Winner
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-6 pt-6 border-t border-slate-200">
+                <button
+                  onClick={() => {
+                    setShowWinnerPopup(false);
+                    setSelectedWinnerSection(null);
+                  }}
+                  className="w-full px-4 py-3 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors duration-200 font-medium"
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -798,6 +1397,11 @@ const CandidateDashboard = ({ token = null }) => {
                     <p className="text-blue-600 font-medium mt-1 text-sm">
                       {selectedCandidate.position}
                     </p>
+                    {selectedCandidate.candidate_id && (
+                      <p className="text-sm text-slate-500 mt-1">
+                        Candidate ID: {selectedCandidate.candidate_id}
+                      </p>
+                    )}
                   </div>
 
                   {/* Info Grid */}
@@ -821,6 +1425,17 @@ const CandidateDashboard = ({ token = null }) => {
                           {selectedCandidate.phone}
                         </p>
                       </div>
+
+                      {selectedCandidate.whatsapp && (
+                        <div>
+                          <p className="text-xs text-slate-500 uppercase tracking-wide">
+                            WhatsApp
+                          </p>
+                          <p className="text-slate-900 font-medium">
+                            {selectedCandidate.whatsapp}
+                          </p>
+                        </div>
+                      )}
                     </div>
 
                     {/* Right */}
@@ -842,6 +1457,17 @@ const CandidateDashboard = ({ token = null }) => {
                           {selectedCandidate.gender || "N/A"}
                         </p>
                       </div>
+
+                      {selectedCandidate.experience && (
+                        <div>
+                          <p className="text-xs text-slate-500 uppercase tracking-wide">
+                            Experience
+                          </p>
+                          <p className="text-slate-900 font-medium">
+                            {selectedCandidate.experience}
+                          </p>
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -917,12 +1543,12 @@ const CandidateDashboard = ({ token = null }) => {
           </div>
         </div>
       )}
-      <div className=" border-t border-slate-200 pt-">
+
+      <div className="border-t border-slate-200 pt-8 mt-8">
         <ElectionDashboard />
       </div>
     </div>
-    
   );
 };
- 
+
 export default CandidateDashboard;

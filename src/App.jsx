@@ -43,7 +43,10 @@ export default function App() {
     location.pathname === "/dashboard" ||
     location.pathname === "/candidate-dashboard" ||
     location.pathname === "/participationForm" ||
-    location.pathname.startsWith("/member-details/");
+    location.pathname.startsWith("/member-details/") ||
+    location.pathname === "/electionhome" ||
+    location.pathname === "/electionManagementplatform" ||
+    location.pathname === "/electionForm"; 
 
   return (
     <div className="max-w-full overflow-x-hidden">
