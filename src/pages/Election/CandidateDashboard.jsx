@@ -1170,65 +1170,62 @@ const CandidateDashboard = ({ token = null }) => {
                           </button>
                         </div>
                       ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-9 ml-10">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 shadow-[0_6px_29px_rgba(59,130,246,0.15)] xl:grid-cols-5 gap-4">
                           {section.candidates.map((candidate) => (
                             <div
                               key={candidate.id}
                               className="bg-white   rounded-lg p-3 border border-gray-200 shadow-sm hover:shadow-md hover:border-blue-300 transition-all"
                             >
+                               
                               <div className="flex flex-col items-center text-center">
-                                {/* Candidate Photo with Black Shadow */}
-                                <div className="mb-7 relative">
-                                  <div className="absolute inset-0 bg-gradient-to-br from-blue-500/20 to-purple-500/20 rounded-full blur-xl transform translate-y-1 scale-110"></div>
+                                {/* Candidate Photo */}
+                                <div className="mb-4 relative">
                                   {candidate.photoUrl ? (
                                     <img
                                       src={candidate.photoUrl}
                                       alt={candidate.name}
-                                      className="relative w-24 h-24  border-2 border-gray-300   object-cover mx-auto rounded-full shadow-2xl"
+                                      className="w-16 h-16 border-2 border-gray-300 object-cover mx-auto rounded-full shadow-md"
                                     />
                                   ) : (
-                                    <div className="relative w-10 h-10 rounded-full bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center mx-auto shadow-xl">
-                                      <span className="text-white font-bold text-xl">
+                                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center mx-auto shadow-md">
+                                      <span className="text-white font-bold text-sm">
                                         {getInitials(candidate.name)}
                                       </span>
                                     </div>
                                   )}
                                 </div>
 
-                                <div className="w-full text-center mb-6">
+                                <div className="w-full text-center mb-4">
                                   {/* Candidate Name */}
-                                  <h5 className="font-bold text-slate-900 text-xl mb-3">
+                                  <h5 className="font-bold text-slate-900 text-sm mb-1 truncate w-full">
                                     {candidate.name}
                                   </h5>
 
-                                  {/* Position - Make it prominent like in image */}
-                                  <div className="mb-3">
-                                    <div className="text-xs font-semibold text-slate-600 uppercase tracking-wider mb-3">
-                                      Position
-                                    </div>
-                                    <div className="text-blue-700 font-bold text-lg bg-gradient-to-r from-blue-100 to-blue-50 px-4 py-2 rounded-lg inline-block">
+                                  {/* Position */}
+                                  <div className="mb-2">
+                                    <div className="text-blue-700 font-semibold text-xs bg-blue-50 px-2 py-1 rounded-md inline-block truncate max-w-full">
                                       {candidate.position}
                                     </div>
                                   </div>
 
                                   {/* Candidate ID */}
                                   {candidate.candidate_id && (
-                                    <div className="text-sm font-medium text-slate-700 bg-slate-100 px-3 py-1.5 rounded-lg inline-block">
+                                    <div className="text-xs text-slate-600 font-medium">
                                       ID: {candidate.candidate_id}
                                     </div>
                                   )}
                                 </div>
 
-                                <div className="flex gap-3 w-full mt-6">
+                                <div className="flex gap-2 w-full">
                                   <button
                                     onClick={() => handleViewDetails(candidate)}
-                                    className="flex-1 text-sm bg-gradient-to-r cursor-pointer from-blue-600 to-blue-700 text-white py-3 rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all font-semibold shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+                                    className="flex-1 text-xs bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition-all font-medium"
                                   >
-                                    View Profile
+                                    View
                                   </button>
                                   <button
                                     onClick={() => handleDeleteClick(candidate)}
-                                    className="flex-1 text-sm bg-gradient-to-r cursor-pointer from-red-500 to-red-600 text-white py-3 rounded-xl hover:from-red-600 hover:to-red-700 transition-all font-semibold shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+                                    className="flex-1 text-xs bg-red-500 text-white py-2 rounded-lg hover:bg-red-600 transition-all font-medium"
                                   >
                                     Delete
                                   </button>
