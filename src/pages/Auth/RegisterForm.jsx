@@ -1,4 +1,4 @@
-import { useState } from "react";
+ import { useState } from "react";
 import axios from "axios";
 
 export default function RegisterForm() {
@@ -15,6 +15,15 @@ export default function RegisterForm() {
     confirmPassword: "",
   });
 
+  // Service selection state
+  const [selectedServices, setSelectedServices] = useState({
+    foodManagement: false,
+    electionSystem: false,
+    luckydraw: false,
+    dashboard: false,
+    digitalRegistration: false,
+  });
+
   const [errors, setErrors] = useState({});
   const [touched, setTouched] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -29,6 +38,14 @@ export default function RegisterForm() {
   const [isSendingOtp, setIsSendingOtp] = useState(false);
   const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
   const [otpError, setOtpError] = useState("");
+
+  // Handle service checkbox changes
+  const handleServiceChange = (service) => {
+    setSelectedServices((prev) => ({
+      ...prev,
+      [service]: !prev[service],
+    }));
+  };
 
   const validateForm = () => {
     const newErrors = {};
@@ -108,6 +125,13 @@ export default function RegisterForm() {
       newErrors.confirmPassword = "Passwords do not match";
     }
 
+    // Service selection validation
+    const selectedCount =
+      Object.values(selectedServices).filter(Boolean).length;
+    if (selectedCount === 0) {
+      newErrors.services = "Please select at least one service";
+    }
+
     return newErrors;
   };
 
@@ -150,7 +174,7 @@ export default function RegisterForm() {
     }));
   };
 
-  // Send OTP API call using Axios - Try different formats
+  // Send OTP API call using Axios
   const sendOtp = async () => {
     if (!formData.email || errors.email) {
       setOtpError("Please enter a valid email address first");
@@ -161,7 +185,6 @@ export default function RegisterForm() {
     setOtpError("");
 
     try {
-      // Try different formats - the API might expect different field names
       const requestData = {
         Email: formData.email,
       };
@@ -169,7 +192,7 @@ export default function RegisterForm() {
       console.log("Sending OTP request with data:", requestData);
 
       const response = await axios.post(
-        "http://localhost:1337/api/admin/requestOtp",
+        "https://api.regeve.in/api/admin/requestOtp",
         requestData,
         {
           headers: {
@@ -206,7 +229,7 @@ export default function RegisterForm() {
     }
   };
 
-  // Verify OTP API call using Axios - Try different formats
+  // Verify OTP API call using Axios
   const verifyOtp = async () => {
     if (!otp.trim()) {
       setOtpError("Please enter the OTP");
@@ -225,7 +248,7 @@ export default function RegisterForm() {
       console.log("Verifying OTP with data:", requestData);
 
       const response = await axios.post(
-        "http://localhost:1337/api/admin/verifyOtp",
+        "https://api.regeve.in/api/admin/verifyOtp",
         requestData,
         {
           headers: {
@@ -258,9 +281,7 @@ export default function RegisterForm() {
     }
   };
 
-  // Submit form using Axios - Try different data formats
-  // Submit form using Axios - Corrected data format
-
+  // Submit form with selected services
   const submitToAPI = async (data) => {
     const apiData = {
       Company_Name: data.companyName.trim(),
@@ -277,15 +298,22 @@ export default function RegisterForm() {
       Password: data.password,
       Email_Verify: true,
       Approved_Admin: false,
+      // Add selected services
+      Services: {
+        Food_Management: selectedServices.foodManagement,
+        Election_System: selectedServices.electionSystem,
+        Lucky_Draw: selectedServices.luckydraw,
+        Dashboard: selectedServices.dashboard,
+      },
     };
 
     console.log("Submitting form data to API:", apiData);
 
     try {
       const response = await axios.post(
-        "http://localhost:1337/api/admin/create",
+        "https://api.regeve.in/api/admin/create",
         {
-          data: apiData, // ⭐ REQUIRED BY STRAPI
+          data: apiData,
         },
         {
           headers: {
@@ -363,6 +391,12 @@ export default function RegisterForm() {
           idCard: "",
           password: "",
           confirmPassword: "",
+        });
+        setSelectedServices({
+          foodManagement: false,
+          electionSystem: false,
+          luckydraw: false,
+          dashboard: false,
         });
         setIsOtpSent(false);
         setIsOtpVerified(false);
@@ -453,400 +487,604 @@ export default function RegisterForm() {
         </div>
       )}
 
-      <div className="max-w-2xl mx-auto">
-        <div className="bg-white py-8 px-6 shadow rounded-lg sm:px-10">
-          <div className="text-center mb-8">
-            <h2 className="text-3xl font-bold text-gray-900">
-              Admin Registration
-            </h2>
-            <p className="mt-2 text-gray-600">Create a new admin account</p>
-          </div>
-
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Company Name */}
-            <div>
-              <label htmlFor="companyName" className={labelClass}>
-                Company Name *
-              </label>
-              <input
-                type="text"
-                id="companyName"
-                name="companyName"
-                value={formData.companyName}
-                onChange={handleChange}
-                onBlur={handleBlur}
-                className={`${inputClass} ${
-                  touched.companyName && errors.companyName
-                    ? "border-red-500"
-                    : ""
-                }`}
-                placeholder="Enter your company name"
-              />
-              {touched.companyName && errors.companyName && (
-                <div className={errorClass}>{errors.companyName}</div>
-              )}
-            </div>
-
-            {/* Name */}
-            <div>
-              <label htmlFor="name" className={labelClass}>
-                Full Name *
-              </label>
-              <input
-                type="text"
-                id="name"
-                name="name"
-                value={formData.name}
-                onChange={handleChange}
-                onBlur={handleBlur}
-                className={`${inputClass} ${
-                  touched.name && errors.name ? "border-red-500" : ""
-                }`}
-                placeholder="Enter your full name"
-              />
-              {touched.name && errors.name && (
-                <div className={errorClass}>{errors.name}</div>
-              )}
-            </div>
-
-            {/* Email with OTP Verification */}
-            <div>
-              <label htmlFor="email" className={labelClass}>
-                Email Address *
-              </label>
-              <div className="flex space-x-2">
-                <input
-                  type="email"
-                  id="email"
-                  name="email"
-                  value={formData.email}
-                  onChange={handleChange}
-                  onBlur={handleBlur}
-                  className={`${inputClass} flex-1 ${
-                    touched.email && errors.email ? "border-red-500" : ""
-                  }`}
-                  placeholder="Enter your email"
-                  disabled={isOtpVerified}
-                />
-                <button
-                  type="button"
-                  onClick={sendOtp}
-                  disabled={
-                    !formData.email ||
-                    errors.email ||
-                    isOtpVerified ||
-                    isSendingOtp
-                  }
-                  className={`px-4 py-2 rounded-md text-sm font-medium transition duration-200 ${
-                    !formData.email ||
-                    errors.email ||
-                    isOtpVerified ||
-                    isSendingOtp
-                      ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                      : "bg-blue-600 text-white hover:bg-blue-700"
-                  }`}
-                >
-                  {isSendingOtp
-                    ? "Sending..."
-                    : isOtpVerified
-                    ? "Verified ✓"
-                    : "Get OTP"}
-                </button>
+      <div className="max-w-6xl mx-auto">
+        <div className="flex flex-col lg:flex-row gap-8">
+          {/* Left Side - Service Selection Panel */}
+          <div className="lg:w-2/3">
+            <div className="bg-white py-8 px-6 shadow rounded-lg h-full">
+              <div className="text-center mb-8">
+                <h2 className="text-3xl font-bold text-gray-900">
+                  Admin Registration
+                </h2>
+                <p className="mt-2 text-gray-600">Create a new admin account</p>
               </div>
-              {touched.email && errors.email && (
-                <div className={errorClass}>{errors.email}</div>
-              )}
-            </div>
 
-            {/* OTP Verification Section */}
-            {isOtpSent && !isOtpVerified && (
-              <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-                <label htmlFor="otp" className={labelClass}>
-                  Enter OTP *
-                </label>
-                <div className="flex space-x-2">
+              <form onSubmit={handleSubmit} className="space-y-6">
+                {/* Company Name */}
+                <div>
+                  <label htmlFor="companyName" className={labelClass}>
+                    Company Name *
+                  </label>
                   <input
                     type="text"
-                    id="otp"
-                    value={otp}
-                    onChange={(e) => setOtp(e.target.value)}
-                    className={`${inputClass} flex-1`}
-                    placeholder="Enter OTP sent to your email"
-                    maxLength={6}
+                    id="companyName"
+                    name="companyName"
+                    value={formData.companyName}
+                    onChange={handleChange}
+                    onBlur={handleBlur}
+                    className={`${inputClass} ${
+                      touched.companyName && errors.companyName
+                        ? "border-red-500"
+                        : ""
+                    }`}
+                    placeholder="Enter your company name"
                   />
-                  <button
-                    type="button"
-                    onClick={verifyOtp}
-                    disabled={!otp.trim() || isVerifyingOtp}
-                    className={`px-4 py-2 rounded-md text-sm font-medium transition duration-200 ${
-                      !otp.trim() || isVerifyingOtp
-                        ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                        : "bg-green-600 text-white hover:bg-green-700"
-                    }`}
-                  >
-                    {isVerifyingOtp ? "Verifying..." : "Verify OTP"}
-                  </button>
+                  {touched.companyName && errors.companyName && (
+                    <div className={errorClass}>{errors.companyName}</div>
+                  )}
                 </div>
-                {otpError && (
-                  <div
-                    className={`text-sm mt-2 ${
-                      otpError.includes("successfully")
-                        ? "text-green-600"
-                        : "text-red-500"
+
+                {/* Name */}
+                <div>
+                  <label htmlFor="name" className={labelClass}>
+                    Full Name *
+                  </label>
+                  <input
+                    type="text"
+                    id="name"
+                    name="name"
+                    value={formData.name}
+                    onChange={handleChange}
+                    onBlur={handleBlur}
+                    className={`${inputClass} ${
+                      touched.name && errors.name ? "border-red-500" : ""
                     }`}
-                  >
-                    {otpError}
+                    placeholder="Enter your full name"
+                  />
+                  {touched.name && errors.name && (
+                    <div className={errorClass}>{errors.name}</div>
+                  )}
+                </div>
+
+                {/* Email with OTP Verification */}
+                <div>
+                  <label htmlFor="email" className={labelClass}>
+                    Email Address *
+                  </label>
+                  <div className="flex space-x-2">
+                    <input
+                      type="email"
+                      id="email"
+                      name="email"
+                      value={formData.email}
+                      onChange={handleChange}
+                      onBlur={handleBlur}
+                      className={`${inputClass} flex-1 ${
+                        touched.email && errors.email ? "border-red-500" : ""
+                      }`}
+                      placeholder="Enter your email"
+                      disabled={isOtpVerified}
+                    />
+                    <button
+                      type="button"
+                      onClick={sendOtp}
+                      disabled={
+                        !formData.email ||
+                        errors.email ||
+                        isOtpVerified ||
+                        isSendingOtp
+                      }
+                      className={`px-4 py-2 rounded-md text-sm font-medium transition duration-200 ${
+                        !formData.email ||
+                        errors.email ||
+                        isOtpVerified ||
+                        isSendingOtp
+                          ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                          : "bg-blue-600 text-white hover:bg-blue-700"
+                      }`}
+                    >
+                      {isSendingOtp
+                        ? "Sending..."
+                        : isOtpVerified
+                        ? "Verified ✓"
+                        : "Get OTP"}
+                    </button>
+                  </div>
+                  {touched.email && errors.email && (
+                    <div className={errorClass}>{errors.email}</div>
+                  )}
+                </div>
+
+                {/* OTP Verification Section */}
+                {isOtpSent && !isOtpVerified && (
+                  <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                    <label htmlFor="otp" className={labelClass}>
+                      Enter OTP *
+                    </label>
+                    <div className="flex space-x-2">
+                      <input
+                        type="text"
+                        id="otp"
+                        value={otp}
+                        onChange={(e) => setOtp(e.target.value)}
+                        className={`${inputClass} flex-1`}
+                        placeholder="Enter OTP sent to your email"
+                        maxLength={6}
+                      />
+                      <button
+                        type="button"
+                        onClick={verifyOtp}
+                        disabled={!otp.trim() || isVerifyingOtp}
+                        className={`px-4 py-2 rounded-md text-sm font-medium transition duration-200 ${
+                          !otp.trim() || isVerifyingOtp
+                            ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                            : "bg-green-600 text-white hover:bg-green-700"
+                        }`}
+                      >
+                        {isVerifyingOtp ? "Verifying..." : "Verify OTP"}
+                      </button>
+                    </div>
+                    {otpError && (
+                      <div
+                        className={`text-sm mt-2 ${
+                          otpError.includes("successfully")
+                            ? "text-green-600"
+                            : "text-red-500"
+                        }`}
+                      >
+                        {otpError}
+                      </div>
+                    )}
+                    <p className="text-sm text-blue-600 mt-2">
+                      We've sent a verification code to your email address.
+                    </p>
                   </div>
                 )}
-                <p className="text-sm text-blue-600 mt-2">
-                  We've sent a verification code to your email address.
+
+                {/* OTP Verified Success */}
+                {isOtpVerified && (
+                  <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+                    <div className="flex items-center space-x-2 text-green-700">
+                      <svg
+                        className="w-5 h-5"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth="2"
+                          d="M5 13l4 4L19 7"
+                        ></path>
+                      </svg>
+                      <span className="font-medium">
+                        Email verified successfully!
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label htmlFor="dob" className={labelClass}>
+                      Date of Birth *
+                    </label>
+                    <input
+                      type="date"
+                      id="dob"
+                      name="dob"
+                      value={formData.dob}
+                      onChange={handleChange}
+                      onBlur={handleBlur}
+                      className={`${inputClass} ${
+                        touched.dob && errors.dob ? "border-red-500" : ""
+                      }`}
+                    />
+                    {touched.dob && errors.dob && (
+                      <div className={errorClass}>{errors.dob}</div>
+                    )}
+                  </div>
+
+                  <div>
+                    <label htmlFor="gender" className={labelClass}>
+                      Gender *
+                    </label>
+                    <select
+                      id="gender"
+                      name="gender"
+                      value={formData.gender}
+                      onChange={handleChange}
+                      onBlur={handleBlur}
+                      className={`${inputClass} ${
+                        touched.gender && errors.gender ? "border-red-500" : ""
+                      }`}
+                    >
+                      <option value="">Select Gender</option>
+                      <option value="male">Male</option>
+                      <option value="female">Female</option>
+                      <option value="other">Other</option>
+                    </select>
+                    {touched.gender && errors.gender && (
+                      <div className={errorClass}>{errors.gender}</div>
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <label htmlFor="occupation" className={labelClass}>
+                    Occupation *
+                  </label>
+                  <input
+                    type="text"
+                    id="occupation"
+                    name="occupation"
+                    value={formData.occupation}
+                    onChange={handleChange}
+                    onBlur={handleBlur}
+                    className={`${inputClass} ${
+                      touched.occupation && errors.occupation
+                        ? "border-red-500"
+                        : ""
+                    }`}
+                    placeholder="Enter your occupation"
+                  />
+                  {touched.occupation && errors.occupation && (
+                    <div className={errorClass}>{errors.occupation}</div>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label htmlFor="phoneNumber" className={labelClass}>
+                      Phone Number *
+                    </label>
+                    <input
+                      type="tel"
+                      id="phoneNumber"
+                      name="phoneNumber"
+                      value={formData.phoneNumber}
+                      onChange={handleChange}
+                      onBlur={handleBlur}
+                      className={`${inputClass} ${
+                        touched.phoneNumber && errors.phoneNumber
+                          ? "border-red-500"
+                          : ""
+                      }`}
+                      placeholder="Enter phone number"
+                    />
+                    {touched.phoneNumber && errors.phoneNumber && (
+                      <div className={errorClass}>{errors.phoneNumber}</div>
+                    )}
+                  </div>
+
+                  <div>
+                    <label htmlFor="idCard" className={labelClass}>
+                      ID Card Number *
+                    </label>
+                    <input
+                      type="text"
+                      id="idCard"
+                      name="idCard"
+                      value={formData.idCard}
+                      onChange={handleChange}
+                      onBlur={handleBlur}
+                      className={`${inputClass} ${
+                        touched.idCard && errors.idCard ? "border-red-500" : ""
+                      }`}
+                      placeholder="Enter ID card number"
+                    />
+                    {touched.idCard && errors.idCard && (
+                      <div className={errorClass}>{errors.idCard}</div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="relative">
+                    <label htmlFor="password" className={labelClass}>
+                      Password *
+                    </label>
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      id="password"
+                      name="password"
+                      value={formData.password}
+                      onChange={handleChange}
+                      onBlur={handleBlur}
+                      className={`${inputClass} ${
+                        touched.password && errors.password
+                          ? "border-red-500"
+                          : ""
+                      }`}
+                      placeholder="Enter password"
+                    />
+                    <span
+                      className="absolute right-3 top-10 cursor-pointer text-gray-600"
+                      onClick={() => setShowPassword(!showPassword)}
+                    >
+                      {showPassword ? "👁️‍🗨️" : "👁️"}
+                    </span>
+                    {touched.password && errors.password && (
+                      <div className={errorClass}>{errors.password}</div>
+                    )}
+                  </div>
+
+                  <div className="relative">
+                    <label htmlFor="confirmPassword" className={labelClass}>
+                      Confirm Password *
+                    </label>
+                    <input
+                      type={showConfirmPassword ? "text" : "password"}
+                      id="confirmPassword"
+                      name="confirmPassword"
+                      value={formData.confirmPassword}
+                      onChange={handleChange}
+                      onBlur={handleBlur}
+                      className={`${inputClass} ${
+                        touched.confirmPassword && errors.confirmPassword
+                          ? "border-red-500"
+                          : ""
+                      }`}
+                      placeholder="Confirm your password"
+                    />
+                    <span
+                      className="absolute right-3 top-10 cursor-pointer text-gray-600"
+                      onClick={() =>
+                        setShowConfirmPassword(!showConfirmPassword)
+                      }
+                    >
+                      {showConfirmPassword ? "👁️‍🗨️" : "👁️"}
+                    </span>
+                    {touched.confirmPassword && errors.confirmPassword && (
+                      <div className={errorClass}>{errors.confirmPassword}</div>
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <button
+                    type="submit"
+                    disabled={isSubmitting || !isOtpVerified}
+                    className={`w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white transition duration-200 ${
+                      isSubmitting || !isOtpVerified
+                        ? "bg-gray-400 cursor-not-allowed"
+                        : "bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                    }`}
+                  >
+                    {isSubmitting ? (
+                      <div className="flex items-center">
+                        <svg
+                          className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
+                          xmlns="http://www.w3.org/2000/svg"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                        >
+                          <circle
+                            className="opacity-25"
+                            cx="12"
+                            cy="12"
+                            r="10"
+                            stroke="currentColor"
+                            strokeWidth="4"
+                          ></circle>
+                          <path
+                            className="opacity-75"
+                            fill="currentColor"
+                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                          ></path>
+                        </svg>
+                        Submitting...
+                      </div>
+                    ) : (
+                      "Register Admin"
+                    )}
+                  </button>
+                  {!isOtpVerified && (
+                    <div className="text-orange-500 text-sm mt-2 text-center">
+                      Please verify your email address before submitting
+                    </div>
+                  )}
+                </div>
+              </form>
+            </div>
+          </div>
+
+          {/* Right Side - Registration Form */}
+          <div className="lg:w-1/3">
+            <div className="bg-white py-8 px-6 shadow rounded-lg h-full">
+              <div className="text-center mb-8">
+                <h2 className="text-2xl font-bold text-gray-900">
+                  Choose Services
+                </h2>
+                <p className="mt-2 text-gray-600">
+                  Select the services you want to use
                 </p>
               </div>
-            )}
 
-            {/* OTP Verified Success */}
-            {isOtpVerified && (
-              <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-                <div className="flex items-center space-x-2 text-green-700">
-                  <svg
-                    className="w-5 h-5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth="2"
-                      d="M5 13l4 4L19 7"
-                    ></path>
-                  </svg>
-                  <span className="font-medium">
-                    Email verified successfully!
-                  </span>
-                </div>
-              </div>
-            )}
-
-            {/* Rest of the form fields remain the same */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label htmlFor="dob" className={labelClass}>
-                  Date of Birth *
-                </label>
-                <input
-                  type="date"
-                  id="dob"
-                  name="dob"
-                  value={formData.dob}
-                  onChange={handleChange}
-                  onBlur={handleBlur}
-                  className={`${inputClass} ${
-                    touched.dob && errors.dob ? "border-red-500" : ""
-                  }`}
-                />
-                {touched.dob && errors.dob && (
-                  <div className={errorClass}>{errors.dob}</div>
-                )}
-              </div>
-
-              <div>
-                <label htmlFor="gender" className={labelClass}>
-                  Gender *
-                </label>
-                <select
-                  id="gender"
-                  name="gender"
-                  value={formData.gender}
-                  onChange={handleChange}
-                  onBlur={handleBlur}
-                  className={`${inputClass} ${
-                    touched.gender && errors.gender ? "border-red-500" : ""
-                  }`}
-                >
-                  <option value="">Select Gender</option>
-                  <option value="male">Male</option>
-                  <option value="female">Female</option>
-                  <option value="other">Other</option>
-                </select>
-                {touched.gender && errors.gender && (
-                  <div className={errorClass}>{errors.gender}</div>
-                )}
-              </div>
-            </div>
-
-            <div>
-              <label htmlFor="occupation" className={labelClass}>
-                Occupation *
-              </label>
-              <input
-                type="text"
-                id="occupation"
-                name="occupation"
-                value={formData.occupation}
-                onChange={handleChange}
-                onBlur={handleBlur}
-                className={`${inputClass} ${
-                  touched.occupation && errors.occupation
-                    ? "border-red-500"
-                    : ""
-                }`}
-                placeholder="Enter your occupation"
-              />
-              {touched.occupation && errors.occupation && (
-                <div className={errorClass}>{errors.occupation}</div>
-              )}
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label htmlFor="phoneNumber" className={labelClass}>
-                  Phone Number *
-                </label>
-                <input
-                  type="tel"
-                  id="phoneNumber"
-                  name="phoneNumber"
-                  value={formData.phoneNumber}
-                  onChange={handleChange}
-                  onBlur={handleBlur}
-                  className={`${inputClass} ${
-                    touched.phoneNumber && errors.phoneNumber
-                      ? "border-red-500"
-                      : ""
-                  }`}
-                  placeholder="Enter phone number"
-                />
-                {touched.phoneNumber && errors.phoneNumber && (
-                  <div className={errorClass}>{errors.phoneNumber}</div>
-                )}
-              </div>
-
-              <div>
-                <label htmlFor="idCard" className={labelClass}>
-                  ID Card Number *
-                </label>
-                <input
-                  type="text"
-                  id="idCard"
-                  name="idCard"
-                  value={formData.idCard}
-                  onChange={handleChange}
-                  onBlur={handleBlur}
-                  className={`${inputClass} ${
-                    touched.idCard && errors.idCard ? "border-red-500" : ""
-                  }`}
-                  placeholder="Enter ID card number"
-                />
-                {touched.idCard && errors.idCard && (
-                  <div className={errorClass}>{errors.idCard}</div>
-                )}
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="relative">
-                <label htmlFor="password" className={labelClass}>
-                  Password *
-                </label>
-                <input
-                  type={showPassword ? "text" : "password"}
-                  id="password"
-                  name="password"
-                  value={formData.password}
-                  onChange={handleChange}
-                  onBlur={handleBlur}
-                  className={`${inputClass} ${
-                    touched.password && errors.password ? "border-red-500" : ""
-                  }`}
-                  placeholder="Enter password"
-                />
-                <span
-                  className="absolute right-3 top-10 cursor-pointer text-gray-600"
-                  onClick={() => setShowPassword(!showPassword)}
-                >
-                  {showPassword ? "👁️‍🗨️" : "👁️"}
-                </span>
-                {touched.password && errors.password && (
-                  <div className={errorClass}>{errors.password}</div>
-                )}
-              </div>
-
-              <div className="relative">
-                <label htmlFor="confirmPassword" className={labelClass}>
-                  Confirm Password *
-                </label>
-                <input
-                  type={showConfirmPassword ? "text" : "password"}
-                  id="confirmPassword"
-                  name="confirmPassword"
-                  value={formData.confirmPassword}
-                  onChange={handleChange}
-                  onBlur={handleBlur}
-                  className={`${inputClass} ${
-                    touched.confirmPassword && errors.confirmPassword
-                      ? "border-red-500"
-                      : ""
-                  }`}
-                  placeholder="Confirm your password"
-                />
-                <span
-                  className="absolute right-3 top-10 cursor-pointer text-gray-600"
-                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                >
-                  {showConfirmPassword ? "👁️‍🗨️" : "👁️"}
-                </span>
-                {touched.confirmPassword && errors.confirmPassword && (
-                  <div className={errorClass}>{errors.confirmPassword}</div>
-                )}
-              </div>
-            </div>
-
-            <div>
-              <button
-                type="submit"
-                disabled={isSubmitting || !isOtpVerified}
-                className={`w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white transition duration-200 ${
-                  isSubmitting || !isOtpVerified
-                    ? "bg-gray-400 cursor-not-allowed"
-                    : "bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                }`}
-              >
-                {isSubmitting ? (
+              <div className="space-y-4">
+                {/* Digital Registration */}
+                <div className="border border-gray-200 rounded-lg p-4 hover:border-blue-300 transition duration-200">
                   <div className="flex items-center">
-                    <svg
-                      className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
-                      xmlns="http://www.w3.org/2000/svg"
-                      fill="none"
-                      viewBox="0 0 24 24"
+                    <input
+                      type="checkbox"
+                      id="digitalRegistration"
+                      checked={selectedServices.digitalRegistration}
+                      onChange={() =>
+                        handleServiceChange("digitalRegistration")
+                      }
+                      className="h-6 w-6 text-blue-600 rounded focus:ring-blue-500"
+                    />
+                    <label
+                      htmlFor="digitalRegistration"
+                      className="ml-3 flex items-center"
                     >
-                      <circle
-                        className="opacity-25"
-                        cx="12"
-                        cy="12"
-                        r="10"
-                        stroke="currentColor"
-                        strokeWidth="4"
-                      ></circle>
-                      <path
-                        className="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                      ></path>
-                    </svg>
-                    Submitting...
+                      <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center mr-3">
+                        <span className="text-blue-600 text-xl">📝</span>
+                      </div>
+                      <div>
+                        <span className="block font-medium text-gray-900">
+                          Digital Registration
+                        </span>
+                        <span className="block text-sm text-gray-500">
+                          Online form submissions, digital applications, and
+                          e-registration
+                        </span>
+                      </div>
+                    </label>
                   </div>
-                ) : (
-                  "Register Admin"
-                )}
-              </button>
-              {!isOtpVerified && (
-                <div className="text-orange-500 text-sm mt-2 text-center">
-                  Please verify your email address before submitting
                 </div>
-              )}
+
+                {/* Food Management Service */}
+                <div className="border border-gray-200 rounded-lg p-4 hover:border-blue-300 transition duration-200">
+                  <div className="flex items-center">
+                    <input
+                      type="checkbox"
+                      id="foodManagement"
+                      checked={selectedServices.foodManagement}
+                      onChange={() => handleServiceChange("foodManagement")}
+                      className="h-5 w-5 text-blue-600 rounded focus:ring-blue-500"
+                    />
+                    <label
+                      htmlFor="foodManagement"
+                      className="ml-3 flex items-center"
+                    >
+                      <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center mr-3">
+                        <span className="text-green-600 text-xl">🍽️</span>
+                      </div>
+                      <div>
+                        <span className="block font-medium text-gray-900">
+                          Food Management
+                        </span>
+                        <span className="block text-sm text-gray-500">
+                          Manage menus, orders, and restaurant operations
+                        </span>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+
+                {/* Election System Service */}
+                <div className="border border-gray-200 rounded-lg p-4 hover:border-blue-300 transition duration-200">
+                  <div className="flex items-center">
+                    <input
+                      type="checkbox"
+                      id="electionSystem"
+                      checked={selectedServices.electionSystem}
+                      onChange={() => handleServiceChange("electionSystem")}
+                      className="h-5 w-5 text-blue-600 rounded focus:ring-blue-500"
+                    />
+                    <label
+                      htmlFor="electionSystem"
+                      className="ml-3 flex items-center"
+                    >
+                      <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center mr-3">
+                        <span className="text-blue-600 text-xl">🗳️</span>
+                      </div>
+                      <div>
+                        <span className="block font-medium text-gray-900">
+                          Election System
+                        </span>
+                        <span className="block text-sm text-gray-500">
+                          Conduct polls, surveys, and voting processes
+                        </span>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+
+                {/* Lucky Draw Service */}
+                <div className="border border-gray-200 rounded-lg p-4 hover:border-blue-300 transition duration-200">
+                  <div className="flex items-center">
+                    <input
+                      type="checkbox"
+                      id="luckydraw"
+                      checked={selectedServices.luckydraw}
+                      onChange={() => handleServiceChange("luckydraw")}
+                      className="h-5 w-5 text-blue-600 rounded focus:ring-blue-500"
+                    />
+                    <label
+                      htmlFor="luckydraw"
+                      className="ml-3 flex items-center"
+                    >
+                      <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center mr-3">
+                        <span className="text-purple-600 text-xl">🎁</span>
+                      </div>
+                      <div>
+                        <span className="block font-medium text-gray-900">
+                          Lucky Draw
+                        </span>
+                        <span className="block text-sm text-gray-500">
+                          Create raffles, contests, and prize distributions
+                        </span>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+
+                {/* Dashboard Service */}
+                <div className="border border-gray-200 rounded-lg p-4 hover:border-blue-300 transition duration-200">
+                  <div className="flex items-center">
+                    <input
+                      type="checkbox"
+                      id="dashboard"
+                      checked={selectedServices.dashboard}
+                      onChange={() => handleServiceChange("dashboard")}
+                      className="h-5 w-5 text-blue-600 rounded focus:ring-blue-500"
+                    />
+                    <label
+                      htmlFor="dashboard"
+                      className="ml-3 flex items-center"
+                    >
+                      <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center mr-3">
+                        <span className="text-orange-600 text-xl">📊</span>
+                      </div>
+                      <div>
+                        <span className="block font-medium text-gray-900">
+                          Dashboard
+                        </span>
+                        <span className="block text-sm text-gray-500">
+                          Analytics, reports, and data visualization tools
+                        </span>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+
+                {/* Service Summary */}
+                <div className="mt-6 p-4 bg-blue-50 rounded-lg">
+                  <h3 className="font-medium text-blue-900 mb-2">
+                    Selected Services
+                  </h3>
+                  <div className="space-y-1">
+                    {Object.entries(selectedServices).map(
+                      ([key, value]) =>
+                        value && (
+                          <div key={key} className="flex items-center text-sm">
+                            <span className="w-2 h-2 bg-blue-500 rounded-full mr-2"></span>
+                            <span className="capitalize">
+                              {key.replace(/([A-Z])/g, " $1").trim()}
+                            </span>
+                          </div>
+                        )
+                    )}
+                    {Object.values(selectedServices).filter(Boolean).length ===
+                      0 && (
+                      <p className="text-gray-500 text-sm italic">
+                        No services selected
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {errors.services && (
+                  <div className="text-red-500 text-sm mt-2">
+                    {errors.services}
+                  </div>
+                )}
+              </div>
             </div>
-          </form>
+          </div>
         </div>
       </div>
 
