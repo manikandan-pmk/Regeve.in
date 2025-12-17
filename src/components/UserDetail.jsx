@@ -273,7 +273,7 @@ const UserDetail = () => {
     if (!Member_ID) return;
 
     axios
-      .post("http://localhost:1337/api/event", { Member_ID })
+      .post("https://api.regeve.in/api/event", { Member_ID })
       .then(() => console.log("Scan event sent to backend"))
       .catch((err) => console.error("Scan event error:", err));
   }, [Member_ID]);
@@ -284,7 +284,7 @@ const UserDetail = () => {
     const loadMember = async () => {
       try {
         const response = await axios.get(
-          `http://localhost:1337/api/event/${Member_ID}`,
+          `https://api.regeve.in/api/event/${Member_ID}`,
           {
             headers: {
               Accept: "application/json",
@@ -311,7 +311,7 @@ const UserDetail = () => {
     const interval = setInterval(async () => {
       try {
         const res = await axios.get(
-          `http://localhost:1337/api/event/${Member_ID}`
+          `https://api.regeve.in/api/event/${Member_ID}`
         );
         setMember(res.data?.data);
         setEditedMember(res.data?.data);
@@ -488,7 +488,7 @@ const UserDetail = () => {
       formData.append("files", customFile);
 
       const uploadResponse = await axios.post(
-        "http://localhost:1337/api/upload/",
+        "https://api.regeve.in/api/upload/",
         formData,
         {
           headers: {
@@ -501,13 +501,13 @@ const UserDetail = () => {
         const uploadedFile = uploadResponse.data[0];
 
         await axios.put(
-          `http://localhost:1337/api/event/${Member_ID}`,
+          `https://api.regeve.in/api/event/${Member_ID}`,
           { data: { Photo: uploadedFile.id } },
           { headers: { "Content-Type": "application/json" } }
         );
 
         const refreshResponse = await axios.get(
-          `http://loaclhost:1337/api/event/${Member_ID}`
+          `https://api.regeve.in/api/event/${Member_ID}`
         );
 
         const updatedMemberData = refreshResponse.data?.data;
@@ -648,7 +648,7 @@ const UserDetail = () => {
       });
 
       const response = await axios.put(
-        `http://localhost:1337/api/event/${Member_ID}`,
+        `https://api.regeve.in/api/event/${Member_ID}`,
         { data: cleanData },
         {
           headers: {
@@ -731,7 +731,7 @@ const UserDetail = () => {
                 >
                   {member.Photo?.url && !imageError ? (
                     <img
-                      src={`http://localhost:1337${
+                      src={`https://api.regeve.in${
                         member.Photo.url
                       }?t=${Date.now()}`}
                       alt="Profile"

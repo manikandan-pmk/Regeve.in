@@ -8,7 +8,7 @@ const QRRedirect = () => {
     if (!memberId) return;
 
     // Correct file name format
-    const target = `http://localhost:1337/uploads/${memberId}/${memberId}_QR.png`;
+    const target = `https://api.regeve.in/uploads/${memberId}/${memberId}_QR.png`;
 
     window.location.replace(target);
   }, [memberId]);

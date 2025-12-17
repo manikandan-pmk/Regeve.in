@@ -8,7 +8,7 @@ export default function MemberDashBoard() {
 
   useEffect(() => {
     // Connect to backend Socket.IO
-    const socket = io("http://localhost:1337", {
+    const socket = io("https://api.regeve.in", {
       transports: ["websocket"],
     });
 

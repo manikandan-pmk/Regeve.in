@@ -1,5 +1,6 @@
- import { useState } from "react";
+import { useState } from "react";
 import axios from "axios";
+import { useNavigate } from "react-router-dom";
 
 export default function RegisterForm() {
   const [formData, setFormData] = useState({
@@ -23,6 +24,8 @@ export default function RegisterForm() {
     dashboard: false,
     digitalRegistration: false,
   });
+
+  const navigate = useNavigate()
 
   const [errors, setErrors] = useState({});
   const [touched, setTouched] = useState({});
@@ -300,10 +303,11 @@ export default function RegisterForm() {
       Approved_Admin: false,
       // Add selected services
       Services: {
-        Food_Management: selectedServices.foodManagement,
-        Election_System: selectedServices.electionSystem,
-        Lucky_Draw: selectedServices.luckydraw,
-        Dashboard: selectedServices.dashboard,
+        "Digital Registration": selectedServices.digitalRegistration,
+        "Food Management": selectedServices.foodManagement,
+        "Election System": selectedServices.electionSystem,
+        "Lucky Draw": selectedServices.luckydraw,
+        "Dashboard": selectedServices.dashboard,
       },
     };
 
@@ -324,6 +328,7 @@ export default function RegisterForm() {
       );
 
       console.log("API Response Success:", response.data);
+      navigate("/")
       return response.data;
     } catch (error) {
       console.error("Error submitting form - Full Error:", error);

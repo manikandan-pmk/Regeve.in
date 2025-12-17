@@ -48,14 +48,14 @@ const Navbar = () => {
   const storedUser = localStorage.getItem("userProfile");
   const userName = storedUser ? JSON.parse(storedUser).name : "";
 
-  const isLoggedIn = !!localStorage.getItem("userToken");
+  const isLoggedIn = !!localStorage.getItem("jwt");
 
   const handleLogout = async () => {
     try {
-      const token = localStorage.getItem("userToken");
+      const token = localStorage.getItem("jwt");
 
       await axios.post(
-        "http://localhost:1337/admin/logout",
+        "https://api.regeve.in/admin/logout",
         {}, // backend usually doesn’t need email
         {
           headers: {
@@ -70,7 +70,7 @@ const Navbar = () => {
       showToast("Logout failed on server, but logging out locally.", "error");
     } finally {
       // ALWAYS log out user locally
-      localStorage.removeItem("userToken");
+      localStorage.removeItem("jwt");
       localStorage.removeItem("userProfile");
 
       // Update UI instantly
@@ -101,7 +101,7 @@ const Navbar = () => {
       ],
     },
 
-    ...(isLoggedIn ? [{ name: "Dashboard", path: "/dashboard" }] : []),
+    ...(isLoggedIn ? [{ name: "Dashboard", path: "/admindashboard" }] : []),
   ];
 
   const menuVariants = {

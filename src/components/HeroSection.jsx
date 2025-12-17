@@ -69,7 +69,7 @@ const HeroSection = () => {
     },
     {
       id: 4,
-      title: "Live Elction Platform",
+      title: "Live Election Platform",
       subtitle: "real-time Election Management",
       buttonText: "Start Election",
       icon: BarChart,
@@ -87,7 +87,7 @@ const HeroSection = () => {
 
   const navigate = useNavigate();
 
-  const isLoggedIn = localStorage.getItem("userToken") !== null;
+  const isLoggedIn = localStorage.getItem("jwt") !== null;
 
   const slideVariants = {
     enter: (direction) => ({
@@ -195,7 +195,6 @@ const HeroSection = () => {
               animate="visible"
               key={currentSlide}
             >
-              // In the slide rendering, you could add:
               {slides[currentSlide].id === 4 && isLoggedIn && (
                 <motion.div
                   className="absolute top-4 right-4 bg-green-500 text-white px-3 py-1 rounded-full text-sm"
@@ -231,12 +230,15 @@ const HeroSection = () => {
                 {slides[currentSlide].subtitle}
               </motion.p>
               {/* DESCRIPTION */}
-              <motion.p
-                variants={textVariants}
-                className="text-base sm:text-lg text-gray-300 mb-6 leading-relaxed max-w-xl mx-auto lg:mx-0"
-              >
-                {slides[currentSlide].description}
-              </motion.p>
+              {slides[currentSlide].description && (
+                <motion.p
+                  variants={textVariants}
+                  className="text-base sm:text-lg text-gray-300 mb-6 leading-relaxed max-w-xl mx-auto lg:mx-0"
+                >
+                  {slides[currentSlide].description}
+                </motion.p>
+              )}
+
               {/* FEATURES */}
               <motion.div
                 variants={textVariants}

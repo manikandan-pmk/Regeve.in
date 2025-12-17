@@ -373,7 +373,7 @@ const EditPopup = ({ user, onClose, onSaved }) => {
         fd.append("files", photoFile);
 
         const uploadRes = await axios.post(
-          "http://localhost:1337/api/upload",
+          "https://api.regeve.in/api/upload",
           fd,
           { headers: { "Content-Type": "multipart/form-data" } }
         );
@@ -408,7 +408,7 @@ const EditPopup = ({ user, onClose, onSaved }) => {
 
       if (uploadedPhoto) payload.Photo = uploadedPhoto.id;
 
-      await axios.put(`http://localhost:1337/api/event-forms/${user.userId}`, {
+      await axios.put(`https://api.regeve.in/api/event-forms/${user.userId}`, {
         data: payload,
       });
 
@@ -786,17 +786,33 @@ const Dashboard = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const token = localStorage.getItem("userToken");
+    const token = localStorage.getItem("jwt");
+
     if (!token) {
-      navigate("/"); // redirect home
+      navigate("/");
+      return;
     }
-  }, []);
+
+    try {
+      const payload = JSON.parse(atob(token.split(".")[1]));
+      const isExpired = payload.exp * 1000 < Date.now();
+
+      if (isExpired) {
+        localStorage.removeItem("jwt");
+        localStorage.removeItem("userProfile");
+        navigate("/");
+      }
+    } catch (err) {
+      localStorage.clear();
+      navigate("/");
+    }
+  }, [navigate]);
 
   // ----------------------------- FETCH API -----------------------------
   const fetchData = async () => {
     try {
       const response = await axios.get(
-        "http://localhost:1337/api/event-forms?populate=*&fields=*"
+        "https://api.regeve.in/api/event-forms?populate=*&fields=*"
       );
       const data = response.data?.data || [];
 
@@ -805,7 +821,7 @@ const Dashboard = () => {
         name: item.Name,
         userId: item.Member_ID,
         userImage: item.Photo?.url
-          ? `http://localhost:1337${item.Photo.url}`
+          ? `https://api.regeve.in${item.Photo.url}`
           : "https://via.placeholder.com/150?text=No+Image",
         age: item.Age,
         gender: item.Gender,
@@ -926,7 +942,7 @@ const Dashboard = () => {
 
       // send correct body structure expected by backend
       await axios.put(
-        `http://localhost:1337/api/event-forms/${memberId}`,
+        `https://api.regeve.in/api/event-forms/${memberId}`,
         {
           data: {
             IsVerified_Member: newStatus,
@@ -960,7 +976,7 @@ const Dashboard = () => {
       );
 
       // Update Strapi
-      await axios.put(`http://localhost:1337/api/event-forms/${memberId}`, {
+      await axios.put(`https://api.regeve.in/api/event-forms/${memberId}`, {
         data: {
           coming_to_family_day: newStatus,
         },
@@ -984,7 +1000,7 @@ const Dashboard = () => {
   const refreshStatsOnly = async () => {
     try {
       const response = await axios.get(
-        "http://localhost:1337/api/event-forms?populate=*&fields=*"
+        "https://api.regeve.in/api/event-forms?populate=*&fields=*"
       );
 
       const data = response.data?.data || [];
@@ -1182,7 +1198,7 @@ const Dashboard = () => {
               onClick={() => {
                 const link = document.createElement("a");
                 link.href =
-                  "http://localhost:1337/api/event-forms/export-verified";
+                  "https://api.regeve.in/api/event-forms/export-verified";
                 link.setAttribute("download", "verified-users.xlsx");
                 document.body.appendChild(link);
                 link.click();
@@ -1326,7 +1342,7 @@ const Dashboard = () => {
               onClick={() => {
                 const link = document.createElement("a");
                 link.href =
-                  "http://localhost:1337/api/event-forms/export-present";
+                  "https://api.regeve.in/api/event-forms/export-present";
                 link.setAttribute("download", "present-users.xlsx");
                 document.body.appendChild(link);
                 link.click();
@@ -1570,7 +1586,7 @@ const Dashboard = () => {
                           onClick={() => {
                             const link = document.createElement("a");
                             link.href =
-                              "http://localhost:1337/api/event-forms/export-notjoining";
+                              "https://api.regeve.in/api/event-forms/export-notjoining";
                             link.setAttribute(
                               "download",
                               "notjoining-users.xlsx"

@@ -46,7 +46,7 @@ export default function EventForm() {
 
       if (numericValue.length === 10) {
         axios
-          .get("http://localhost:1337/api/")
+          .get("https://api.regeve.in/api/")
           .then((res) => {
             const all = res.data.data;
 
@@ -85,7 +85,7 @@ export default function EventForm() {
       // 🟦 1️⃣ STAFF SEARCH
       if (numericValue.length >= 3) {
         axios
-          .get(`http://localhost/api//${numericValue}`)
+          .get(`https://api.regeve.in/api//${numericValue}`)
           .then((res) => {
             if (res.data?.data) {
               setSearchResults([res.data.data]);
@@ -109,7 +109,7 @@ export default function EventForm() {
       // 🔥 FIXED STRICT CHECK — AVOID FALSE REGISTERED FLAG
       if (numericValue.length === 8) {
         axios
-          .get(`http://localhost:1337/api/`)
+          .get(`https://api.regeve.in/api/`)
           .then((res) => {
             const all = res.data.data;
 
@@ -142,7 +142,7 @@ export default function EventForm() {
     const fd = new FormData();
     fd.append("files", file);
 
-    const res = await axios.post("http://localhost:1337/api/upload", fd);
+    const res = await axios.post("https://api.regeve.in/api/upload", fd);
     return res.data[0].id;
   };
 
@@ -179,7 +179,7 @@ export default function EventForm() {
 
       // Save form with uploaded photo ID
       const response = await axios.post(
-        "http://localhost:1337/api/event-forms",
+        "https://api.regeve.in/api/event-forms",
         {
           data: {
             ...form,
@@ -194,7 +194,7 @@ export default function EventForm() {
 
       // Fetch user details using Member_ID
       const userDetails = await axios.get(
-        `http://localhost:1337/api/event-forms`
+        `https://api.regeve.in/api/event-forms`
       );
 
       setMemberData(userDetails.data.data);
@@ -811,7 +811,7 @@ export default function EventForm() {
                           onClick={() => {
                             const detailsLink = `${window.location.origin}/#/member-details/${memberData.Member_ID}`;
                             const qrCleanLink = `${window.location.origin}/#/qr/${memberData.Member_ID}`;
-                            const qrImageDirect = `http://localhost:1337/uploads/${memberData.Member_ID}/${memberData.Member_ID}_QR.png`;
+                            const qrImageDirect = `https://api.regeve.in/uploads/${memberData.Member_ID}/${memberData.Member_ID}_QR.png`;
 
                             const message = `
 🎉 *Registration Confirmed!*
@@ -898,7 +898,7 @@ Please present your QR Code at the venue for entry.
                         <div className="text-center">
                           <div className="flex justify-center mb-3">
                             <img
-                              src={`http://localhost:1337${memberData.QRCode.url}`}
+                              src={`https://api.regeve.in${memberData.QRCode.url}`}
                               alt="QR Code"
                               className="w-32 h-32 sm:w-36 sm:h-36 border border-gray-200 rounded-lg bg-white p-2 mx-auto"
                             />

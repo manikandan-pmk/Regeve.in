@@ -31,12 +31,14 @@ import ElectionManagementPlatform from "./pages/Election/ElectionManagementPlatf
 import ElectionForm from "./pages/Election/ElectionForm";
 import VotingPage from "./pages/Election/VotingPage";
 import EventGallery from "./pages/EventGallery ";
+import AdminDashboard from "./pages/AdminDashboard";
 
 export default function App() {
   const location = useLocation();
 
   const hideLayout =
     location.pathname === "/event-form" ||
+    location.pathname === "/admindashboard" ||
     location.pathname === "/giftstatus" ||
     location.pathname === "/eventform-qr" ||
     location.pathname === "/scanDashboard" ||
@@ -91,6 +93,7 @@ export default function App() {
         <Route path="/electionForm" element={<ElectionForm />} />
         <Route path="/votingpage" element={<VotingPage />} />
         <Route path="/eventgallery" element={<EventGallery />} />
+        <Route path="/admindashboard" element={<AdminDashboard />} />
       </Routes>
 
       {!hideLayout && <Footer />}

@@ -1,4 +1,4 @@
- import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Search,
   Users,
@@ -13,6 +13,20 @@ import {
 } from "lucide-react";
 import axios from "axios";
 
+const axiosInstance = axios.create({
+  baseURL: "https://api.regeve.in/api",
+});
+
+axiosInstance.interceptors.request.use((config) => {
+  const token = localStorage.getItem("jwt");
+
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+
+  return config;
+});
+
 const ElectionDashboard = () => {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("all");
@@ -23,7 +37,7 @@ const ElectionDashboard = () => {
   const allPeople = React.useMemo(() => {
     const people = [];
     const seenEmails = new Set(); // Use email to deduplicate
-    
+
     // Add candidates first (they take priority)
     candidates.forEach((candidate) => {
       if (!seenEmails.has(candidate.email)) {
@@ -35,7 +49,7 @@ const ElectionDashboard = () => {
         });
       }
     });
-    
+
     // Add participants who are NOT already candidates
     participants.forEach((participant) => {
       if (!seenEmails.has(participant.email)) {
@@ -47,14 +61,14 @@ const ElectionDashboard = () => {
         });
       }
     });
-    
+
     return people;
   }, [participants, candidates]);
 
   // Calculate deduplicated counts
   const totalCandidates = React.useMemo(() => {
     const seenEmails = new Set();
-    return candidates.filter(candidate => {
+    return candidates.filter((candidate) => {
       if (!seenEmails.has(candidate.email)) {
         seenEmails.add(candidate.email);
         return true;
@@ -64,16 +78,16 @@ const ElectionDashboard = () => {
   }, [candidates]);
 
   const totalParticipants = participants.length;
-  
+
   const totalVoters = React.useMemo(() => {
     // Get all candidate emails (deduplicated)
     const candidateEmails = new Set();
-    candidates.forEach(candidate => {
+    candidates.forEach((candidate) => {
       candidateEmails.add(candidate.email);
     });
-    
+
     // Count participants who are NOT candidates
-    return participants.filter(p => !candidateEmails.has(p.email)).length;
+    return participants.filter((p) => !candidateEmails.has(p.email)).length;
   }, [participants, candidates]);
 
   const totalVotes = React.useMemo(() => {
@@ -94,8 +108,8 @@ const ElectionDashboard = () => {
     const fetchData = async () => {
       try {
         // Fetch Participants
-        const participantRes = await axios.get(
-          "https://api.regeve.in/api/election-participants?populate=*"
+        const participantRes = await axiosInstance.get(
+          "/election-participants?populate=*"
         );
 
         const participantArray = participantRes.data.data || [];
@@ -103,7 +117,9 @@ const ElectionDashboard = () => {
         const formattedParticipants = participantArray.map((item) => {
           const photoUrl = item.attributes?.photo?.data?.attributes?.url
             ? `https://api.regeve.in${item.attributes.photo.data.attributes.url}`
-            : `https://api.dicebear.com/7.x/initials/svg?seed=${item.attributes?.name || "User"}`;
+            : `https://api.dicebear.com/7.x/initials/svg?seed=${
+                item.attributes?.name || "User"
+              }`;
 
           return {
             id: item.id,
@@ -119,21 +135,25 @@ const ElectionDashboard = () => {
         });
 
         // Fetch Candidates
-        const candidateRes = await axios.get(
-          "https://api.regeve.in/api/candidates?populate[photo]=true&populate[election_candidate_position]=true"
+        const candidateRes = await axiosInstance.get(
+          "/candidates?populate[photo]=true&populate[election_candidate_position]=true"
         );
 
         const candidateArray = candidateRes.data.data || [];
         const formattedCandidates = candidateArray.map((item) => {
           // Handle both Strapi v4 and v5 structures
           const attributes = item.attributes || item;
-          const photoData = attributes?.photo?.data?.attributes || attributes?.photo;
-          const positionData = attributes?.election_candidate_position?.data?.attributes || 
-                            attributes?.election_candidate_position;
-          
+          const photoData =
+            attributes?.photo?.data?.attributes || attributes?.photo;
+          const positionData =
+            attributes?.election_candidate_position?.data?.attributes ||
+            attributes?.election_candidate_position;
+
           const photoUrl = photoData?.url
             ? `https://api.regeve.in${photoData.url}`
-            : `https://api.dicebear.com/7.x/initials/svg?seed=${attributes?.name || "Candidate"}`;
+            : `https://api.dicebear.com/7.x/initials/svg?seed=${
+                attributes?.name || "Candidate"
+              }`;
 
           return {
             id: item.id,
@@ -205,7 +225,9 @@ const ElectionDashboard = () => {
               <div className="p-2 md:p-3 rounded-lg md:rounded-xl bg-blue-50">
                 <Users className="w-5 h-5 md:w-6 md:h-6 text-blue-600" />
               </div>
-              <span className="text-xs md:text-sm text-green-600 font-medium">+8%</span>
+              <span className="text-xs md:text-sm text-green-600 font-medium">
+                +8%
+              </span>
             </div>
             <p className="text-gray-500 text-xs md:text-sm font-medium mb-1 md:mb-2">
               Total Participants
@@ -226,7 +248,9 @@ const ElectionDashboard = () => {
               <div className="p-2 md:p-3 rounded-lg md:rounded-xl bg-green-50">
                 <UserCheck className="w-5 h-5 md:w-6 md:h-6 text-green-600" />
               </div>
-              <span className="text-xs md:text-sm text-blue-600 font-medium">Active</span>
+              <span className="text-xs md:text-sm text-blue-600 font-medium">
+                Active
+              </span>
             </div>
             <p className="text-gray-500 text-xs md:text-sm font-medium mb-1 md:mb-2">
               Total Candidates
@@ -245,7 +269,9 @@ const ElectionDashboard = () => {
               <div className="p-2 md:p-3 rounded-lg md:rounded-xl bg-purple-50">
                 <Vote className="w-5 h-5 md:w-6 md:h-6 text-purple-600" />
               </div>
-              <span className="text-xs md:text-sm text-purple-600 font-medium">Cast</span>
+              <span className="text-xs md:text-sm text-purple-600 font-medium">
+                Cast
+              </span>
             </div>
             <p className="text-gray-500 text-xs md:text-sm font-medium mb-1 md:mb-2">
               Total Votes
@@ -306,7 +332,9 @@ const ElectionDashboard = () => {
             </div>
             <div className="flex items-center gap-2 md:gap-3">
               <div className="flex items-center bg-white border border-gray-300 rounded-lg md:rounded-xl px-3 md:px-4 py-2 md:py-3 shadow-sm">
-                <div className="outline-none bg-transparent text-gray-700 text-sm md:text-base">Candidates</div>
+                <div className="outline-none bg-transparent text-gray-700 text-sm md:text-base">
+                  Candidates
+                </div>
               </div>
             </div>
           </div>
@@ -527,11 +555,13 @@ const ElectionDashboard = () => {
                       >
                         {p.role === "Candidate" ? (
                           <>
-                            <UserCheck className="w-3 h-3 lg:w-4 lg:h-4 mr-1.5 lg:mr-2" /> Candidate
+                            <UserCheck className="w-3 h-3 lg:w-4 lg:h-4 mr-1.5 lg:mr-2" />{" "}
+                            Candidate
                           </>
                         ) : (
                           <>
-                            <Users className="w-3 h-3 lg:w-4 lg:h-4 mr-1.5 lg:mr-2" /> Voter
+                            <Users className="w-3 h-3 lg:w-4 lg:h-4 mr-1.5 lg:mr-2" />{" "}
+                            Voter
                           </>
                         )}
                       </span>
@@ -573,7 +603,9 @@ const ElectionDashboard = () => {
                     {p.role === "Candidate" ? (
                       <div className="space-y-2 lg:space-y-3">
                         <div className="flex items-center justify-between">
-                          <span className="text-xs lg:text-sm text-gray-600">Votes:</span>
+                          <span className="text-xs lg:text-sm text-gray-600">
+                            Votes:
+                          </span>
                           <span className="font-bold text-gray-900 text-sm lg:text-base">
                             {(p.votes || 0).toLocaleString()}
                           </span>

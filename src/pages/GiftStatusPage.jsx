@@ -9,7 +9,7 @@ const GiftStatusPage = () => {
   const fetchUsers = async () => {
     try {
       const res = await axios.get(
-        "http://localhost:1337/api/event-forms?populate=Photo"
+        "https://api.regeve.in/api/event-forms?populate=Photo"
       );
       setUsers(res.data.data);
     } catch (err) {
@@ -27,7 +27,7 @@ const GiftStatusPage = () => {
 
     try {
       await axios.put(
-        `http://localhost:1337/api/event-forms/${user.Member_ID}`,
+        `https://api.regeve.in/api/event-forms/${user.Member_ID}`,
         {
           data: {
             IsGiftReceived: status,
@@ -90,7 +90,7 @@ const GiftStatusPage = () => {
           <tbody>
             {filteredUsers.map((user) => {
               const imageUrl = user.Photo?.url
-                ? `http://localhost:1337${user.Photo.url}`
+                ? `https://api.regeve.in${user.Photo.url}`
                 : "https://via.placeholder.com/60";
 
               return (

@@ -51,7 +51,7 @@ const Login = ({ onClose, onSwitchToRegister, onLoginSuccess }) => {
     setApiError("");
 
     try {
-      const response = await fetch("http://localhost:1337/api/admin/login", {
+      const response = await fetch("https://api.regeve.in/api/admin/login", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -59,34 +59,43 @@ const Login = ({ onClose, onSwitchToRegister, onLoginSuccess }) => {
 
         // FIXED PAYLOAD (API requires lowercase fields)
         body: JSON.stringify({
-          Email: formData.email,
-          Password: formData.password,
+          identifier: formData.email,
+          password: formData.password,
         }),
       });
+      console.log("EMAIL:", formData.email);
+      console.log("PASSWORD:", formData.password);
 
       const data = await response.json();
 
-      if (response.ok && data.message === "Login SuccessFull") {
+      if (response.ok && data.jwt) {
         setSuccess(true);
 
-        // Store in localStorage
-        localStorage.setItem("userToken", data.token);
+        // ✅ store STRAPI jwt
+        localStorage.setItem("jwt", data.jwt);
+
+        // optional profile
         localStorage.setItem(
           "userProfile",
           JSON.stringify({
-            name: data.login?.Name || "User",
-            email: data.login?.Email || formData.email,
-            company: data.login?.Company_Name || "",
+            email: data.user?.email,
+            id: data.user?.id,
+            adminId: data.adminId,
           })
         );
 
-        // Close after animation
         setTimeout(() => {
-          navigate("/dashboard");
+          navigate("/admindashboard");
           onClose();
-        }, 2000);
+        }, 1500);
       } else {
-        setApiError(data.message || "Invalid email or password");
+        const errorMessage =
+          data?.message ||
+          data?.error?.message ||
+          data?.response ||
+          "Login failed. Please try again.";
+
+        setApiError(errorMessage);
       }
     } catch (err) {
       console.error("Login Error:", err);
