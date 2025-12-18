@@ -309,6 +309,8 @@ export default function AdminDashboard() {
   const [searchQuery, setSearchQuery] = useState("");
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
+  const adminId = localStorage.getItem("adminId");
+
   // Services configuration
   const servicesConfig = {
     "Digital Registration": {
@@ -481,12 +483,26 @@ export default function AdminDashboard() {
       return;
     }
 
+    // Parse current URL to see what adminId is in the URL
+    const pathParts = window.location.pathname.split("/").filter(Boolean);
+    console.log("Path parts:", pathParts);
+
+    if (pathParts.length > 0) {
+      console.log("AdminId from URL:", pathParts[0]);
+    }
+
     setLoadingStates((prev) => ({ ...prev, [service.id]: true }));
     await new Promise((resolve) => setTimeout(resolve, 800));
     setLoadingStates((prev) => ({ ...prev, [service.id]: false }));
-    adminNavigate(navigate, service.route);
-  };
 
+    // Try navigation with the adminId from current URL
+    const currentAdminId = pathParts[0] || adminId;
+    if (currentAdminId) {
+      navigate(`/${currentAdminId}${service.route}`);
+    } else {
+      navigate("/regeve-admin");
+    }
+  };
   const handleLogout = () => {
     localStorage.clear();
     navigate("/");

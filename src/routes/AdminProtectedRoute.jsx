@@ -1,9 +1,10 @@
+// AdminProtectedRoute.jsx - UPDATED
 import { Navigate, useParams } from "react-router-dom";
 
 const AdminProtectedRoute = ({ children }) => {
   const token = localStorage.getItem("jwt");
   const storedAdminId = localStorage.getItem("adminId");
-  const { adminid } = useParams();
+  const { adminId } = useParams(); // Changed from adminid to adminId
 
   // ❌ Not logged in
   if (!token) {
@@ -11,7 +12,7 @@ const AdminProtectedRoute = ({ children }) => {
   }
 
   // ❌ Wrong admin trying to access
-  if (String(adminid) !== String(storedAdminId)) {
+  if (String(adminId) !== String(storedAdminId)) {
     return <Navigate to="/" replace />;
   }
 

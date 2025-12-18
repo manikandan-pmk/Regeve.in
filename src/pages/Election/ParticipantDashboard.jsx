@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
+import { adminNavigate } from "../../utils/adminNavigation";
 import {
   Search,
   Filter,
@@ -19,10 +20,12 @@ import {
   Save,
   X,
 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import axios from "axios";
 
 const ParticipantDashboard = () => {
+  const { adminId, electionDocumentId } = useParams();
+
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("all");
@@ -392,7 +395,11 @@ const ParticipantDashboard = () => {
         <div className="mb-8">
           <div className="flex items-center gap-4 mb-6">
             <button
-              onClick={() => navigate("/candidate-dashboard")}
+              onClick={() =>
+                navigate(
+                  `/${adminId}/candidate-dashboard/${electionDocumentId}`
+                )
+              }
               className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white rounded-xl border border-gray-200 hover:bg-gray-50 transition-all duration-200 shadow-[0_1px_3px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_8px_rgba(0,0,0,0.05)]"
             >
               <ArrowLeft className="w-4 h-4" />
@@ -841,255 +848,255 @@ const ParticipantDashboard = () => {
           )}
         </div>
 
-         {/* Edit Modal with Animation */}
-{(editingId || isModalOpen) && (
-  <div
-    className={`fixed inset-0 z-50 overflow-y-auto ${
-      isModalOpen ? "animate-fadeIn" : "animate-fadeOut"
-    }`}
-  >
-    {/* Backdrop with click handler */}
-    <div 
-      className="fixed inset-0 bg-black/50 transition-opacity"
-      onClick={cancelEdit}
-    ></div>
-
-    <div className="flex min-h-full items-center justify-center p-4">
-      <div
-        className={`relative bg-white rounded-2xl max-w-4xl w-full p-6 shadow-2xl transform transition-all duration-300 ${
-          isModalOpen ? "scale-100 opacity-100" : "scale-95 opacity-0"
-        }`}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h3 className="text-xl font-bold text-gray-900">
-              Edit Voter Details
-            </h3>
-            <p className="text-sm text-gray-500 mt-1">
-              Participant ID: {editForm.participant_id}
-            </p>
-          </div>
-          <button
-            onClick={cancelEdit}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors duration-200"
+        {/* Edit Modal with Animation */}
+        {(editingId || isModalOpen) && (
+          <div
+            className={`fixed inset-0 z-50 overflow-y-auto ${
+              isModalOpen ? "animate-fadeIn" : "animate-fadeOut"
+            }`}
           >
-            <X className="w-5 h-5 text-gray-500" />
-          </button>
-        </div>
-
-        {/* UPDATED FORM LAYOUT TO MATCH IMAGE */}
-        <div className="space-y-6 mb-6">
-          {/* First Row */}
-          <div className="grid grid-cols-2 gap-8">
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <label className="block text-sm font-medium text-gray-700">
-                  Full Name *
-                </label>
-                <div className="w-3/4">
-                  <input
-                    type="text"
-                    value={editForm.name || ""}
-                    onChange={(e) =>
-                      setEditForm({ ...editForm, name: e.target.value })
-                    }
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-blue-400 outline-none transition"
-                    placeholder="Enter full name"
-                  />
-                </div>
-              </div>
-              <div className="flex items-center justify-between">
-                <label className="block text-sm font-medium text-gray-700">
-                  Email Address *
-                </label>
-                <div className="w-3/4">
-                  <input
-                    type="email"
-                    value={editForm.email || ""}
-                    onChange={(e) =>
-                      setEditForm({
-                        ...editForm,
-                        email: e.target.value,
-                      })
-                    }
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-blue-400 outline-none transition"
-                    placeholder="Enter email address"
-                  />
-                </div>
-              </div>
-              <div className="flex items-center justify-between">
-                <label className="block text-sm font-medium text-gray-700">
-                  Age
-                </label>
-                <div className="w-3/4">
-                  <input
-                    type="number"
-                    value={editForm.age || ""}
-                    onChange={(e) =>
-                      setEditForm({
-                        ...editForm,
-                        age: parseInt(e.target.value),
-                      })
-                    }
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-blue-400 outline-none transition"
-                    placeholder="Enter age"
-                  />
-                </div>
-              </div>
-              <div className="flex items-center justify-between">
-                <label className="block text-sm font-medium text-gray-700">
-                  Gender
-                </label>
-                <div className="w-3/4">
-                  <select
-                    value={editForm.gender || ""}
-                    onChange={(e) =>
-                      setEditForm({
-                        ...editForm,
-                        gender: e.target.value,
-                      })
-                    }
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-blue-400 outline-none transition"
-                  >
-                    <option value="">Select Gender</option>
-                    <option value="male">Male</option>
-                    <option value="female">Female</option>
-                    <option value="other">Other</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <label className="block text-sm font-medium text-gray-700">
-                  Phone Number *
-                </label>
-                <div className="w-3/4">
-                  <input
-                    type="tel"
-                    value={editForm.phone || ""}
-                    onChange={(e) =>
-                      setEditForm({
-                        ...editForm,
-                        phone: e.target.value,
-                      })
-                    }
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-blue-400 outline-none transition"
-                    placeholder="Enter phone number"
-                  />
-                </div>
-              </div>
-              <div className="flex items-center justify-between">
-                <label className="block text-sm font-medium text-gray-700">
-                  WhatsApp Number
-                </label>
-                <div className="w-3/4">
-                  <input
-                    type="tel"
-                    value={editForm.whatsapp || ""}
-                    onChange={(e) =>
-                      setEditForm({
-                        ...editForm,
-                        whatsapp: e.target.value,
-                      })
-                    }
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-blue-400 outline-none transition"
-                    placeholder="Enter WhatsApp number"
-                  />
-                </div>
-              </div>
-              <div className="flex items-center justify-between">
-                <label className="block text-sm font-medium text-gray-700">
-                  ID Number *
-                </label>
-                <div className="w-3/4">
-                  <input
-                    type="text"
-                    value={editForm.idNumber || ""}
-                    onChange={(e) =>
-                      setEditForm({
-                        ...editForm,
-                        idNumber: e.target.value,
-                      })
-                    }
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-blue-400 outline-none transition"
-                    placeholder="Enter ID number"
-                  />
-                </div>
-              </div>
-              <div className="flex items-center justify-between">
-                <label className="block text-sm font-medium text-gray-700">
-                  Participant ID
-                </label>
-                <div className="w-3/4">
-                  <input
-                    type="text"
-                    value={editForm.participant_id || ""}
-                    onChange={(e) =>
-                      setEditForm({
-                        ...editForm,
-                        participant_id: e.target.value,
-                      })
-                    }
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-blue-400 outline-none transition bg-gray-50"
-                    placeholder="Auto-generated"
-                    readOnly
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Profile Photo */}
-        <div className="flex items-center gap-6 mb-6">
-          <img
-            src={photoPreview}
-            alt="Preview"
-            className="w-24 h-24 rounded-xl object-cover border"
-          />
-          <label className="cursor-pointer">
-            <input
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={(e) => {
-                const file = e.target.files[0];
-                if (file) {
-                  setPhotoFile(file);
-                  setPhotoPreview(URL.createObjectURL(file));
-                }
-              }}
-            />
-            <span className="px-4 py-2 text-sm bg-gray-100 rounded-lg hover:bg-gray-200">
-              Change Photo
-            </span>
-          </label>
-        </div>
-
-        <div className="border-t border-gray-200 pt-6">
-          <div className="flex justify-end gap-3">
-            <button
+            {/* Backdrop with click handler */}
+            <div
+              className="fixed inset-0 bg-black/50 transition-opacity"
               onClick={cancelEdit}
-              className="px-5 py-2.5 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors duration-200"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={saveEdit}
-              className="px-5 py-2.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-colors duration-200 flex items-center gap-2"
-            >
-              <Save className="w-4 h-4" />
-              Save Changes
-            </button>
+            ></div>
+
+            <div className="flex min-h-full items-center justify-center p-4">
+              <div
+                className={`relative bg-white rounded-2xl max-w-4xl w-full p-6 shadow-2xl transform transition-all duration-300 ${
+                  isModalOpen ? "scale-100 opacity-100" : "scale-95 opacity-0"
+                }`}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h3 className="text-xl font-bold text-gray-900">
+                      Edit Voter Details
+                    </h3>
+                    <p className="text-sm text-gray-500 mt-1">
+                      Participant ID: {editForm.participant_id}
+                    </p>
+                  </div>
+                  <button
+                    onClick={cancelEdit}
+                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors duration-200"
+                  >
+                    <X className="w-5 h-5 text-gray-500" />
+                  </button>
+                </div>
+
+                {/* UPDATED FORM LAYOUT TO MATCH IMAGE */}
+                <div className="space-y-6 mb-6">
+                  {/* First Row */}
+                  <div className="grid grid-cols-2 gap-8">
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <label className="block text-sm font-medium text-gray-700">
+                          Full Name *
+                        </label>
+                        <div className="w-3/4">
+                          <input
+                            type="text"
+                            value={editForm.name || ""}
+                            onChange={(e) =>
+                              setEditForm({ ...editForm, name: e.target.value })
+                            }
+                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-blue-400 outline-none transition"
+                            placeholder="Enter full name"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <label className="block text-sm font-medium text-gray-700">
+                          Email Address *
+                        </label>
+                        <div className="w-3/4">
+                          <input
+                            type="email"
+                            value={editForm.email || ""}
+                            onChange={(e) =>
+                              setEditForm({
+                                ...editForm,
+                                email: e.target.value,
+                              })
+                            }
+                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-blue-400 outline-none transition"
+                            placeholder="Enter email address"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <label className="block text-sm font-medium text-gray-700">
+                          Age
+                        </label>
+                        <div className="w-3/4">
+                          <input
+                            type="number"
+                            value={editForm.age || ""}
+                            onChange={(e) =>
+                              setEditForm({
+                                ...editForm,
+                                age: parseInt(e.target.value),
+                              })
+                            }
+                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-blue-400 outline-none transition"
+                            placeholder="Enter age"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <label className="block text-sm font-medium text-gray-700">
+                          Gender
+                        </label>
+                        <div className="w-3/4">
+                          <select
+                            value={editForm.gender || ""}
+                            onChange={(e) =>
+                              setEditForm({
+                                ...editForm,
+                                gender: e.target.value,
+                              })
+                            }
+                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-blue-400 outline-none transition"
+                          >
+                            <option value="">Select Gender</option>
+                            <option value="male">Male</option>
+                            <option value="female">Female</option>
+                            <option value="other">Other</option>
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <label className="block text-sm font-medium text-gray-700">
+                          Phone Number *
+                        </label>
+                        <div className="w-3/4">
+                          <input
+                            type="tel"
+                            value={editForm.phone || ""}
+                            onChange={(e) =>
+                              setEditForm({
+                                ...editForm,
+                                phone: e.target.value,
+                              })
+                            }
+                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-blue-400 outline-none transition"
+                            placeholder="Enter phone number"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <label className="block text-sm font-medium text-gray-700">
+                          WhatsApp Number
+                        </label>
+                        <div className="w-3/4">
+                          <input
+                            type="tel"
+                            value={editForm.whatsapp || ""}
+                            onChange={(e) =>
+                              setEditForm({
+                                ...editForm,
+                                whatsapp: e.target.value,
+                              })
+                            }
+                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-blue-400 outline-none transition"
+                            placeholder="Enter WhatsApp number"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <label className="block text-sm font-medium text-gray-700">
+                          ID Number *
+                        </label>
+                        <div className="w-3/4">
+                          <input
+                            type="text"
+                            value={editForm.idNumber || ""}
+                            onChange={(e) =>
+                              setEditForm({
+                                ...editForm,
+                                idNumber: e.target.value,
+                              })
+                            }
+                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-blue-400 outline-none transition"
+                            placeholder="Enter ID number"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <label className="block text-sm font-medium text-gray-700">
+                          Participant ID
+                        </label>
+                        <div className="w-3/4">
+                          <input
+                            type="text"
+                            value={editForm.participant_id || ""}
+                            onChange={(e) =>
+                              setEditForm({
+                                ...editForm,
+                                participant_id: e.target.value,
+                              })
+                            }
+                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-blue-400 outline-none transition bg-gray-50"
+                            placeholder="Auto-generated"
+                            readOnly
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Profile Photo */}
+                <div className="flex items-center gap-6 mb-6">
+                  <img
+                    src={photoPreview}
+                    alt="Preview"
+                    className="w-24 h-24 rounded-xl object-cover border"
+                  />
+                  <label className="cursor-pointer">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files[0];
+                        if (file) {
+                          setPhotoFile(file);
+                          setPhotoPreview(URL.createObjectURL(file));
+                        }
+                      }}
+                    />
+                    <span className="px-4 py-2 text-sm bg-gray-100 rounded-lg hover:bg-gray-200">
+                      Change Photo
+                    </span>
+                  </label>
+                </div>
+
+                <div className="border-t border-gray-200 pt-6">
+                  <div className="flex justify-end gap-3">
+                    <button
+                      onClick={cancelEdit}
+                      className="px-5 py-2.5 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors duration-200"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={saveEdit}
+                      className="px-5 py-2.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-colors duration-200 flex items-center gap-2"
+                    >
+                      <Save className="w-4 h-4" />
+                      Save Changes
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
-    </div>
-  </div>
-)}
+        )}
         {/* Summary Footer */}
         <div className="mt-6 bg-white rounded-2xl border border-gray-100 shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-6">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -1123,7 +1130,6 @@ const ParticipantDashboard = () => {
       </div>
 
       {/* Add CSS animations */}
-       
     </div>
   );
 };

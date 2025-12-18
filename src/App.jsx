@@ -27,7 +27,7 @@ import QRRedirect from "./pages/QRRedirect";
 // 🔐 ELECTION
 import ElectionHome from "./pages/Election/ElectionHome";
 import CandidateDashboard from "./pages/Election/CandidateDashboard";
-import ParticipationForm from "./pages/Election/ParticipationForm";
+import ParticipantDashboard from "./pages/Election/ParticipantDashboard";
 import ElectionManagementPlatform from "./pages/Election/ElectionManagementPlatform";
 import ElectionForm from "./pages/Election/ElectionForm";
 import VotingPage from "./pages/Election/VotingPage";
@@ -41,28 +41,26 @@ export default function App() {
 
   // 🚫 Hide Navbar & Footer on specific pages
   const hideLayout =
-  location.pathname === "/event-form" ||
-  location.pathname === "/giftstatus" ||
-  location.pathname === "/eventform-qr" ||
-  location.pathname === "/scanDashboard" ||
-  location.pathname === "/luckydraw" ||
-  location.pathname === "/regeve-admin" ||
-  location.pathname === "/dashboard" ||
-  location.pathname === "/participationDashboard" ||
-  location.pathname === "/votingpage" ||
-
-  // ✅ FIXED — Candidate Dashboard
-  location.pathname.includes("/candidate-dashboard/") ||
-
-  // election pages
-  location.pathname.includes("/electionhome") ||
-  location.pathname.startsWith("/electionForm") ||
-
-  // member details
-  location.pathname.startsWith("/member-details/") ||
-
-  // admin dashboard
-  location.pathname.endsWith("/admindashboard");
+    location.pathname === "/event-form" ||
+    location.pathname === "/giftstatus" ||
+    location.pathname === "/eventform-qr" ||
+    location.pathname === "/scanDashboard" ||
+    location.pathname === "/luckydraw" ||
+    location.pathname === "/regeve-admin" ||
+    location.pathname === "/dashboard" ||
+    location.pathname === "/participationDashboard" ||
+    location.pathname === "/votingpage" ||
+    // ✅ FIXED — Candidate Dashboard
+    location.pathname.includes("/candidate-dashboard/") ||
+    // ✅ Participant Dashboard (FIXED)
+    location.pathname.includes("/participant-dashboard/") ||
+    // election pages
+    location.pathname.includes("/electionhome") ||
+    location.pathname.startsWith("/electionForm") ||
+    // member details
+    location.pathname.startsWith("/member-details/") ||
+    // admin dashboard
+    location.pathname.endsWith("/admindashboard");
 
   return (
     <div className="max-w-full overflow-x-hidden">
@@ -78,7 +76,6 @@ export default function App() {
         <Route path="/blog" element={<BlogPage />} />
         <Route path="/help" element={<HelpCenter />} />
         <Route path="/privacy" element={<PrivacyPolicy />} />
-
         {/* ================= SERVICES ================= */}
         <Route path="/:adminId/dashboard" element={<Dashboard />} />
         <Route path="/event-form" element={<EventForm />} />
@@ -93,20 +90,18 @@ export default function App() {
           path="/service/dashboard-system-page"
           element={<DashboardSystemPage />}
         />
-
         {/* ================= AUTH ================= */}
         <Route path="/regeve-admin" element={<RegisterForm />} />
-
         {/* ================= MEMBER / QR ================= */}
         <Route path="/member-details/:Member_ID" element={<UserDetail />} />
         <Route path="/scanDashboard" element={<MemberDashBoard />} />
         <Route path="/eventform-qr" element={<QRCodeForm />} />
         <Route path="/giftstatus" element={<GiftStatusPage />} />
         <Route path="/qr/:memberId" element={<QRRedirect />} />
-
         {/* ================= ADMIN PROTECTED ================= */}
+
         <Route
-          path="/:adminid/electionhome"
+          path="/:adminId/electionhome"
           element={
             <AdminProtectedRoute>
               <ElectionHome />
@@ -115,27 +110,28 @@ export default function App() {
         />
 
         <Route
-          path="/:adminid/candidate-dashboard/:electionDocumentId"
-          element={<CandidateDashboard />}
+          path="/:adminId/candidate-dashboard/:electionDocumentId"
+          element={
+            <AdminProtectedRoute>
+              <CandidateDashboard />
+            </AdminProtectedRoute>
+          }
         />
-
-        <Route path="/participationDashboard" element={<ParticipationForm />} />
-
+        <Route
+          path="/:adminId/participant-dashboard/:electionDocumentId"
+          element={<ParticipantDashboard />}
+        />
         <Route
           path="/electionManagementplatform"
           element={<ElectionManagementPlatform />}
         />
-
         <Route
-          path="/electionForm/:company/:adminDocId/:electionId"
+          path="/electionForm/:adminId/:electionDocumentId/:electionName"
           element={<ElectionForm />}
         />
-
         <Route path="/votingpage" element={<VotingPage />} />
-
         {/* ================= ADMIN DASHBOARD ================= */}
         <Route path="/:adminId/admindashboard" element={<AdminDashboard />} />
-
         {/* ================= FALLBACK ================= */}
         <Route path="/" element={<Home />} />
       </Routes>

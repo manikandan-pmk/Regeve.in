@@ -101,7 +101,6 @@ const CandidateDashboard = () => {
 
     const fetchElectionMeta = async () => {
       try {
-
         // Fetch all elections and filter by documentId
         const res = await axiosInstance.get("/election-names", {
           params: {
@@ -110,13 +109,11 @@ const CandidateDashboard = () => {
           },
         });
 
-
         // Find the election with matching documentId
         const allElections = res.data?.data || [];
         const election = allElections.find(
           (e) => e.documentId === electionDocumentId
         );
-
 
         if (!election) {
           console.error(
@@ -763,7 +760,11 @@ const CandidateDashboard = () => {
               </button>
 
               <button
-                onClick={() => adminNavigate(navigate, "/participationForm")}
+                onClick={() =>
+                  navigate(
+                    `/${adminId}/participant-dashboard/${electionDocumentId}`
+                  )
+                }
                 className="flex items-center justify-center gap-2 bg-gradient-to-r from-amber-500 to-amber-600 text-white px-6 py-3 rounded-xl hover:from-amber-600 hover:to-amber-700 transition-all duration-200 font-semibold shadow-lg hover:shadow-xl min-w-[160px]"
               >
                 <svg

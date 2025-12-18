@@ -21,7 +21,7 @@ export default function ElectionParticipantForm({ token = null }) {
   const [message, setMessage] = useState(null);
   const [photoPreview, setPhotoPreview] = useState(null);
 
-  const { company, adminDocId, electionId } = useParams();
+  const { adminId, electionDocumentId } = useParams();
 
   function handleChange(e) {
     const { name, value } = e.target;
@@ -146,8 +146,9 @@ export default function ElectionParticipantForm({ token = null }) {
           id_card: form.id_card,
           gender: form.gender, // "male" | "female" | "others"
           Photo: uploadedPhotoId ? [uploadedPhotoId] : [],
-          electionId: Number(electionId),
-          adminDocId,
+          // ✅ NUMERIC ADMIN ID
+          adminId: Number(adminId),
+          electionDocumentId,
         },
       };
 

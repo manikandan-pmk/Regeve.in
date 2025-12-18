@@ -1,6 +1,6 @@
 // components/ElectionHome.js
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { adminNavigate } from "../../utils/adminNavigation";
 import axios from "axios";
 
@@ -15,6 +15,10 @@ const ElectionHome = () => {
   const [loading, setLoading] = useState(false);
   const [creating, setCreating] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
+
+  const { adminId } = useParams();
+
+  const storedAdminId = localStorage.getItem("adminId");
 
   // Added a second category for a more realistic dropdown example
   const electionCategories = {
@@ -80,12 +84,13 @@ const ElectionHome = () => {
 
       // ✅ ALWAYS REFRESH FROM DB
       await fetchElections();
-
-      // navigate using documentId
-      adminNavigate(
-        navigate,
-        `/candidate-dashboard/${res.data.data.documentId}`
+      console.log(
+        "Navigating to:",
+        `/${adminId}/candidate-dashboard/${res.data.data.documentId}`
       );
+
+      // FIXED: Use adminNavigate function instead of direct navigate
+      navigate(`/${adminId}/candidate-dashboard/${res.data.data.documentId}`);
 
       setShowCreatePopup(false);
       setElectionName("");
@@ -140,11 +145,10 @@ const ElectionHome = () => {
       // Add to UI immediately
       await fetchElections();
 
-      // Navigate
-      adminNavigate(
-        navigate,
-        `/candidate-dashboard/${savedElection.documentId}`
-      );
+      // FIXED: Use adminNavigate function
+      navigate(`/${adminId}/candidate-dashboard/${savedElection.documentId}`);
+
+      // No need to set showSelectionPopup since we're navigating away
     } catch (error) {
       console.error("Saving election type failed", error);
     }
@@ -425,9 +429,9 @@ const ElectionHome = () => {
                   {/* Action */}
                   <button
                     onClick={() =>
-                      adminNavigate(
-                        navigate,
-                        `/candidate-dashboard/${election.documentId}`
+                      // FIXED: Use adminNavigate function
+                      navigate(
+                        `/${adminId}/candidate-dashboard/${election.documentId}`
                       )
                     }
                     className="w-full py-2.5 rounded-xl

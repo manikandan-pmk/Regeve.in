@@ -1,8 +1,9 @@
-export const getAdminId = () => {
+// adminNavigation.js - FIXED VERSION
+const getAdminId = () => {
   return localStorage.getItem("adminId");
 };
 
-export const adminNavigate = (navigate, path) => {
+const adminNavigate = (navigate, path) => {
   const adminId = getAdminId();
 
   if (!adminId) {
@@ -12,3 +13,5 @@ export const adminNavigate = (navigate, path) => {
 
   navigate(`/${adminId}${path}`);
 };
+
+export { getAdminId, adminNavigate };
