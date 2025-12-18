@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { Routes, Route, useLocation } from "react-router-dom";
 
 import "./App.css";
@@ -24,47 +23,66 @@ import MemberDashBoard from "./pages/Scan/MemberDashBoard";
 import QRCodeForm from "./components/QRCodeFom/QRCodeForm";
 import GiftStatusPage from "./pages/GiftStatusPage";
 import QRRedirect from "./pages/QRRedirect";
+
+// 🔐 ELECTION
 import ElectionHome from "./pages/Election/ElectionHome";
 import CandidateDashboard from "./pages/Election/CandidateDashboard";
 import ParticipationForm from "./pages/Election/ParticipationForm";
 import ElectionManagementPlatform from "./pages/Election/ElectionManagementPlatform";
 import ElectionForm from "./pages/Election/ElectionForm";
 import VotingPage from "./pages/Election/VotingPage";
-import EventGallery from "./pages/EventGallery ";
+
+// 👤 ADMIN
 import AdminDashboard from "./pages/AdminDashboard";
+import AdminProtectedRoute from "./routes/AdminProtectedRoute";
 
 export default function App() {
   const location = useLocation();
 
+  // 🚫 Hide Navbar & Footer on specific pages
   const hideLayout =
-    location.pathname === "/event-form" ||
-    location.pathname === "/admindashboard" ||
-    location.pathname === "/giftstatus" ||
-    location.pathname === "/eventform-qr" ||
-    location.pathname === "/scanDashboard" ||
-    location.pathname === "/luckydraw" ||
-    location.pathname === "/regeve-admin" ||
-    location.pathname === "/dashboard" ||
-    location.pathname === "/candidate-dashboard" ||
-    location.pathname === "/participationForm" ||
-    location.pathname.startsWith("/member-details/") ||
-    location.pathname === "/electionhome" ||
-    location.pathname === "/electionForm" ||
-    location.pathname === "/votingpage";
+  location.pathname === "/event-form" ||
+  location.pathname === "/giftstatus" ||
+  location.pathname === "/eventform-qr" ||
+  location.pathname === "/scanDashboard" ||
+  location.pathname === "/luckydraw" ||
+  location.pathname === "/regeve-admin" ||
+  location.pathname === "/dashboard" ||
+  location.pathname === "/participationDashboard" ||
+  location.pathname === "/votingpage" ||
+
+  // ✅ FIXED — Candidate Dashboard
+  location.pathname.includes("/candidate-dashboard/") ||
+
+  // election pages
+  location.pathname.includes("/electionhome") ||
+  location.pathname.startsWith("/electionForm") ||
+
+  // member details
+  location.pathname.startsWith("/member-details/") ||
+
+  // admin dashboard
+  location.pathname.endsWith("/admindashboard");
 
   return (
     <div className="max-w-full overflow-x-hidden">
       <ScrollToTop />
+
       {!hideLayout && <Navbar />}
 
       <Routes>
+        {/* ================= PUBLIC ROUTES ================= */}
         <Route path="/" element={<Home />} />
         <Route path="/about" element={<About />} />
         <Route path="/contact" element={<Contact />} />
-        <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/blog" element={<BlogPage />} />
+        <Route path="/help" element={<HelpCenter />} />
+        <Route path="/privacy" element={<PrivacyPolicy />} />
+
+        {/* ================= SERVICES ================= */}
+        <Route path="/:adminId/dashboard" element={<Dashboard />} />
         <Route path="/event-form" element={<EventForm />} />
-        <Route path="/regeve-admin" element={<RegisterForm />} />
-        <Route path="/luckydraw" element={<LuckyDraw />} />
+        <Route path="/:adminId/luckydraw" element={<LuckyDraw />} />
         <Route path="/service/registration" element={<EventRegistration />} />
         <Route
           path="/service/luckydraw-system-page"
@@ -75,25 +93,51 @@ export default function App() {
           path="/service/dashboard-system-page"
           element={<DashboardSystemPage />}
         />
+
+        {/* ================= AUTH ================= */}
+        <Route path="/regeve-admin" element={<RegisterForm />} />
+
+        {/* ================= MEMBER / QR ================= */}
         <Route path="/member-details/:Member_ID" element={<UserDetail />} />
-        <Route path="/blog" element={<BlogPage />} />
-        <Route path="/help" element={<HelpCenter />} />
-        <Route path="/privacy" element={<PrivacyPolicy />} />
         <Route path="/scanDashboard" element={<MemberDashBoard />} />
         <Route path="/eventform-qr" element={<QRCodeForm />} />
         <Route path="/giftstatus" element={<GiftStatusPage />} />
         <Route path="/qr/:memberId" element={<QRRedirect />} />
-        <Route path="/electionhome" element={<ElectionHome />} />
-        <Route path="/candidate-dashboard" element={<CandidateDashboard />} />
-        <Route path="/participationForm" element={<ParticipationForm />} />
+
+        {/* ================= ADMIN PROTECTED ================= */}
+        <Route
+          path="/:adminid/electionhome"
+          element={
+            <AdminProtectedRoute>
+              <ElectionHome />
+            </AdminProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/:adminid/candidate-dashboard/:electionDocumentId"
+          element={<CandidateDashboard />}
+        />
+
+        <Route path="/participationDashboard" element={<ParticipationForm />} />
+
         <Route
           path="/electionManagementplatform"
           element={<ElectionManagementPlatform />}
         />
-        <Route path="/electionForm" element={<ElectionForm />} />
+
+        <Route
+          path="/electionForm/:company/:adminDocId/:electionId"
+          element={<ElectionForm />}
+        />
+
         <Route path="/votingpage" element={<VotingPage />} />
-        <Route path="/eventgallery" element={<EventGallery />} />
-        <Route path="/admindashboard" element={<AdminDashboard />} />
+
+        {/* ================= ADMIN DASHBOARD ================= */}
+        <Route path="/:adminId/admindashboard" element={<AdminDashboard />} />
+
+        {/* ================= FALLBACK ================= */}
+        <Route path="/" element={<Home />} />
       </Routes>
 
       {!hideLayout && <Footer />}

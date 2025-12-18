@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import axios from "axios";
+import { useParams } from "react-router-dom";
 
 const API_URL = "https://api.regeve.in/api/election-participants";
 
@@ -19,6 +20,8 @@ export default function ElectionParticipantForm({ token = null }) {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState(null);
   const [photoPreview, setPhotoPreview] = useState(null);
+
+  const { company, adminDocId, electionId } = useParams();
 
   function handleChange(e) {
     const { name, value } = e.target;
@@ -143,7 +146,8 @@ export default function ElectionParticipantForm({ token = null }) {
           id_card: form.id_card,
           gender: form.gender, // "male" | "female" | "others"
           Photo: uploadedPhotoId ? [uploadedPhotoId] : [],
-          publishedAt: new Date().toISOString(),
+          electionId: Number(electionId),
+          adminDocId,
         },
       };
 
@@ -192,19 +196,18 @@ export default function ElectionParticipantForm({ token = null }) {
       setLoading(false);
     }
   }
-  
-  async function checkExistingUser(email, phone) {
-  try {
-    const response = await axios.get(
-      `${API_URL}?filters[email][$eq]=${email}&filters[phone_number][$eq]=${phone}`
-    );
-    return response.data.data.length > 0;
-  } catch (error) {
-    console.error("Check user error:", error);
-    return false;
-  }
-}
 
+  async function checkExistingUser(email, phone) {
+    try {
+      const response = await axios.get(
+        `${API_URL}?filters[email][$eq]=${email}&filters[phone_number][$eq]=${phone}`
+      );
+      return response.data.data.length > 0;
+    } catch (error) {
+      console.error("Check user error:", error);
+      return false;
+    }
+  }
 
   return (
     <div className="min-h-screen mt-10 flex items-center justify-center bg-gradient-to-br from-gray-50 to-blue-50 py-12 px-4">

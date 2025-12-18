@@ -69,23 +69,30 @@ const Login = ({ onClose, onSwitchToRegister, onLoginSuccess }) => {
       const data = await response.json();
 
       if (response.ok && data.jwt) {
+        const adminId = data.adminId; // ✅ DEFINE IT HERE
+
+        if (!adminId) {
+          throw new Error("Admin ID missing from login response");
+        }
+
         setSuccess(true);
 
-        // ✅ store STRAPI jwt
+        // 🔐 store auth
         localStorage.setItem("jwt", data.jwt);
+        localStorage.setItem("adminId", adminId);
 
-        // optional profile
+        // optional profile (SAFE)
         localStorage.setItem(
           "userProfile",
           JSON.stringify({
             email: data.user?.email,
-            id: data.user?.id,
-            adminId: data.adminId,
+            userId: data.user?.id,
+            adminId,
           })
         );
 
         setTimeout(() => {
-          navigate("/admindashboard");
+          navigate(`/${adminId}/admindashboard`);
           onClose();
         }, 1500);
       } else {

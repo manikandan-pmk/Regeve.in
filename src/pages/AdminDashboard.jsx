@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { motion, AnimatePresence } from "framer-motion";
 import Logo from "/re.png";
+import { adminNavigate } from "../utils/adminNavigation";
+
 import {
   FiLogOut,
   FiRefreshCw,
@@ -482,7 +484,7 @@ export default function AdminDashboard() {
     setLoadingStates((prev) => ({ ...prev, [service.id]: true }));
     await new Promise((resolve) => setTimeout(resolve, 800));
     setLoadingStates((prev) => ({ ...prev, [service.id]: false }));
-    navigate(service.route);
+    adminNavigate(navigate, service.route);
   };
 
   const handleLogout = () => {

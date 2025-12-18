@@ -12,6 +12,7 @@ import {
   TrendingUp,
 } from "lucide-react";
 import axios from "axios";
+import { useParams } from "react-router-dom";
 
 const axiosInstance = axios.create({
   baseURL: "https://api.regeve.in/api",
@@ -28,6 +29,7 @@ axiosInstance.interceptors.request.use((config) => {
 });
 
 const ElectionDashboard = () => {
+  const { electionDocumentId } = useParams();
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("all");
   const [participants, setParticipants] = useState([]);
@@ -104,84 +106,64 @@ const ElectionDashboard = () => {
   // -----------------------------
   // FETCH PARTICIPANTS & CANDIDATES
   // -----------------------------
+
+  const fetchData = async () => {
+    try {
+      // 1️⃣ Fetch positions WITH candidates (same as CandidateDashboard)
+      const sectionRes = await axiosInstance.get(
+        `/election-candidate-positions?electionId=${electionDocumentId}`
+      );
+
+      const sections = sectionRes.data.data || [];
+
+      // 2️⃣ Extract candidates from sections
+      const extractedCandidates = sections.flatMap((section) =>
+        (section.candidates || []).map((c) => ({
+          id: c.id,
+          documentId: c.documentId,
+          name: c.name,
+          email: c.email || "",
+          registrationDate: c.createdAt,
+          image: c.photo?.url
+            ? `https://api.regeve.in${c.photo.url}`
+            : `https://api.dicebear.com/7.x/initials/svg?seed=${c.name}`,
+          votes: c.votes || 0,
+          party: c.party || null,
+          position: section.Position,
+        }))
+      );
+
+      // 3️⃣ Fetch participants (optional but filtered)
+      const participantRes = await axiosInstance.get(
+        "/election-participants?populate=*"
+      );
+
+      const formattedParticipants =
+        participantRes.data.data
+          ?.map((item) => ({
+            id: item.id,
+            name: item.attributes?.name,
+            email: item.attributes?.email,
+            isVerified: item.attributes?.isVerified,
+            election: item.attributes?.election_name?.data?.documentId,
+            registrationDate: item.attributes?.createdAt,
+            image: `https://api.dicebear.com/7.x/initials/svg?seed=${item.attributes?.name}`,
+          }))
+          .filter(
+            (p) => p.isVerified === true && p.election === electionDocumentId
+          ) || [];
+
+      setCandidates(extractedCandidates);
+      setParticipants(formattedParticipants);
+    } catch (err) {
+      console.error("ElectionDashboard fetch error:", err);
+    }
+  };
+
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        // Fetch Participants
-        const participantRes = await axiosInstance.get(
-          "/election-participants?populate=*"
-        );
-
-        const participantArray = participantRes.data.data || [];
-
-        const formattedParticipants = participantArray.map((item) => {
-          const photoUrl = item.attributes?.photo?.data?.attributes?.url
-            ? `https://api.regeve.in${item.attributes.photo.data.attributes.url}`
-            : `https://api.dicebear.com/7.x/initials/svg?seed=${
-                item.attributes?.name || "User"
-              }`;
-
-          return {
-            id: item.id,
-            documentId: item.documentId,
-            name: item.attributes?.name || "Unknown",
-            email: item.attributes?.email || "",
-            registrationDate: item.attributes?.createdAt || item.createdAt,
-            image: photoUrl,
-            votes: 0,
-            party: null,
-            isVerified: item.attributes?.isVerified || false,
-          };
-        });
-
-        // Fetch Candidates
-        const candidateRes = await axiosInstance.get(
-          "/candidates?populate[photo]=true&populate[election_candidate_position]=true"
-        );
-
-        const candidateArray = candidateRes.data.data || [];
-        const formattedCandidates = candidateArray.map((item) => {
-          // Handle both Strapi v4 and v5 structures
-          const attributes = item.attributes || item;
-          const photoData =
-            attributes?.photo?.data?.attributes || attributes?.photo;
-          const positionData =
-            attributes?.election_candidate_position?.data?.attributes ||
-            attributes?.election_candidate_position;
-
-          const photoUrl = photoData?.url
-            ? `https://api.regeve.in${photoData.url}`
-            : `https://api.dicebear.com/7.x/initials/svg?seed=${
-                attributes?.name || "Candidate"
-              }`;
-
-          return {
-            id: item.id,
-            documentId: item.documentId,
-            name: attributes?.name || "Unknown Candidate",
-            email: attributes?.email || "",
-            registrationDate: attributes?.createdAt || item.createdAt,
-            image: photoUrl,
-            votes: attributes?.votes || 0,
-            party: attributes?.party || null,
-            position: positionData?.Position || "Candidate",
-          };
-        });
-
-        // Filter only verified participants
-        const verifiedParticipants = formattedParticipants.filter(
-          (p) => p.isVerified === true
-        );
-
-        setParticipants(verifiedParticipants);
-        setCandidates(formattedCandidates);
-      } catch (error) {
-        console.error("API Fetch Error:", error);
-      }
-    };
-
+    if (!electionDocumentId) return;
     fetchData();
-  }, []);
+  }, [electionDocumentId]);
 
   // Filtering Logic
   const filteredList = allPeople.filter((p) => {
@@ -352,11 +334,7 @@ const ElectionDashboard = () => {
                 {/* Participant Info */}
                 <div className="flex items-start gap-3 mb-4">
                   <div className="relative">
-                    <img
-                      src={p.image}
-                      alt={p.name}
-                      className="w-12 h-12 rounded-lg object-cover border-2 border-white shadow-md"
-                    />
+                    <img src={p.image} alt={p.name} className="w-full h-full" />
                     {p.role === "Candidate" && (
                       <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center shadow-md">
                         <UserCheck className="w-2.5 h-2.5 text-white" />
@@ -509,7 +487,7 @@ const ElectionDashboard = () => {
                         <img
                           src={p.image}
                           alt={p.name}
-                          className="w-12 h-12 lg:w-14 lg:h-14 rounded-lg lg:rounded-xl object-cover border-2 border-white shadow-md"
+                          className="w-full h-full border-1 border-white rounded-md lg:w-14 lg:h-14 "
                         />
                         {p.role === "Candidate" && (
                           <div className="absolute -bottom-1 -right-1 w-5 h-5 lg:w-6 lg:h-6 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center shadow-md">

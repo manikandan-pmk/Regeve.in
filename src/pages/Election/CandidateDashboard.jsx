@@ -1,9 +1,10 @@
 // components/CandidateDashboard.js
 import React, { useState, useRef, useEffect } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
-import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import axios from "axios";
 import ElectionDashboard from "./ElectionDashboard ";
+import { adminNavigate } from "../../utils/adminNavigation";
 
 const API_URL = "https://api.regeve.in/api";
 
@@ -22,7 +23,7 @@ axiosInstance.interceptors.request.use((config) => {
 });
 
 const CandidateDashboard = () => {
-  const location = useLocation();
+  const { adminId, electionDocumentId } = useParams();
   const [showForm, setShowForm] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -54,20 +55,18 @@ const CandidateDashboard = () => {
   const navigate = useNavigate();
   const [photo, setPhoto] = useState(null);
 
-  // Get election data from navigation state
-  const electionData = location.state || {
-    electionName: "Untitled Election",
-    electionType: "Custom",
-    electionCategory: "Custom Election",
-    electionId: null,
-  };
-
   const formModalRef = useRef(null);
   const detailsModalRef = useRef(null);
   const deleteModalRef = useRef(null);
   const addSectionRef = useRef(null);
   const winnerPopupRef = useRef(null);
   const deleteSectionModalRef = useRef(null);
+
+  const [electionMeta, setElectionMeta] = useState({
+    electionName: "",
+    electionType: "",
+    electionCategory: "",
+  });
 
   // Show alert message with auto-dismiss
   const showAlert = (type, text, duration = 5000, field = null) => {
@@ -95,11 +94,54 @@ const CandidateDashboard = () => {
   }, [fieldFocus]);
 
   // Fetch sections from backend
+  // In CandidateDashboard.jsx, replace the fetchElectionMeta function with:
+
   useEffect(() => {
-    if (electionData.electionId) {
-      fetchSections();
-    }
-  }, [electionData.electionId]);
+    if (!electionDocumentId) return;
+
+    const fetchElectionMeta = async () => {
+      try {
+
+        // Fetch all elections and filter by documentId
+        const res = await axiosInstance.get("/election-names", {
+          params: {
+            populate: "*",
+            "pagination[pageSize]": 100, // Fetch enough to find the election
+          },
+        });
+
+
+        // Find the election with matching documentId
+        const allElections = res.data?.data || [];
+        const election = allElections.find(
+          (e) => e.documentId === electionDocumentId
+        );
+
+
+        if (!election) {
+          console.error(
+            "Election not found with documentId:",
+            electionDocumentId
+          );
+          showAlert("error", "Election not found");
+          adminNavigate(navigate, "/electionhome");
+          return;
+        }
+
+        setElectionMeta({
+          electionName: election.Election_Name || "",
+          electionType: election.Election_Type || "",
+          electionCategory: election.Election_Category || "",
+        });
+      } catch (err) {
+        console.error("Election meta fetch failed:", err);
+        showAlert("error", "Failed to load election data");
+        adminNavigate(navigate, "/electionhome");
+      }
+    };
+
+    fetchElectionMeta();
+  }, [electionDocumentId]);
 
   // Click outside to close modals
   useEffect(() => {
@@ -154,7 +196,9 @@ const CandidateDashboard = () => {
     try {
       setIsFetchingCandidates(true);
 
-      const response = await axiosInstance.get("/election-candidate-positions");
+      const response = await axiosInstance.get(
+        `/election-candidate-positions?electionId=${electionDocumentId}`
+      );
 
       // backend returns { data: [...] }
       const list = response.data.data;
@@ -192,6 +236,12 @@ const CandidateDashboard = () => {
       setIsFetchingCandidates(false);
     }
   };
+
+  useEffect(() => {
+    if (electionDocumentId) {
+      fetchSections();
+    }
+  }, [electionDocumentId]);
 
   // Check for duplicate email, phone, or whatsapp
   const checkDuplicates = (candidateData = formData) => {
@@ -376,9 +426,10 @@ const CandidateDashboard = () => {
           photo: photoId, // This should be the ID, not the object
           // CRITICAL: This field must match your relation name
           election_candidate_position: Number(formData.sectionId),
-
         },
       };
+
+      console.log("SECTION ID:", formData.sectionId);
 
       // Make the API call
       const response = await axiosInstance.post("/candidates", payload);
@@ -444,7 +495,7 @@ const CandidateDashboard = () => {
       const payload = {
         data: {
           Position: newSectionName.trim(),
-          election_name: electionData.electionId, // Match your relation field name
+          election_name: electionDocumentId, // documentId // Match your relation field name
         },
       };
 
@@ -637,8 +688,8 @@ const CandidateDashboard = () => {
       <div className="max-w-7xl mx-auto">
         {/* Back Navigation */}
         <div className="mb-6">
-          <Link
-            to="/electionhome"
+          <button
+            onClick={() => adminNavigate(navigate, "/electionhome")}
             className="inline-flex items-center gap-2 text-slate-600 hover:text-blue-600 transition-colors duration-200 group"
           >
             <svg
@@ -655,7 +706,7 @@ const CandidateDashboard = () => {
               />
             </svg>
             <span className="font-medium">Back to select election</span>
-          </Link>
+          </button>
         </div>
 
         {/* Main Dashboard Card */}
@@ -667,7 +718,7 @@ const CandidateDashboard = () => {
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
                   <span className="text-sm font-semibold text-slate-600 uppercase tracking-wide">
-                    {electionData.electionCategory}
+                    {electionMeta.electionCategory}
                   </span>
                 </div>
                 <div className="w-px h-4 bg-slate-300"></div>
@@ -681,11 +732,11 @@ const CandidateDashboard = () => {
               </div>
 
               <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">
-                {electionData.electionName}
+                {electionMeta.electionName}
               </h1>
 
               <p className="text-slate-600 text-lg">
-                {electionData.electionType} • Candidate Management
+                {electionMeta.electionType} • Candidate Management
               </p>
             </div>
 
@@ -712,7 +763,7 @@ const CandidateDashboard = () => {
               </button>
 
               <button
-                onClick={() => navigate("/participationForm")}
+                onClick={() => adminNavigate(navigate, "/participationForm")}
                 className="flex items-center justify-center gap-2 bg-gradient-to-r from-amber-500 to-amber-600 text-white px-6 py-3 rounded-xl hover:from-amber-600 hover:to-amber-700 transition-all duration-200 font-semibold shadow-lg hover:shadow-xl min-w-[160px]"
               >
                 <svg
@@ -831,7 +882,7 @@ const CandidateDashboard = () => {
                 <p className="text-slate-600 mb-8 leading-relaxed">
                   Create your first election position for{" "}
                   <strong className="text-blue-600">
-                    {electionData.electionName}
+                    {electionMeta.electionName}
                   </strong>
                   . Each position will have its own section of candidates.
                 </p>
@@ -1098,16 +1149,16 @@ const CandidateDashboard = () => {
                             >
                               <div className="flex flex-col items-center text-center">
                                 {/* Candidate Photo */}
-                                <div className="mb-4 relative">
+                                <div className="mb-4 w-28 h-28 border border-gray-300 rounded-xl overflow-hidden bg-white flex items-center justify-center">
                                   {candidate.photoUrl ? (
                                     <img
                                       src={candidate.photoUrl}
                                       alt={candidate.name}
-                                      className="w-16 h-16 border-2 border-gray-300 object-cover mx-auto rounded-full shadow-md"
+                                      className="w-full h-full"
                                     />
                                   ) : (
-                                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center mx-auto shadow-md">
-                                      <span className="text-white font-bold text-sm">
+                                    <div className="w-full h-full bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center">
+                                      <span className="text-white font-bold text-lg">
                                         {getInitials(candidate.name)}
                                       </span>
                                     </div>
@@ -1116,12 +1167,12 @@ const CandidateDashboard = () => {
 
                                 <div className="w-full text-center mb-4">
                                   {/* Candidate Name */}
-                                  <h5 className="font-bold text-slate-900 text-sm mb-1 truncate w-full">
+                                  <h5 className="font-bold text-slate-900 text-sm truncate">
                                     {candidate.name}
                                   </h5>
 
                                   {/* Position */}
-                                  <div className="mb-2">
+                                  <div>
                                     <div className="text-blue-700 font-semibold text-xs bg-blue-50 px-2 py-1 rounded-md inline-block truncate max-w-full">
                                       {candidate.position}
                                     </div>
@@ -1178,7 +1229,7 @@ const CandidateDashboard = () => {
                       Add New Candidate
                     </h2>
                     <p className="text-slate-600 text-sm mt-1">
-                      {electionData.electionName}
+                      {electionMeta.electionName}
                     </p>
                   </div>
                   <button
@@ -1577,7 +1628,7 @@ const CandidateDashboard = () => {
                           <img
                             src={selectedCandidate.photoUrl}
                             alt={selectedCandidate.name}
-                            className="relative w-20 h-20 sm:w-32 sm:h-32 rounded-full object-cover border-4 border-white shadow-lg sm:shadow-2xl"
+                            className="relative w-20 h-20 sm:w-32 sm:h-32 border-2 border-white shadow-lg sm:shadow-2xl"
                           />
                         ) : (
                           <div className="relative w-20 h-20 sm:w-32 sm:h-32 rounded-full bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center border-4 border-white shadow-lg sm:shadow-2xl">
