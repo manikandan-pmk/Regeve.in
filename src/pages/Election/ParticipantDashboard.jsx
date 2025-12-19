@@ -19,9 +19,23 @@ import {
   ArrowLeft,
   Save,
   X,
+  Share2, // Add this
+  Copy,
 } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import axios from "axios";
+
+const axiosInstance = axios.create({
+  baseURL: "https://api.regeve.in/api",
+});
+
+axiosInstance.interceptors.request.use((config) => {
+  const token = localStorage.getItem("jwt");
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
 
 const ParticipantDashboard = () => {
   const { adminId, electionDocumentId } = useParams();
@@ -39,57 +53,100 @@ const ParticipantDashboard = () => {
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState({});
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [electionName, setElectionName] = useState("");
 
   const [photoFile, setPhotoFile] = useState(null);
   const [photoPreview, setPhotoPreview] = useState("");
 
   const [confirmAction, setConfirmAction] = useState(null);
+  // Add this state for share modal - place it with your other useState declarations
+  const [shareModal, setShareModal] = useState({
+    open: false,
+    participant: null,
+    link: "",
+  });
 
-  useEffect(() => {
-    fetchParticipants();
-  }, []);
+  // Function to generate the share link
+  const generateElectionFormLink = () => {
+    const baseUrl = window.location.origin;
 
+    // Convert election name to URL-friendly format
+    const urlFriendlyElectionName = electionName
+      ? encodeURIComponent(electionName.replace(/\s+/g, "-").toLowerCase())
+      : "election-form";
+
+    return `${baseUrl}/#/electionForm/${adminId}/${electionDocumentId}/${urlFriendlyElectionName}`;
+  };
+
+  // Function to copy to clipboard
+  const copyElectionFormLink = () => {
+    const link = generateElectionFormLink();
+
+    navigator.clipboard
+      .writeText(link)
+      .then(() => {
+        showAlertMessage("Election form link copied to clipboard!", "success");
+      })
+      .catch((err) => {
+        console.error("Failed to copy: ", err);
+        showAlertMessage("Failed to copy link", "error");
+      });
+  };
   const fetchParticipants = async () => {
     try {
-      const response = await axios.get(
-        "https://api.regeve.in/api/election-participants?populate=*"
+      const response = await axiosInstance.get(
+        `/election-participants?populate=*&filters[election][documentId]=${electionDocumentId}`
       );
 
       const apiData = response.data.data;
 
-      if (Array.isArray(apiData)) {
-        const formatted = apiData.map((item) => {
-          const photoUrl = item.Photo?.url
-            ? `https://api.regeve.in${item.Photo.url}`
-            : `https://api.dicebear.com/7.x/initials/svg?seed=${item.name}`;
+      const formatted = apiData.map((item) => ({
+        id: item.id,
+        participant_id: item.participant_id,
+        name: item.name,
+        email: item.email,
+        phone: item.phone_number,
+        whatsapp: item.whatsapp_number,
+        age: item.age,
+        idNumber: item.id_card,
+        gender: item.gender,
+        verified: item.isVerified,
+        image: item.Photo?.url
+          ? `https://api.regeve.in${item.Photo.url}`
+          : `https://api.dicebear.com/7.x/initials/svg?seed=${item.name}`,
+        constituency: item.constituency || "Unknown",
+      }));
 
-          return {
-            id: item.id,
-            documentId: item.documentId,
-            name: item.name,
-            email: item.email,
-            phone: item.phone_number,
-            whatsapp: item.whatsapp_number,
-            age: item.age,
-            idNumber: item.id_card,
-            gender: item.gender,
-            address: "Not Provided",
-            registrationDate: item.createdAt,
-            verified: item.isVerified,
-            hasVoted: item.hasVoted,
-            voteToken: item.VoteToken,
-            constituency: "Not Assigned",
-            participant_id: item.participant_id,
-            image: photoUrl,
-          };
-        });
-
-        setParticipants(formatted);
-      }
+      setParticipants(formatted);
     } catch (error) {
       console.error("Error fetching participants:", error);
     }
   };
+
+  const fetchElectionName = async () => {
+    try {
+      const response = await axiosInstance.get(
+        `/election-names/${electionDocumentId}`
+      );
+
+      const electionData = response.data?.data;
+
+      if (electionData?.Election_Name) {
+        setElectionName(electionData.Election_Name);
+      } else {
+        setElectionName("Election Form");
+      }
+    } catch (error) {
+      console.error("Error fetching election name:", error);
+      setElectionName("Election Form");
+    }
+  };
+
+  // Call fetchElectionName in useEffect
+  useEffect(() => {
+    fetchParticipants();
+    fetchElectionName();
+  }, []);
 
   // Show alert function
   const showAlertMessage = (message, type = "success") => {
@@ -107,7 +164,7 @@ const ParticipantDashboard = () => {
     const newStatus = !participant.verified;
 
     try {
-      await axios.put(
+      await axiosInstance.put(
         `https://api.regeve.in/api/election-participants/${participant.participant_id}`,
         {
           data: { isVerified: newStatus },
@@ -161,7 +218,7 @@ const ParticipantDashboard = () => {
         const photoForm = new FormData();
         photoForm.append("files", photoFile);
 
-        const uploadRes = await axios.post(
+        const uploadRes = await axiosInstance.post(
           "https://api.regeve.in/api/upload",
           photoForm,
           {
@@ -173,7 +230,7 @@ const ParticipantDashboard = () => {
       }
 
       // 2️⃣ Update participant
-      await axios.put(
+      await axiosInstance.put(
         `https://api.regeve.in/api/election-participants/${editForm.participant_id}`,
         {
           data: {
@@ -417,10 +474,48 @@ const ParticipantDashboard = () => {
               </p>
             </div>
 
-            <button className="px-5 py-2.5 border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 transition-all duration-200 flex items-center gap-2 text-sm font-medium bg-white shadow-[0_1px_3px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_8px_rgba(0,0,0,0.05)]">
-              <Download className="w-4 h-4" />
-              Export Data
-            </button>
+            <div className="flex items-center gap-3">
+              {/* Share Election Form Button */}
+              {/* Share Election Form Button in Header */}
+              {/* Share Election Form Button */}
+              <button
+                onClick={() => {
+                  const baseUrl = window.location.origin;
+
+                  // Use the actual election name from state
+                  const urlFriendlyElectionName = electionName
+                    ? encodeURIComponent(
+                        electionName.replace(/\s+/g, "-").toLowerCase()
+                      )
+                    : "election-form";
+
+                  const electionFormLink = `${baseUrl}/#/electionForm/${adminId}/${electionDocumentId}/${urlFriendlyElectionName}`;
+
+                  navigator.clipboard
+                    .writeText(electionFormLink)
+                    .then(() => {
+                      showAlertMessage(
+                        "Election form link copied to clipboard!",
+                        "success"
+                      );
+                    })
+                    .catch((err) => {
+                      console.error("Failed to copy: ", err);
+                      showAlertMessage("Failed to copy link", "error");
+                    });
+                }}
+                className="px-5 py-2.5 border border-green-200 text-green-700 rounded-xl hover:bg-green-50 transition-all duration-200 flex items-center gap-2 text-sm font-medium bg-white shadow-[0_1px_3px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_8px_rgba(0,0,0,0.05)]"
+              >
+                <Share2 className="w-4 h-4" />
+                Share Election Form
+              </button>
+
+              {/* Existing Export Data Button */}
+              <button className="px-5 py-2.5 border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 transition-all duration-200 flex items-center gap-2 text-sm font-medium bg-white shadow-[0_1px_3px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_8px_rgba(0,0,0,0.05)]">
+                <Download className="w-4 h-4" />
+                Export Data
+              </button>
+            </div>
           </div>
         </div>
 

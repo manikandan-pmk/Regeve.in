@@ -21,7 +21,12 @@ export default function ElectionParticipantForm({ token = null }) {
   const [message, setMessage] = useState(null);
   const [photoPreview, setPhotoPreview] = useState(null);
 
-  const { adminId, electionDocumentId } = useParams();
+  const { adminId, electionDocumentId, electionName } = useParams();
+  console.log("🔍 DEBUG - URL Parameters received:", {
+    adminId,
+    electionDocumentId,
+    electionName,
+  });
 
   function handleChange(e) {
     const { name, value } = e.target;

@@ -46,7 +46,10 @@ const Navbar = () => {
   const navigate = useNavigate();
 
   const storedUser = localStorage.getItem("userProfile");
-  const userName = storedUser ? JSON.parse(storedUser).name : "";
+  const parsedUser = storedUser ? JSON.parse(storedUser) : null;
+
+  const userName = parsedUser?.name || "";
+  const adminId = parsedUser?.adminId || null; // 👈 FIX
 
   const isLoggedIn = !!localStorage.getItem("jwt");
 
@@ -101,7 +104,9 @@ const Navbar = () => {
       ],
     },
 
-    ...(isLoggedIn ? [{ name: "Dashboard", path: "/admindashboard" }] : []),
+    ...(isLoggedIn
+      ? [{ name: "Dashboard", path: `/${adminId}/admindashboard` }]
+      : []),
   ];
 
   const menuVariants = {
