@@ -49,7 +49,6 @@ export default function App() {
     location.pathname === "/regeve-admin" ||
     location.pathname === "/dashboard" ||
     location.pathname === "/participationDashboard" ||
-    location.pathname === "/votingpage" ||
     // ✅ FIXED — Candidate Dashboard
     location.pathname.includes("/candidate-dashboard/") ||
     // ✅ Participant Dashboard (FIXED)
@@ -60,7 +59,8 @@ export default function App() {
     // member details
     location.pathname.startsWith("/member-details/") ||
     // admin dashboard
-    location.pathname.endsWith("/admindashboard");
+    location.pathname.endsWith("/admindashboard") ||
+    location.pathname.includes("/votingpage/");
 
   return (
     <div className="max-w-full overflow-x-hidden">
@@ -99,7 +99,6 @@ export default function App() {
         <Route path="/giftstatus" element={<GiftStatusPage />} />
         <Route path="/qr/:memberId" element={<QRRedirect />} />
         {/* ================= ADMIN PROTECTED ================= */}
-
         <Route
           path="/:adminId/electionhome"
           element={
@@ -108,7 +107,6 @@ export default function App() {
             </AdminProtectedRoute>
           }
         />
-
         <Route
           path="/:adminId/candidate-dashboard/:electionDocumentId"
           element={
@@ -129,7 +127,15 @@ export default function App() {
           path="/electionForm/:adminId/:electionDocumentId/:electionName"
           element={<ElectionForm />}
         />
-        <Route path="/votingpage" element={<VotingPage />} />
+
+        <Route
+          path="/:adminId/votingpage/:electionDocumentId"
+          element={
+            <AdminProtectedRoute>
+              <VotingPage token={localStorage.getItem("jwt")} />
+            </AdminProtectedRoute>
+          }
+        />
         {/* ================= ADMIN DASHBOARD ================= */}
         <Route path="/:adminId/admindashboard" element={<AdminDashboard />} />
         {/* ================= FALLBACK ================= */}

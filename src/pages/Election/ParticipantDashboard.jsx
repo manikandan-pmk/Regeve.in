@@ -1,5 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
-import { adminNavigate } from "../../utils/adminNavigation";
+ import React, { useState, useEffect } from "react";
 import {
   Search,
   Filter,
@@ -20,10 +19,10 @@ import {
   Save,
   X,
   Share2, // Add this
-  Copy,
 } from "lucide-react";
-import { useNavigate, useParams } from "react-router-dom";
+
 import axios from "axios";
+import { useNavigate, useParams } from "react-router-dom";
 
 const axiosInstance = axios.create({
   baseURL: "https://api.regeve.in/api",
@@ -76,6 +75,20 @@ const ParticipantDashboard = () => {
       : "election-form";
 
     return `${baseUrl}/#/electionForm/${adminId}/${electionDocumentId}/${urlFriendlyElectionName}`;
+  };
+
+  const handleVotingPageClick = () => {
+    const baseUrl = window.location.origin;
+    const votingLink = `${baseUrl}/#/${adminId}/votingpage/${electionDocumentId}`;
+
+    navigator.clipboard
+      .writeText(votingLink)
+      .then(() => {
+        showAlertMessage("Voting page link copied to clipboard!", "success");
+      })
+      .catch(() => {
+        showAlertMessage("Failed to copy voting page link", "error");
+      });
   };
 
   // Function to copy to clipboard
@@ -478,6 +491,17 @@ const ParticipantDashboard = () => {
               {/* Share Election Form Button */}
               {/* Share Election Form Button in Header */}
               {/* Share Election Form Button */}
+
+              <button
+                onClick={handleVotingPageClick}
+                className="px-5 py-2.5 border border-green-200 text-green-700 rounded-xl
+             hover:bg-green-50 transition-all duration-200 flex items-center gap-2
+             text-sm font-medium bg-white shadow"
+              >
+                <span className="text-lg">🗳️</span>
+                Voting Page
+              </button>
+
               <button
                 onClick={() => {
                   const baseUrl = window.location.origin;
