@@ -1,4 +1,4 @@
- import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Search,
   Filter,
@@ -178,7 +178,7 @@ const ParticipantDashboard = () => {
 
     try {
       await axiosInstance.put(
-        `https://api.regeve.in/api/election-participants/${participant.participant_id}`,
+        `/election-participants/by-participant-id/${participant.participant_id}`,
         {
           data: { isVerified: newStatus },
         }

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import {
   Search,
@@ -10,6 +11,7 @@ import {
   Vote,
   UserPlus,
   TrendingUp,
+  Award,
 } from "lucide-react";
 import axios from "axios";
 import { useParams } from "react-router-dom";
@@ -31,92 +33,122 @@ axiosInstance.interceptors.request.use((config) => {
 const ElectionDashboard = () => {
   const { electionDocumentId } = useParams();
   const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState("all");
+  const [positionFilter, setPositionFilter] = useState("all");
   const [participants, setParticipants] = useState([]);
   const [candidates, setCandidates] = useState([]);
+  const [voteData, setVoteData] = useState({
+    totalVotesCast: 0,
+    voters: [],
+  });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // Use unique identifiers to prevent duplication
-  const allPeople = React.useMemo(() => {
-    const people = [];
-    const seenEmails = new Set(); // Use email to deduplicate
+  // Extract unique positions from candidates
+  const positions = React.useMemo(() => {
+    const uniquePositions = new Set();
+    candidates.forEach(candidate => {
+      if (candidate.position) {
+        uniquePositions.add(candidate.position);
+      }
+    });
+    return Array.from(uniquePositions).sort();
+  }, [candidates]);
 
-    // Add candidates first (they take priority)
+  // Only show candidates (no voters)
+  const allCandidates = React.useMemo(() => {
+    const seenIds = new Set();
+    const uniqueCandidates = [];
+
     candidates.forEach((candidate) => {
-      if (!seenEmails.has(candidate.email)) {
-        seenEmails.add(candidate.email);
-        people.push({
+      const uniqueKey = candidate.email || `candidate-${candidate.id}`;
+
+      if (!seenIds.has(uniqueKey)) {
+        seenIds.add(uniqueKey);
+        uniqueCandidates.push({
           ...candidate,
-          id: `candidate-${candidate.documentId || candidate.id}`, // Use documentId for unique ID
+          id: `candidate-${candidate.id}`,
           role: "Candidate",
+          name: candidate.name || "Unknown",
+          email: candidate.email || "",
+          registrationDate: candidate.registrationDate || candidate.createdAt,
+          image:
+            candidate.image ||
+            `https://api.dicebear.com/7.x/initials/svg?seed=${candidate.name}`,
+          isVerified: true,
+          votes: candidate.votes || 0,
+          position: candidate.position || null,
+          party: candidate.party || null,
         });
       }
     });
 
-    // Add participants who are NOT already candidates
-    participants.forEach((participant) => {
-      if (!seenEmails.has(participant.email)) {
-        seenEmails.add(participant.email);
-        people.push({
-          ...participant,
-          id: `participant-${participant.id}`,
-          role: "Voter",
-        });
-      }
-    });
-
-    return people;
-  }, [participants, candidates]);
+    return uniqueCandidates;
+  }, [candidates]);
 
   // Calculate deduplicated counts
   const totalCandidates = React.useMemo(() => {
-    const seenEmails = new Set();
-    return candidates.filter((candidate) => {
-      if (!seenEmails.has(candidate.email)) {
-        seenEmails.add(candidate.email);
-        return true;
-      }
-      return false;
-    }).length;
-  }, [candidates]);
+    return allCandidates.length;
+  }, [allCandidates]);
 
-  const totalParticipants = participants.length;
+  // Total participants count (only for stats)
+  const totalParticipants = React.useMemo(() => {
+    const seen = new Set();
+    participants.forEach((p) => {
+      const key = p.documentId || p.id;
+      if (key) seen.add(key);
+    });
+    return seen.size;
+  }, [participants]);
 
+  // Total voters count (only for stats)
   const totalVoters = React.useMemo(() => {
-    // Get all candidate emails (deduplicated)
+    if (participants.length === 0) return 0;
+
+    // Get all candidate emails
     const candidateEmails = new Set();
     candidates.forEach((candidate) => {
-      candidateEmails.add(candidate.email);
+      if (candidate.email) candidateEmails.add(candidate.email);
     });
 
     // Count participants who are NOT candidates
-    return participants.filter((p) => !candidateEmails.has(p.email)).length;
+    const seenEmails = new Set();
+    const uniqueVoters = participants.filter((p) => {
+      if (p.email && !seenEmails.has(p.email)) {
+        seenEmails.add(p.email);
+        return !candidateEmails.has(p.email);
+      }
+      return false;
+    });
+
+    return uniqueVoters.length;
   }, [participants, candidates]);
 
   const totalVotes = React.useMemo(() => {
-    const seenEmails = new Set();
-    return candidates.reduce((sum, candidate) => {
-      if (!seenEmails.has(candidate.email)) {
-        seenEmails.add(candidate.email);
-        return sum + (candidate.votes || 0);
-      }
-      return sum;
+    return allCandidates.reduce((sum, candidate) => {
+      return sum + (candidate.votes || 0);
     }, 0);
-  }, [candidates]);
+  }, [allCandidates]);
+
+  // Calculate maximum votes for percentage calculation
+  const maxVotes = React.useMemo(() => {
+    if (allCandidates.length === 0) return 1;
+    const max = Math.max(...allCandidates.map((c) => c.votes || 0));
+    return max > 0 ? max : 1;
+  }, [allCandidates]);
 
   // -----------------------------
-  // FETCH PARTICIPANTS & CANDIDATES
+  // FETCH DATA FUNCTIONS
   // -----------------------------
 
-  const fetchData = async () => {
+  const fetchCandidates = async () => {
     try {
-      // 1️⃣ Fetch positions WITH candidates (same as CandidateDashboard)
       const sectionRes = await axiosInstance.get(
         `/election-candidate-positions?electionId=${electionDocumentId}`
       );
 
       const sections = sectionRes.data.data || [];
 
-      // 2️⃣ Extract candidates from sections
+      // Extract candidates from sections
       const extractedCandidates = sections.flatMap((section) =>
         (section.candidates || []).map((c) => ({
           id: c.id,
@@ -127,59 +159,177 @@ const ElectionDashboard = () => {
           image: c.photo?.url
             ? `https://api.regeve.in${c.photo.url}`
             : `https://api.dicebear.com/7.x/initials/svg?seed=${c.name}`,
-          votes: c.votes || 0,
+          votes: c.vote_count || 0,
           party: c.party || null,
           position: section.Position,
         }))
       );
 
-      // 3️⃣ Fetch participants (optional but filtered)
-      const participantRes = await axiosInstance.get(
-        "/election-participants?populate=*"
-      );
+      return extractedCandidates;
+    } catch (err) {
+      console.error("Error fetching candidates:", err);
+      throw err;
+    }
+  };
 
-      const formattedParticipants =
-        participantRes.data.data
-          ?.map((item) => ({
+  const fetchParticipants = async () => {
+    try {
+      // Try different API endpoints for participants
+      let participantsData = [];
+
+      // First try: Check if we have a specific endpoint for this election
+      try {
+        const res = await axiosInstance.get(
+          `/election-participants?filters[election_name][documentId][$eq]=${electionDocumentId}&populate=*`
+        );
+
+        if (res.data && Array.isArray(res.data.data)) {
+          participantsData = res.data.data.map((item) => ({
             id: item.id,
-            name: item.attributes?.name,
-            email: item.attributes?.email,
-            isVerified: item.attributes?.isVerified,
+            name: item.attributes?.name || "Unknown",
+            email: item.attributes?.email || "",
+            isVerified: item.attributes?.isVerified || false,
             election: item.attributes?.election_name?.data?.documentId,
             registrationDate: item.attributes?.createdAt,
-            image: `https://api.dicebear.com/7.x/initials/svg?seed=${item.attributes?.name}`,
-          }))
-          .filter(
-            (p) => p.isVerified === true && p.election === electionDocumentId
-          ) || [];
+            image: `https://api.dicebear.com/7.x/initials/svg?seed=${
+              item.attributes?.name || "User"
+            }`,
+          }));
+        }
+      } catch (e1) {
+        console.log("Trying alternative participants endpoint...");
 
-      setCandidates(extractedCandidates);
-      setParticipants(formattedParticipants);
+        // Second try: Fallback to general endpoint
+        try {
+          const res = await axiosInstance.get(
+            "/election-participants?populate=*"
+          );
+
+          if (res.data && Array.isArray(res.data.data)) {
+            participantsData = res.data.data
+              .map((item) => ({
+                id: item.id,
+                name: item.attributes?.name || "Unknown",
+                email: item.attributes?.email || "",
+                isVerified: item.attributes?.isVerified || false,
+                election: item.attributes?.election_name?.data?.documentId,
+                registrationDate: item.attributes?.createdAt,
+                image: `https://api.dicebear.com/7.x/initials/svg?seed=${
+                  item.attributes?.name || "User"
+                }`,
+              }))
+              .filter((p) => {
+                // Filter by election ID and verified status
+                const isSameElection = p.election === electionDocumentId;
+                const isVerified = p.isVerified === true;
+                return isSameElection && isVerified;
+              });
+          }
+        } catch (e2) {
+          console.error("Both participant endpoints failed:", e2);
+          // Return empty array but don't throw - we can still show candidates
+          return [];
+        }
+      }
+
+      return participantsData;
+    } catch (err) {
+      console.error("Error in fetchParticipants:", err);
+      return [];
+    }
+  };
+
+  const fetchVoteData = async () => {
+    try {
+      const voteRes = await axiosInstance.get(
+        `/election-votes?electionId=${electionDocumentId}`
+      );
+
+      const voteData = voteRes.data.data || voteRes.data || [];
+      const totalVotesCast = voteData.length || 0;
+
+      return {
+        totalVotesCast,
+        voters: voteData,
+      };
+    } catch (voteErr) {
+      console.warn("Could not fetch vote data:", voteErr);
+      // Fallback - will be calculated from candidates
+      return {
+        totalVotesCast: 0,
+        voters: [],
+      };
+    }
+  };
+
+  // Update the main fetchData function
+  const fetchData = async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      // Fetch all data in parallel
+      const [candidatesData, participantsData, voteData] = await Promise.all([
+        fetchCandidates(),
+        fetchParticipants(),
+        fetchVoteData(),
+      ]);
+
+      setCandidates(candidatesData);
+      setParticipants(participantsData);
+      setVoteData(voteData);
+
+      // If no participants found but we have candidates, log it
+      if (participantsData.length === 0 && candidatesData.length > 0) {
+        console.log("No participants found, but showing candidates");
+      }
     } catch (err) {
       console.error("ElectionDashboard fetch error:", err);
+      setError("Failed to load election data. Please try again.");
+    } finally {
+      setTimeout(() => setLoading(false), 300);
     }
   };
 
   useEffect(() => {
-    if (!electionDocumentId) return;
+    if (!electionDocumentId) {
+      setError("No election ID provided");
+      setLoading(false);
+      return;
+    }
     fetchData();
   }, [electionDocumentId]);
 
-  // Filtering Logic
-  const filteredList = allPeople.filter((p) => {
-    const matchesSearch =
-      p.name.toLowerCase().includes(search.toLowerCase()) ||
-      p.email.toLowerCase().includes(search.toLowerCase()) ||
-      (p.party && p.party.toLowerCase().includes(search.toLowerCase())) ||
-      (p.position && p.position.toLowerCase().includes(search.toLowerCase()));
+  // Filtering Logic with position filter
+  const filteredCandidates = React.useMemo(() => {
+    return allCandidates.filter((candidate) => {
+      const matchesSearch =
+        candidate.name.toLowerCase().includes(search.toLowerCase()) ||
+        candidate.email.toLowerCase().includes(search.toLowerCase()) ||
+        (candidate.party && candidate.party.toLowerCase().includes(search.toLowerCase())) ||
+        (candidate.position && candidate.position.toLowerCase().includes(search.toLowerCase()));
 
-    const matchesFilter =
-      filter === "all" ||
-      (filter === "candidate" && p.role === "Candidate") ||
-      (filter === "voter" && p.role === "Voter");
+      const matchesPositionFilter =
+        positionFilter === "all" ||
+        (candidate.position && candidate.position === positionFilter);
 
-    return matchesSearch && matchesFilter;
-  });
+      return matchesSearch && matchesPositionFilter;
+    });
+  }, [allCandidates, search, positionFilter]);
+
+  // Animation variants
+  const fadeIn = {
+    hidden: { opacity: 0, y: 20 },
+    visible: { opacity: 1, y: 0 },
+  };
+
+  // Calculate votes for voteData if not available from API
+  const displayedTotalVotes = React.useMemo(() => {
+    if (voteData.totalVotesCast > 0) {
+      return voteData.totalVotesCast;
+    }
+    return totalVotes;
+  }, [voteData.totalVotesCast, totalVotes]);
 
   return (
     <div className="pt-6 md:pt-10 px-3 md:px-4 lg:px-6 max-w-7xl mx-auto">
@@ -187,111 +337,170 @@ const ElectionDashboard = () => {
       <div className="mb-6 md:mb-10">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-4 md:mb-6">
           <div className="mb-4 md:mb-0">
-            <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">
+            <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2 animate-fade-in">
               Election Analytics Dashboard
             </h1>
-            <p className="text-gray-500 text-sm md:text-base">
-              Monitor election progress and participant analytics
+            <p className="text-gray-500 text-sm md:text-base animate-fade-in animation-delay-100">
+              Monitor election progress and candidate analytics
             </p>
           </div>
-          <button className="w-full md:w-auto px-4 md:px-5 py-2.5 bg-white border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 transition-all duration-200 flex items-center justify-center gap-2 font-medium text-sm shadow-sm hover:shadow">
-            <Download className="w-4 h-4" />
+          <button className="w-full md:w-auto px-4 md:px-5 py-2.5 bg-white border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 transition-all duration-300 ease-out hover:scale-[1.02] transform flex items-center justify-center gap-2 font-medium text-sm shadow-sm hover:shadow-md animate-fade-in animation-delay-200">
+            <Download className="w-4 h-4 transition-transform duration-300 group-hover:scale-110" />
             Export Report
           </button>
         </div>
 
-        {/* Stats Grid - Fixed for mobile */}
+        {/* Error Message */}
+        {error && (
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl animate-fade-in">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <div className="w-5 h-5 bg-red-500 rounded-full flex items-center justify-center">
+                  <svg
+                    className="w-3 h-3 text-white"
+                    fill="currentColor"
+                    viewBox="0 0 20 20"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                </div>
+              </div>
+              <div className="ml-3">
+                <p className="text-sm font-medium text-red-800">{error}</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Stats Grid - Updated to show only candidate-focused stats */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 lg:gap-10">
-          <div className="bg-white p-4 md:p-6 rounded-xl md:rounded-2xl border border-gray-100 shadow-[0_1px_3px_rgba(0,0,0,0.04),0_10px_20px_rgba(0,0,0,0.08)] hover:shadow-[0_4px_8px_rgba(0,0,0,0.05),0_15px_25px_rgba(0,0,0,0.12)] transition-all duration-300">
-            <div className="flex items-center justify-between mb-3 md:mb-4">
-              <div className="p-2 md:p-3 rounded-lg md:rounded-xl bg-blue-50">
-                <Users className="w-5 h-5 md:w-6 md:h-6 text-blue-600" />
+          {loading ? (
+            // Loading skeleton for stats cards
+            Array.from({ length: 3 }).map((_, index) => (
+              <div
+                key={index}
+                className="bg-white p-4 md:p-6 rounded-xl md:rounded-2xl border border-gray-100 animate-pulse"
+              >
+                <div className="flex items-center justify-between mb-3 md:mb-4">
+                  <div className="p-2 md:p-3 rounded-lg md:rounded-xl bg-gray-200">
+                    <div className="w-5 h-5 md:w-6 md:h-6"></div>
+                  </div>
+                  <div className="w-10 h-4 bg-gray-200 rounded"></div>
+                </div>
+                <div className="h-4 bg-gray-200 rounded mb-2"></div>
+                <div className="h-8 md:h-10 bg-gray-200 rounded mb-4"></div>
+                <div className="h-3 bg-gray-200 rounded"></div>
               </div>
-              <span className="text-xs md:text-sm text-green-600 font-medium">
-                +8%
-              </span>
-            </div>
-            <p className="text-gray-500 text-xs md:text-sm font-medium mb-1 md:mb-2">
-              Total Participants
-            </p>
-            <p className="text-2xl md:text-3xl font-bold text-gray-900">
-              {totalParticipants.toLocaleString()}
-            </p>
-            <div className="mt-3 md:mt-4 flex items-center text-xs md:text-sm text-gray-500">
-              <UserPlus className="w-3 h-3 md:w-4 md:h-4 mr-1 md:mr-2" />
-              <span>
-                {totalCandidates} candidates • {totalVoters} voters
-              </span>
-            </div>
-          </div>
+            ))
+          ) : (
+            <>
+              {/* Total Candidates Card */}
+              <div className="bg-white p-4 md:p-6 rounded-xl md:rounded-2xl border border-gray-100 shadow-[0_1px_3px_rgba(0,0,0,0.04),0_10px_20px_rgba(0,0,0,0.08)] hover:shadow-[0_4px_8px_rgba(0,0,0,0.05),0_15px_25px_rgba(0,0,0,0.12)] transition-all duration-500 ease-out hover:scale-[1.02] transform animate-slide-up">
+                <div className="flex items-center justify-between mb-3 md:mb-4">
+                  <div className="p-2 md:p-3 rounded-lg md:rounded-xl bg-blue-50 animate-pulse-once">
+                    <UserCheck className="w-5 h-5 md:w-6 md:h-6 text-blue-600" />
+                  </div>
+                  <span className="text-xs md:text-sm text-green-600 font-medium animate-fade-in">
+                    {totalCandidates > 0 ? "Active" : "No Candidates"}
+                  </span>
+                </div>
+                <p className="text-gray-500 text-xs md:text-sm font-medium mb-1 md:mb-2">
+                  Total Candidates
+                </p>
+                <p className="text-2xl md:text-3xl font-bold text-gray-900 animate-count-up">
+                  {totalCandidates}
+                </p>
+                <div className="mt-3 md:mt-4 flex items-center text-xs md:text-sm text-gray-500">
+                  <UserCheck className="w-3 h-3 md:w-4 md:h-4 mr-1 md:mr-2 animate-bounce-once" />
+                  <span>
+                    {positions.length} position{positions.length !== 1 ? 's' : ''} available
+                  </span>
+                </div>
+              </div>
 
-          <div className="bg-white p-4 md:p-6 rounded-xl md:rounded-2xl border border-gray-100 shadow-[0_1px_3px_rgba(0,0,0,0.04),0_10px_20px_rgba(0,0,0,0.08)] hover:shadow-[0_4px_8px_rgba(0,0,0,0.05),0_15px_25px_rgba(0,0,0,0.12)] transition-all duration-300">
-            <div className="flex items-center justify-between mb-3 md:mb-4">
-              <div className="p-2 md:p-3 rounded-lg md:rounded-xl bg-green-50">
-                <UserCheck className="w-5 h-5 md:w-6 md:h-6 text-green-600" />
+              {/* Total Positions Card */}
+              <div className="bg-white p-4 md:p-6 rounded-xl md:rounded-2xl border border-gray-100 shadow-[0_1px_3px_rgba(0,0,0,0.04),0_10px_20px_rgba(0,0,0,0.08)] hover:shadow-[0_4px_8px_rgba(0,0,0,0.05),0_15px_25px_rgba(0,0,0,0.12)] transition-all duration-500 ease-out hover:scale-[1.02] transform animate-slide-up animation-delay-100">
+                <div className="flex items-center justify-between mb-3 md:mb-4">
+                  <div className="p-2 md:p-3 rounded-lg md:rounded-xl bg-green-50 animate-pulse-once">
+                    <Award className="w-5 h-5 md:w-6 md:h-6 text-green-600" />
+                  </div>
+                  <span className="text-xs md:text-sm text-blue-600 font-medium animate-fade-in">
+                    {positions.length > 0 ? "Available" : "No Positions"}
+                  </span>
+                </div>
+                <p className="text-gray-500 text-xs md:text-sm font-medium mb-1 md:mb-2">
+                  Total Positions
+                </p>
+                <p className="text-2xl md:text-3xl font-bold text-gray-900 animate-count-up animation-delay-100">
+                  {positions.length}
+                </p>
+                <div className="mt-3 md:mt-4 flex items-center text-xs md:text-sm text-gray-500">
+                  <TrendingUp className="w-3 h-3 md:w-4 md:h-4 mr-1 md:mr-2 animate-bounce-once animation-delay-100" />
+                  <span>
+                    {positions.length > 0
+                      ? "Contested positions"
+                      : "No positions defined"}
+                  </span>
+                </div>
               </div>
-              <span className="text-xs md:text-sm text-blue-600 font-medium">
-                Active
-              </span>
-            </div>
-            <p className="text-gray-500 text-xs md:text-sm font-medium mb-1 md:mb-2">
-              Total Candidates
-            </p>
-            <p className="text-2xl md:text-3xl font-bold text-gray-900">
-              {totalCandidates}
-            </p>
-            <div className="mt-3 md:mt-4 flex items-center text-xs md:text-sm text-gray-500">
-              <TrendingUp className="w-3 h-3 md:w-4 md:h-4 mr-1 md:mr-2" />
-              <span>Active contenders in race</span>
-            </div>
-          </div>
 
-          <div className="bg-white p-4 md:p-6 rounded-xl md:rounded-2xl border border-gray-100 shadow-[0_1px_3px_rgba(0,0,0,0.04),0_10px_20px_rgba(0,0,0,0.08)] hover:shadow-[0_4px_8px_rgba(0,0,0,0.05),0_15px_25px_rgba(0,0,0,0.12)] transition-all duration-300">
-            <div className="flex items-center justify-between mb-3 md:mb-4">
-              <div className="p-2 md:p-3 rounded-lg md:rounded-xl bg-purple-50">
-                <Vote className="w-5 h-5 md:w-6 md:h-6 text-purple-600" />
+              {/* Total Votes Card */}
+              <div className="bg-white p-4 md:p-6 rounded-xl md:rounded-2xl border border-gray-100 shadow-[0_1px_3px_rgba(0,0,0,0.04),0_10px_20px_rgba(0,0,0,0.08)] hover:shadow-[0_4px_8px_rgba(0,0,0,0.05),0_15px_25px_rgba(0,0,0,0.12)] transition-all duration-500 ease-out hover:scale-[1.02] transform animate-slide-up animation-delay-200">
+                <div className="flex items-center justify-between mb-3 md:mb-4">
+                  <div className="p-2 md:p-3 rounded-lg md:rounded-xl bg-purple-50 animate-pulse-once">
+                    <Vote className="w-5 h-5 md:w-6 md:h-6 text-purple-600" />
+                  </div>
+                  <span className="text-xs md:text-sm text-purple-600 font-medium animate-fade-in">
+                    {displayedTotalVotes > 0 ? "Cast" : "No Votes"}
+                  </span>
+                </div>
+                <p className="text-gray-500 text-xs md:text-sm font-medium mb-1 md:mb-2">
+                  Total Votes
+                </p>
+                <p className="text-2xl md:text-3xl font-bold text-gray-900 animate-count-up animation-delay-200">
+                  {displayedTotalVotes.toLocaleString()}
+                </p>
+                <div className="mt-3 md:mt-4 flex items-center text-xs md:text-sm text-gray-500">
+                  <Calendar className="w-3 h-3 md:w-4 md:h-4 mr-1 md:mr-2 animate-bounce-once animation-delay-200" />
+                  <span>
+                    {displayedTotalVotes > 0
+                      ? "Votes recorded to date"
+                      : "Awaiting first vote"}
+                  </span>
+                </div>
               </div>
-              <span className="text-xs md:text-sm text-purple-600 font-medium">
-                Cast
-              </span>
-            </div>
-            <p className="text-gray-500 text-xs md:text-sm font-medium mb-1 md:mb-2">
-              Total Votes
-            </p>
-            <p className="text-2xl md:text-3xl font-bold text-gray-900">
-              {totalVotes.toLocaleString()}
-            </p>
-            <div className="mt-3 md:mt-4 flex items-center text-xs md:text-sm text-gray-500">
-              <Calendar className="w-3 h-3 md:w-4 md:h-4 mr-1 md:mr-2" />
-              <span>Votes recorded to date</span>
-            </div>
-          </div>
+            </>
+          )}
         </div>
       </div>
 
       {/* Main Content Card */}
-      <div className="bg-gradient-to-br from-white to-gray-50 rounded-xl md:rounded-2xl border border-gray-200 shadow-lg overflow-hidden">
+      <div className="bg-gradient-to-br from-white to-gray-50 rounded-xl md:rounded-2xl border border-gray-200 shadow-lg overflow-hidden animate-fade-in animation-delay-300">
         {/* Header */}
         <div className="p-4 md:p-6 border-b border-gray-200">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 md:gap-4">
             <div>
               <h2 className="text-lg md:text-xl font-semibold text-gray-900">
-                Candidates Directory
+                Candidate Directory
               </h2>
               <p className="text-gray-500 text-xs md:text-sm mt-1">
-                Manage and view all election Candidates
+                View and manage all election candidates
               </p>
             </div>
             <div className="flex items-center gap-2 md:gap-4">
               <div className="text-xs md:text-sm text-gray-600">
                 <span className="font-semibold text-gray-900">
-                  {filteredList.length}
+                  {filteredCandidates.length}
                 </span>{" "}
                 of{" "}
                 <span className="font-semibold text-gray-900">
-                  {allPeople.length}
+                  {totalCandidates}
                 </span>{" "}
-                participants
+                candidates
               </div>
             </div>
           </div>
@@ -301,370 +510,395 @@ const ElectionDashboard = () => {
         <div className="p-4 md:p-6 bg-gradient-to-r from-gray-50/50 to-white border-b border-gray-200">
           <div className="flex flex-col md:flex-row md:items-center gap-3 md:gap-4">
             <div className="flex-1">
-              <div className="relative">
-                <Search className="absolute left-3 md:left-4 top-1/2 transform -translate-y-1/2 w-4 h-4 md:w-5 md:h-5 text-gray-400" />
+              <div className="relative group">
+                <Search className="absolute left-3 md:left-4 top-1/2 transform -translate-y-1/2 w-4 h-4 md:w-5 md:h-5 text-gray-400 transition-transform duration-300 group-hover:scale-110" />
                 <input
                   type="text"
-                  placeholder="Search candidates by name, email, or position..."
+                  placeholder="Search candidates by name, email, position, or party..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  className="w-full pl-10 md:pl-12 pr-3 md:pr-4 py-2.5 md:py-3.5 bg-white border border-gray-300 rounded-lg md:rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all duration-200 text-gray-700 placeholder-gray-500 text-sm md:text-base shadow-sm"
+                  className="w-full pl-10 md:pl-12 pr-3 md:pr-4 py-2.5 md:py-3.5 bg-white border border-gray-300 rounded-lg md:rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all duration-300 text-gray-700 placeholder-gray-500 text-sm md:text-base shadow-sm hover:shadow-md focus:shadow-lg"
                 />
               </div>
             </div>
             <div className="flex items-center gap-2 md:gap-3">
-              <div className="flex items-center bg-white border border-gray-300 rounded-lg md:rounded-xl px-3 md:px-4 py-2 md:py-3 shadow-sm">
-                <div className="outline-none bg-transparent text-gray-700 text-sm md:text-base">
-                  Candidates
-                </div>
-              </div>
+              {/* Position Filter Only */}
+              <select
+                value={positionFilter}
+                onChange={(e) => setPositionFilter(e.target.value)}
+                className="flex items-center bg-white border border-gray-300 rounded-lg md:rounded-xl px-3 md:px-4 py-2 md:py-3 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all duration-300 hover:shadow-md text-sm md:text-base min-w-[180px]"
+                disabled={positions.length === 0}
+              >
+                <option value="all">All Positions</option>
+                {positions.map((position) => (
+                  <option key={position} value={position}>
+                    {position}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
         </div>
 
-        {/* Table - Made responsive */}
+        {/* Table */}
         <div className="overflow-x-auto">
-          {/* Mobile Cards View */}
-          <div className="block md:hidden">
-            {filteredList.map((p) => (
-              <div
-                key={p.id}
-                className="p-4 border-b border-gray-200 hover:bg-gradient-to-r hover:from-gray-50/50 hover:to-gray-100/30 transition-all duration-200"
-              >
-                {/* Participant Info */}
-                <div className="flex items-start gap-3 mb-4">
-                  <div className="relative">
-                    <img src={p.image} alt={p.name} className="w-full h-full" />
-                    {p.role === "Candidate" && (
-                      <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center shadow-md">
-                        <UserCheck className="w-2.5 h-2.5 text-white" />
-                      </div>
-                    )}
+          {loading ? (
+            // Loading skeleton for table
+            <div className="p-4 md:p-6 space-y-4">
+              {Array.from({ length: 5 }).map((_, index) => (
+                <div key={index} className="animate-pulse">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-gray-200 rounded-full"></div>
+                    <div className="space-y-2 flex-1">
+                      <div className="h-4 bg-gray-200 rounded w-1/4"></div>
+                      <div className="h-3 bg-gray-200 rounded w-1/3"></div>
+                    </div>
                   </div>
-                  <div className="flex-1">
-                    <h3 className="font-semibold text-gray-900 text-sm">
-                      {p.name}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <>
+              {/* Mobile Cards View - Only Candidates */}
+              <div className="block md:hidden">
+                {filteredCandidates.length === 0 ? (
+                  <div className="text-center py-12 animate-fade-in">
+                    <div className="w-16 h-16 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl flex items-center justify-center mx-auto mb-4 shadow-inner">
+                      <UserCheck className="w-8 h-8 text-gray-400 animate-pulse" />
+                    </div>
+                    <h3 className="text-gray-700 text-lg font-semibold mb-2">
+                      No candidates found
                     </h3>
-                    <div className="flex items-center gap-1 mt-1">
-                      <svg
-                        className="w-3 h-3 text-gray-400"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth="2"
-                          d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-                        />
-                      </svg>
-                      <span className="text-xs text-gray-600 truncate">
-                        {p.email}
-                      </span>
-                    </div>
+                    <p className="text-gray-500 text-sm max-w-md mx-auto px-4">
+                      {search || positionFilter !== "all"
+                        ? "Try adjusting your search or position filter"
+                        : "No candidates registered for this election"}
+                    </p>
                   </div>
-                </div>
+                ) : (
+                  filteredCandidates.map((candidate, index) => (
+                    <div
+                      key={candidate.id}
+                      className="p-4 border-b border-gray-200 hover:bg-gradient-to-r hover:from-gray-50/50 hover:to-gray-100/30 transition-all duration-300 ease-out animate-slide-up"
+                      style={{ animationDelay: `${index * 50}ms` }}
+                    >
+                      {/* Candidate Info */}
+                      <div className="flex items-start gap-3 mb-4">
+                        <div className="relative">
+                          <img
+                            src={candidate.image}
+                            alt={candidate.name}
+                            className="w-12 h-12 rounded-lg transition-transform duration-300 hover:scale-110"
+                          />
+                          <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center shadow-md animate-pulse-slow">
+                            <UserCheck className="w-2.5 h-2.5 text-white" />
+                          </div>
+                        </div>
+                        <div className="flex-1">
+                          <h3 className="font-semibold text-gray-900 text-sm">
+                            {candidate.name}
+                          </h3>
+                          <div className="flex items-center gap-1 mt-1">
+                            <svg
+                              className="w-3 h-3 text-gray-400"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth="2"
+                                d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+                              />
+                            </svg>
+                            <span className="text-xs text-gray-600 truncate">
+                              {candidate.email}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
 
-                {/* Role & Position */}
-                <div className="mb-3">
-                  <span
-                    className={`inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-medium ${
-                      p.role === "Candidate"
-                        ? "bg-gradient-to-r from-blue-50 to-blue-100/50 text-blue-700 border border-blue-200"
-                        : "bg-gradient-to-r from-gray-50 to-gray-100/50 text-gray-700 border border-gray-200"
-                    }`}
-                  >
-                    {p.role === "Candidate" ? (
-                      <>
-                        <UserCheck className="w-3 h-3 mr-1.5" /> Candidate
-                      </>
-                    ) : (
-                      <>
-                        <Users className="w-3 h-3 mr-1.5" /> Voter
-                      </>
-                    )}
-                  </span>
-                  {p.position && (
-                    <div className="text-xs text-gray-600 mt-2">
-                      <span className="font-medium">Position:</span>{" "}
-                      {p.position}
-                    </div>
-                  )}
-                </div>
-
-                {/* Registration Date */}
-                <div className="flex items-center gap-2 text-gray-700 mb-3">
-                  <div className="p-1.5 bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg">
-                    <Calendar className="w-4 h-4 text-gray-600" />
-                  </div>
-                  <div>
-                    <div className="font-medium text-gray-900 text-sm">
-                      {new Date(p.registrationDate).toLocaleDateString(
-                        "en-US",
-                        {
-                          month: "short",
-                          day: "numeric",
-                          year: "numeric",
-                        }
-                      )}
-                    </div>
-                    <div className="text-xs text-gray-500">Registered</div>
-                  </div>
-                </div>
-
-                {/* Performance / Votes */}
-                <div>
-                  {p.role === "Candidate" ? (
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs text-gray-600">Votes:</span>
-                        <span className="font-bold text-gray-900 text-sm">
-                          {(p.votes || 0).toLocaleString()}
+                      {/* Position & Party */}
+                      <div className="mb-3 space-y-2">
+                        <span className="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-medium bg-gradient-to-r from-blue-50 to-blue-100/50 text-blue-700 border border-blue-200 hover:from-blue-100 hover:to-blue-200/50 transition-all duration-300">
+                          <UserCheck className="w-3 h-3 mr-1.5" /> Candidate
                         </span>
-                      </div>
-                      <div className="w-full bg-gray-200 rounded-full h-1.5">
-                        <div
-                          className="bg-gradient-to-r from-green-500 to-emerald-600 h-1.5 rounded-full shadow-sm"
-                          style={{
-                            width:
-                              totalVotes > 0
-                                ? `${((p.votes || 0) / totalVotes) * 100}%`
-                                : "0%",
-                          }}
-                        ></div>
-                      </div>
-                      <div className="text-xs text-gray-500">
-                        {totalVotes > 0
-                          ? `${(((p.votes || 0) / totalVotes) * 100).toFixed(
-                              1
-                            )}% of total votes`
-                          : "0% of total votes"}
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-2 text-gray-500">
-                      <div className="p-1.5 bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg">
-                        <Vote className="w-4 h-4" />
-                      </div>
-                      <span className="text-sm">Eligible Voter</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Desktop Table View */}
-          <table className="w-full hidden md:table">
-            <thead className="bg-gradient-to-r from-gray-50 to-gray-100/50">
-              <tr>
-                <th className="p-4 lg:p-6 text-left text-sm font-semibold text-gray-700">
-                  Participant
-                </th>
-                <th className="p-4 lg:p-6 text-left text-sm font-semibold text-gray-700">
-                  Role & Position
-                </th>
-                <th className="p-4 lg:p-6 text-left text-sm font-semibold text-gray-700">
-                  Registration
-                </th>
-                <th className="p-4 lg:p-6 text-left text-sm font-semibold text-gray-700">
-                  Performance
-                </th>
-              </tr>
-            </thead>
-
-            <tbody className="divide-y divide-gray-200/50">
-              {filteredList.map((p) => (
-                <tr
-                  key={p.id}
-                  className="hover:bg-gradient-to-r hover:from-gray-50/50 hover:to-gray-100/30 transition-all duration-200"
-                >
-                  {/* Participant Column */}
-                  <td className="p-4 lg:p-6">
-                    <div className="flex items-center gap-3 lg:gap-4">
-                      <div className="relative">
-                        <img
-                          src={p.image}
-                          alt={p.name}
-                          className="w-full h-full border-1 border-white rounded-md lg:w-14 lg:h-14 "
-                        />
-                        {p.role === "Candidate" && (
-                          <div className="absolute -bottom-1 -right-1 w-5 h-5 lg:w-6 lg:h-6 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center shadow-md">
-                            <UserCheck className="w-2.5 h-2.5 lg:w-3.5 lg:h-3.5 text-white" />
+                        {candidate.position && (
+                          <div className="text-xs text-gray-600">
+                            <span className="font-medium">Position:</span>{" "}
+                            {candidate.position}
+                          </div>
+                        )}
+                        {candidate.party && (
+                          <div className="text-xs text-gray-600">
+                            <span className="font-medium">Party:</span>{" "}
+                            {candidate.party}
                           </div>
                         )}
                       </div>
-                      <div>
-                        <h3 className="font-semibold text-gray-900 text-sm lg:text-base">
-                          {p.name}
-                        </h3>
-                        <div className="flex items-center gap-1 lg:gap-2 mt-1 lg:mt-1.5">
-                          <svg
-                            className="w-3 h-3 lg:w-4 lg:h-4 text-gray-400"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth="2"
-                              d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-                            />
-                          </svg>
-                          <span className="text-xs lg:text-sm text-gray-600 truncate max-w-[150px] lg:max-w-[180px]">
-                            {p.email}
-                          </span>
+
+                      {/* Registration Date */}
+                      <div className="flex items-center gap-2 text-gray-700 mb-3">
+                        <div className="p-1.5 bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg transition-transform duration-300 hover:scale-110">
+                          <Calendar className="w-4 h-4 text-gray-600" />
+                        </div>
+                        <div>
+                          <div className="font-medium text-gray-900 text-sm">
+                            {candidate.registrationDate
+                              ? new Date(
+                                  candidate.registrationDate
+                                ).toLocaleDateString("en-US", {
+                                  month: "short",
+                                  day: "numeric",
+                                  year: "numeric",
+                                })
+                              : "Not specified"}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            Registered
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </td>
 
-                  {/* Role Column */}
-                  <td className="p-4 lg:p-6">
-                    <div className="space-y-1 lg:space-y-2">
-                      <span
-                        className={`inline-flex items-center px-3 py-1.5 lg:px-4 lg:py-2 rounded-lg text-xs lg:text-sm font-medium ${
-                          p.role === "Candidate"
-                            ? "bg-gradient-to-r from-blue-50 to-blue-100/50 text-blue-700 border border-blue-200"
-                            : "bg-gradient-to-r from-gray-50 to-gray-100/50 text-gray-700 border border-gray-200"
-                        }`}
-                      >
-                        {p.role === "Candidate" ? (
-                          <>
-                            <UserCheck className="w-3 h-3 lg:w-4 lg:h-4 mr-1.5 lg:mr-2" />{" "}
-                            Candidate
-                          </>
-                        ) : (
-                          <>
-                            <Users className="w-3 h-3 lg:w-4 lg:h-4 mr-1.5 lg:mr-2" />{" "}
-                            Voter
-                          </>
-                        )}
-                      </span>
-                      {p.position && (
-                        <div className="text-xs lg:text-sm text-gray-600">
-                          <span className="font-medium">Position:</span>{" "}
-                          {p.position}
-                        </div>
-                      )}
-                    </div>
-                  </td>
-
-                  {/* Registration Date */}
-                  <td className="p-4 lg:p-6">
-                    <div className="flex items-center gap-2 lg:gap-3 text-gray-700">
-                      <div className="p-2 lg:p-2.5 bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg">
-                        <Calendar className="w-4 h-4 lg:w-5 lg:h-5 text-gray-600" />
-                      </div>
-                      <div>
-                        <div className="font-medium text-gray-900 text-sm lg:text-base">
-                          {new Date(p.registrationDate).toLocaleDateString(
-                            "en-US",
-                            {
-                              month: "short",
-                              day: "numeric",
-                              year: "numeric",
-                            }
-                          )}
-                        </div>
-                        <div className="text-xs lg:text-sm text-gray-500 mt-0.5">
-                          Registered
-                        </div>
-                      </div>
-                    </div>
-                  </td>
-
-                  {/* Performance / Votes */}
-                  <td className="p-4 lg:p-6">
-                    {p.role === "Candidate" ? (
-                      <div className="space-y-2 lg:space-y-3">
+                      {/* Votes Performance */}
+                      <div className="space-y-2">
                         <div className="flex items-center justify-between">
-                          <span className="text-xs lg:text-sm text-gray-600">
+                          <span className="text-xs text-gray-600">
                             Votes:
                           </span>
-                          <span className="font-bold text-gray-900 text-sm lg:text-base">
-                            {(p.votes || 0).toLocaleString()}
+                          <span className="font-bold text-gray-900 text-sm animate-count-up">
+                            {(candidate.votes || 0).toLocaleString()}
                           </span>
                         </div>
-                        <div className="w-full bg-gray-200 rounded-full h-1.5 lg:h-2">
+                        <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
                           <div
-                            className="bg-gradient-to-r from-green-500 to-emerald-600 h-1.5 lg:h-2 rounded-full shadow-sm"
+                            className="bg-gradient-to-r from-green-500 to-emerald-600 h-1.5 rounded-full shadow-sm transition-all duration-1000 ease-out"
                             style={{
-                              width:
-                                totalVotes > 0
-                                  ? `${((p.votes || 0) / totalVotes) * 100}%`
-                                  : "0%",
+                              width: `${((candidate.votes || 0) / maxVotes) * 100}%`,
                             }}
                           ></div>
                         </div>
                         <div className="text-xs text-gray-500">
-                          {totalVotes > 0
-                            ? `${(((p.votes || 0) / totalVotes) * 100).toFixed(
+                          {maxVotes > 0
+                            ? `${(((candidate.votes || 0) / maxVotes) * 100).toFixed(
                                 1
-                              )}% of total votes`
-                            : "0% of total votes"}
+                              )}% of highest votes`
+                            : "No votes yet"}
                         </div>
                       </div>
-                    ) : (
-                      <div className="flex items-center gap-2 lg:gap-3 text-gray-500">
-                        <div className="p-2 lg:p-2.5 bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg">
-                          <Vote className="w-4 h-4 lg:w-5 lg:h-5" />
-                        </div>
-                        <span className="text-sm">Eligible Voter</span>
-                      </div>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-
-          {filteredList.length === 0 && (
-            <div className="text-center py-12 md:py-20">
-              <div className="w-16 h-16 md:w-24 md:h-24 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl md:rounded-2xl flex items-center justify-center mx-auto mb-4 md:mb-6 shadow-inner">
-                <Users className="w-8 h-8 md:w-12 md:h-12 text-gray-400" />
+                    </div>
+                  ))
+                )}
               </div>
-              <h3 className="text-gray-700 text-lg md:text-xl font-semibold mb-2 md:mb-3">
-                No participants found
-              </h3>
-              <p className="text-gray-500 text-sm md:text-base max-w-md mx-auto px-4">
-                Try adjusting your search criteria or filter to find what you're
-                looking for
-              </p>
-            </div>
+
+              {/* Desktop Table View - Only Candidates */}
+              <table className="w-full hidden md:table">
+                <thead className="bg-gradient-to-r from-gray-50 to-gray-100/50">
+                  <tr>
+                    <th className="p-4 lg:p-6 text-left text-sm font-semibold text-gray-700">
+                      Candidate
+                    </th>
+                    <th className="p-4 lg:p-6 text-left text-sm font-semibold text-gray-700">
+                      Position & Party
+                    </th>
+                    <th className="p-4 lg:p-6 text-left text-sm font-semibold text-gray-700">
+                      Registration
+                    </th>
+                    <th className="p-4 lg:p-6 text-left text-sm font-semibold text-gray-700">
+                      Vote Performance
+                    </th>
+                  </tr>
+                </thead>
+
+                <tbody className="divide-y divide-gray-200/50">
+                  {filteredCandidates.length === 0 ? (
+                    <tr>
+                      <td colSpan="4" className="p-8 text-center">
+                        <div className="flex flex-col items-center justify-center">
+                          <div className="w-16 h-16 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl flex items-center justify-center mb-4 shadow-inner">
+                            <UserCheck className="w-8 h-8 text-gray-400 animate-pulse" />
+                          </div>
+                          <h3 className="text-gray-700 text-lg font-semibold mb-2">
+                            No candidates found
+                          </h3>
+                          <p className="text-gray-500 text-sm max-w-md">
+                            {search || positionFilter !== "all"
+                              ? "Try adjusting your search or position filter"
+                              : "No candidates registered for this election"}
+                          </p>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredCandidates.map((candidate, index) => (
+                      <tr
+                        key={candidate.id}
+                        className="hover:bg-gradient-to-r hover:from-gray-50/50 hover:to-gray-100/30 transition-all duration-300 ease-out animate-slide-up"
+                        style={{ animationDelay: `${index * 30}ms` }}
+                      >
+                        {/* Candidate Column */}
+                        <td className="p-4 lg:p-6">
+                          <div className="flex items-center gap-3 lg:gap-4">
+                            <div className="relative">
+                              <img
+                                src={candidate.image}
+                                alt={candidate.name}
+                                className="w-14 h-14 rounded-lg transition-transform duration-300 hover:scale-110"
+                              />
+                              <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center shadow-md animate-pulse-slow">
+                                <UserCheck className="w-3.5 h-3.5 text-white" />
+                              </div>
+                            </div>
+                            <div>
+                              <h3 className="font-semibold text-gray-900 text-base">
+                                {candidate.name}
+                              </h3>
+                              <div className="flex items-center gap-2 mt-1.5">
+                                <svg
+                                  className="w-4 h-4 text-gray-400"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth="2"
+                                    d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+                                  />
+                                </svg>
+                                <span className="text-sm text-gray-600 truncate max-w-[180px]">
+                                  {candidate.email}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* Position & Party Column */}
+                        <td className="p-4 lg:p-6">
+                          <div className="space-y-2">
+                            <span className="inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium bg-gradient-to-r from-blue-50 to-blue-100/50 text-blue-700 border border-blue-200 hover:from-blue-100 hover:to-blue-200/50 transition-all duration-300">
+                              <UserCheck className="w-4 h-4 mr-2" /> Candidate
+                            </span>
+                            {candidate.position && (
+                              <div className="text-sm text-gray-600">
+                                <span className="font-medium">Position:</span>{" "}
+                                {candidate.position}
+                              </div>
+                            )}
+                            {candidate.party && (
+                              <div className="text-sm text-gray-600">
+                                <span className="font-medium">Party:</span>{" "}
+                                {candidate.party}
+                              </div>
+                            )}
+                          </div>
+                        </td>
+
+                        {/* Registration Date */}
+                        <td className="p-4 lg:p-6">
+                          <div className="flex items-center gap-3 text-gray-700">
+                            <div className="p-2.5 bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg transition-transform duration-300 hover:scale-110">
+                              <Calendar className="w-5 h-5 text-gray-600" />
+                            </div>
+                            <div>
+                              <div className="font-medium text-gray-900 text-base">
+                                {candidate.registrationDate
+                                  ? new Date(
+                                      candidate.registrationDate
+                                    ).toLocaleDateString("en-US", {
+                                      month: "short",
+                                      day: "numeric",
+                                      year: "numeric",
+                                    })
+                                  : "Not specified"}
+                              </div>
+                              <div className="text-sm text-gray-500 mt-0.5">
+                                Registered
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* Vote Performance */}
+                        <td className="p-4 lg:p-6">
+                          <div className="space-y-3">
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm text-gray-600">
+                                Votes:
+                              </span>
+                              <span className="font-bold text-gray-900 text-base animate-count-up">
+                                {(candidate.votes || 0).toLocaleString()}
+                              </span>
+                            </div>
+                            <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                              <div
+                                className="bg-gradient-to-r from-green-500 to-emerald-600 h-2 rounded-full shadow-sm transition-all duration-1000 ease-out"
+                                style={{
+                                  width: `${((candidate.votes || 0) / maxVotes) * 100}%`,
+                                }}
+                              ></div>
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              {maxVotes > 0
+                                ? `${(((candidate.votes || 0) / maxVotes) * 100).toFixed(
+                                    1
+                                  )}% of highest votes`
+                                : "No votes yet"}
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </>
           )}
         </div>
 
         {/* Footer */}
-        {filteredList.length > 0 && (
-          <div className="px-4 md:px-6 py-3 md:py-5 border-t border-gray-200 bg-gradient-to-r from-gray-50/50 to-white">
+        {filteredCandidates.length > 0 && !loading && (
+          <div className="px-4 md:px-6 py-3 md:py-5 border-t border-gray-200 bg-gradient-to-r from-gray-50/50 to-white animate-fade-in">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 md:gap-4">
               <div className="text-xs md:text-sm text-gray-600">
                 Showing{" "}
                 <span className="font-semibold text-gray-900">
-                  {filteredList.length}
+                  {filteredCandidates.length}
                 </span>{" "}
                 of{" "}
                 <span className="font-semibold text-gray-900">
-                  {allPeople.length}
+                  {totalCandidates}
                 </span>{" "}
-                participants
+                candidates
+                {positionFilter !== "all" && (
+                  <span className="ml-2 text-blue-600">
+                    • Position: {positionFilter}
+                  </span>
+                )}
               </div>
               <div className="flex items-center gap-4 md:gap-6 text-xs md:text-sm">
                 <div className="flex items-center gap-1.5 md:gap-2">
-                  <div className="w-2 h-2 md:w-3 md:h-3 rounded-full bg-gradient-to-r from-blue-500 to-blue-600"></div>
+                  <div className="w-2 h-2 md:w-3 md:h-3 rounded-full bg-gradient-to-r from-blue-500 to-blue-600 animate-pulse"></div>
                   <span className="text-gray-600">Candidates:</span>
                   <span className="font-semibold text-gray-900">
                     {totalCandidates}
                   </span>
                 </div>
                 <div className="flex items-center gap-1.5 md:gap-2">
-                  <div className="w-2 h-2 md:w-3 md:h-3 rounded-full bg-gradient-to-r from-gray-400 to-gray-500"></div>
-                  <span className="text-gray-600">Voters:</span>
+                  <div className="w-2 h-2 md:w-3 md:h-3 rounded-full bg-gradient-to-r from-green-500 to-green-600 animate-pulse animation-delay-200"></div>
+                  <span className="text-gray-600">Total Votes:</span>
                   <span className="font-semibold text-gray-900">
-                    {totalVoters}
+                    {displayedTotalVotes.toLocaleString()}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5 md:gap-2">
+                  <div className="w-2 h-2 md:w-3 md:h-3 rounded-full bg-gradient-to-r from-purple-500 to-purple-600 animate-pulse animation-delay-100"></div>
+                  <span className="text-gray-600">Positions:</span>
+                  <span className="font-semibold text-gray-900">
+                    {positions.length}
                   </span>
                 </div>
               </div>
@@ -672,6 +906,107 @@ const ElectionDashboard = () => {
           </div>
         )}
       </div>
+
+      {/* Add CSS animations */}
+      <style jsx>{`
+        @keyframes fadeIn {
+          from {
+            opacity: 0;
+          }
+          to {
+            opacity: 1;
+          }
+        }
+
+        @keyframes slideUp {
+          from {
+            opacity: 0;
+            transform: translateY(20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+
+        @keyframes countUp {
+          from {
+            opacity: 0;
+          }
+          to {
+            opacity: 1;
+          }
+        }
+
+        @keyframes pulseOnce {
+          0%,
+          100% {
+            transform: scale(1);
+          }
+          50% {
+            transform: scale(1.05);
+          }
+        }
+
+        @keyframes bounceOnce {
+          0%,
+          100% {
+            transform: translateY(0);
+          }
+          50% {
+            transform: translateY(-3px);
+          }
+        }
+
+        @keyframes pulseSlow {
+          0%,
+          100% {
+            opacity: 1;
+          }
+          50% {
+            opacity: 0.7;
+          }
+        }
+
+        .animate-fade-in {
+          animation: fadeIn 0.6s ease-out forwards;
+        }
+
+        .animate-slide-up {
+          animation: slideUp 0.6s ease-out forwards;
+          opacity: 0;
+        }
+
+        .animate-count-up {
+          animation: countUp 1s ease-out forwards;
+          opacity: 0;
+          animation-fill-mode: forwards;
+        }
+
+        .animate-pulse-once {
+          animation: pulseOnce 0.5s ease-out;
+        }
+
+        .animate-bounce-once {
+          animation: bounceOnce 0.5s ease-out;
+        }
+
+        .animate-pulse-slow {
+          animation: pulseSlow 2s infinite;
+        }
+
+        .animation-delay-100 {
+          animation-delay: 100ms;
+        }
+
+        .animation-delay-200 {
+          animation-delay: 200ms;
+        }
+
+        .animation-delay-300 {
+          animation-delay: 300ms;
+        }
+      `}</style>
     </div>
   );
 };

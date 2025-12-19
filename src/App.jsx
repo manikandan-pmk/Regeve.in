@@ -127,15 +127,11 @@ export default function App() {
           path="/electionForm/:adminId/:electionDocumentId/:electionName"
           element={<ElectionForm />}
         />
-
         <Route
           path="/:adminId/votingpage/:electionDocumentId"
-          element={
-            <AdminProtectedRoute>
-              <VotingPage token={localStorage.getItem("jwt")} />
-            </AdminProtectedRoute>
-          }
+          element={<VotingPage />}
         />
+
         {/* ================= ADMIN DASHBOARD ================= */}
         <Route path="/:adminId/admindashboard" element={<AdminDashboard />} />
         {/* ================= FALLBACK ================= */}
