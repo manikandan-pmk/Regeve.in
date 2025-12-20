@@ -107,9 +107,11 @@ const ParticipantDashboard = () => {
   };
   const fetchParticipants = async () => {
     try {
-      const response = await axiosInstance.get(
-        `/election-participants?populate=*&filters[election][documentId]=${electionDocumentId}`
-      );
+      const response= await axiosInstance.get("/election-participants", {
+        params: {
+          electionDocumentId: electionDocumentId, // ✅ REQUIRED
+        },
+      });
 
       const apiData = response.data.data;
 

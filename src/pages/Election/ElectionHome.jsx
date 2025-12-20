@@ -101,21 +101,24 @@ const ElectionHome = () => {
     }
   };
 
-  const handleDeleteElection = async (electionId) => {
+  const handleDeleteElection = async (documentId) => {
     if (!window.confirm("Are you sure you want to delete this election?"))
       return;
 
     try {
-      setDeletingId(electionId);
+      setDeletingId(documentId);
 
       await axios.delete(
-        `https://api.regeve.in/api/election-names/${electionId}`,
+        `https://api.regeve.in/api/election-names/${documentId}`,
         {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
         }
       );
 
-      setElections((prev) => prev.filter((e) => e.documentId !== electionId));
+      // ✅ Remove from UI after successful delete
+      setElections((prev) => prev.filter((e) => e.documentId !== documentId));
     } catch (err) {
       alert("Failed to delete election");
       console.error(err);
