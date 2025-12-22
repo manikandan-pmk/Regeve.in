@@ -51,6 +51,14 @@ const CandidateDashboard = () => {
   const [electionStatus, setElectionStatus] = useState(null);
   const [dashboardRefreshKey, setDashboardRefreshKey] = useState(0);
 
+  // Add these state variables alongside your existing ones
+  const [startDate, setStartDate] = useState("");
+  const [startHour, setStartHour] = useState("09");
+  const [startMinute, setStartMinute] = useState("00");
+  const [endDate, setEndDate] = useState("");
+  const [endHour, setEndHour] = useState("17");
+  const [endMinute, setEndMinute] = useState("00");
+
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -69,6 +77,7 @@ const CandidateDashboard = () => {
   const addSectionRef = useRef(null);
   const winnerPopupRef = useRef(null);
   const deleteSectionModalRef = useRef(null);
+  const hasReloadedOnActive = useRef(false);
 
   const [electionMeta, setElectionMeta] = useState({
     electionName: "",
@@ -78,6 +87,59 @@ const CandidateDashboard = () => {
     end_time: null, // ✅ ADD
     election_status: null, // ✅ ADD
   });
+
+  // Helper functions for date/time handling
+  const getCurrentDate = () => {
+    return new Date().toISOString().split("T")[0];
+  };
+
+  const updateStartTime = (date, hour, minute) => {
+    if (!date || hour === "" || minute === "") return;
+    setStartTime(`${date}T${hour}:${minute}:00`);
+  };
+  const updateEndTime = (date, hour, minute) => {
+    if (!date || hour === "" || minute === "") return;
+    setEndTime(`${date}T${hour}:${minute}:00`);
+  };
+
+  // Initialize date/time when modal opens
+  useEffect(() => {
+    if (showStartElection) {
+      const now = new Date();
+      const currentDate = now.toISOString().split("T")[0];
+      const currentHour = now.getHours().toString().padStart(2, "0");
+      const currentMinute = now.getMinutes().toString().padStart(2, "0");
+
+      // Calculate 10 minutes from now
+      const tenMinutesLater = new Date(now.getTime() + 10 * 60 * 1000);
+      const startHourStr = tenMinutesLater
+        .getHours()
+        .toString()
+        .padStart(2, "0");
+      const startMinuteStr = tenMinutesLater
+        .getMinutes()
+        .toString()
+        .padStart(2, "0");
+
+      setStartDate(currentDate);
+      setStartHour(startHourStr);
+      setStartMinute(startMinuteStr);
+      updateStartTime(currentDate, startHourStr, startMinuteStr);
+
+      // Set end time to 8 hours later by default
+      const endDateTime = new Date(
+        tenMinutesLater.getTime() + 8 * 60 * 60 * 1000
+      );
+      const endDateStr = endDateTime.toISOString().split("T")[0];
+      const endHourStr = endDateTime.getHours().toString().padStart(2, "0");
+      const endMinuteStr = endDateTime.getMinutes().toString().padStart(2, "0");
+
+      setEndDate(endDateStr);
+      setEndHour(endHourStr);
+      setEndMinute(endMinuteStr);
+      updateEndTime(endDateStr, endHourStr, endMinuteStr);
+    }
+  }, [showStartElection]);
 
   // Show alert message with auto-dismiss
   const showAlert = (type, text, duration = 5000, field = null) => {
@@ -185,6 +247,7 @@ const CandidateDashboard = () => {
 
       setElectionStatus("ended");
       setTimeLeft("Election Ended");
+      hasReloadedOnActive.current = false; // reset for restart
       clearInterval(interval);
     }, 1000);
 
@@ -267,9 +330,9 @@ const CandidateDashboard = () => {
             age: c.age,
             gender: c.gender,
             candidate_id: c.candidate_id,
-            is_winner: c.is_winner,
-            winner_section: c.winner_section,
             position: section.Position,
+            IsWinnedCandidate: c.IsWinnedCandidate,
+            vote_count: c.vote_count,
             photoUrl: c.photo?.url
               ? `https://api.regeve.in${c.photo.url}`
               : null,
@@ -474,6 +537,7 @@ const CandidateDashboard = () => {
           photo: photoId, // This should be the ID, not the object
           // CRITICAL: This field must match your relation name
           election_candidate_position: Number(formData.sectionId),
+          election_name: electionDocumentId, // documentId string
         },
       };
 
@@ -529,25 +593,46 @@ const CandidateDashboard = () => {
       return "Start time and end time are required";
     }
 
-    const now = new Date();
     const start = new Date(startTime);
     const end = new Date(endTime);
+    const now = new Date();
 
-    if (start <= now) {
-      return "Start time must be at least 10 minutes from now";
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+      return "Invalid date or time selection";
     }
 
-    const diffMinutes = (start - now) / (1000 * 60);
-    if (diffMinutes < MIN_BUFFER_MINUTES) {
-      return "Election must be started at least 10 minutes before start time";
+    const diffMinutes = (start.getTime() - now.getTime()) / 60000;
+    if (diffMinutes < 10) {
+      return "Start time must be at least 10 minutes from now";
     }
 
     if (end <= start) {
       return "End time must be after start time";
     }
 
-    return null; // ✅ valid
+    const durationMinutes = (end - start) / 60000;
+    if (durationMinutes < 30) {
+      return "Election should last at least 30 minutes";
+    }
+
+    return null;
   };
+
+  // Update validation when dates/times change
+  useEffect(() => {
+    if (showStartElection) {
+      updateStartTime(startDate, startHour, startMinute);
+      updateEndTime(endDate, endHour, endMinute);
+    }
+  }, [
+    startDate,
+    startHour,
+    startMinute,
+    endDate,
+    endHour,
+    endMinute,
+    showStartElection,
+  ]);
 
   const handleStartElection = async () => {
     const error = validateElectionTimeUI(startTime, endTime);
@@ -563,12 +648,24 @@ const CandidateDashboard = () => {
       const startUTC = new Date(startTime).toISOString();
       const endUTC = new Date(endTime).toISOString();
 
-      await axiosInstance.put(`/elections/${electionDocumentId}/start`, {
+      // ✅ FIX: Wrap data in a 'data' object
+      const endpoint =
+        electionStatus === "ended"
+          ? `/elections/${electionDocumentId}/restart`
+          : `/elections/${electionDocumentId}/start`;
+
+      await axiosInstance.put(endpoint, {
         start_time: startUTC,
         end_time: endUTC,
       });
 
-      showAlert("success", "Election scheduled successfully");
+      showAlert(
+        "success",
+        electionStatus === "ended"
+          ? "Election restarted successfully"
+          : "Election scheduled successfully"
+      );
+
       setShowStartElection(false);
       window.location.reload();
     } catch (err) {
@@ -576,6 +673,9 @@ const CandidateDashboard = () => {
         "error",
         err.response?.data?.message || "Failed to start election"
       );
+      console.log("Full error:", err.response?.data);
+      console.log("Error message:", err.response?.data?.message);
+      console.log("Error details:", err.response?.data?.error);
     } finally {
       setStartingElection(false);
     }
@@ -706,43 +806,29 @@ const CandidateDashboard = () => {
     );
   };
 
-  const handleDeclareWinner = (sectionId) => {
-    const section = sections.find((s) => s.id === sectionId);
-    if (!section || section.candidates.length === 0) {
-      showAlert("error", "No candidates in this position to declare as winner");
-      return;
-    }
-    setSelectedWinnerSection(section);
-    setShowWinnerPopup(true);
-  };
-
-  const handleSelectWinner = async (candidate) => {
+  const handleDeclareWinnerBackend = async (sectionId) => {
     try {
-      // Update to match your backend structure
-      await axiosInstance.put(`/candidates/${candidate.id}`, {
-        data: {
-          is_winner: true,
-          winner_section: selectedWinnerSection.id,
-        },
+      await axiosInstance.post("/election-winners/declare", {
+        adminId: Number(adminId),
+        electionId: electionDocumentId, // documentId string
+        positionId: Number(sectionId),
       });
 
-      await fetchSections();
+      showAlert("success", "Winner declared successfully");
 
-      showAlert(
-        "success",
-        `${candidate.name} declared as winner for ${selectedWinnerSection.name}`
-      );
-
-      setShowWinnerPopup(false);
-      setSelectedWinnerSection(null);
+      await fetchSections(); // refresh UI
+      setDashboardRefreshKey((prev) => prev + 1);
     } catch (err) {
       console.error(err);
-      showAlert("error", "Failed to declare winner");
+      showAlert(
+        "error",
+        err.response?.data?.message || "Failed to declare winner"
+      );
     }
   };
 
   const getWinnerForSection = (section) => {
-    return section.candidates.find((c) => c.is_winner === true);
+    return section.candidates.find((c) => c.IsWinnedCandidate === true);
   };
 
   // Calculate total candidates across all sections
@@ -910,20 +996,19 @@ const CandidateDashboard = () => {
 
             {/* Action Buttons */}
             <div className="flex flex-col xs:flex-row gap-3 w-full sm:w-auto">
-              <button
-                disabled={
-                  electionStatus === "active" || electionStatus === "ended"
-                }
-                onClick={() => setShowStartElection(true)}
-                className={`flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-semibold shadow-lg min-w-[160px]
+              {electionStatus === "scheduled" && (
+                <button
+                  onClick={() => setShowStartElection(true)}
+                  className={`flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-semibold shadow-lg min-w-[160px]
     ${
       electionStarted
         ? "bg-slate-300 text-slate-600 cursor-not-allowed"
         : "bg-gradient-to-r from-emerald-500 to-emerald-600 text-white hover:from-emerald-600 hover:to-emerald-700"
     }`}
-              >
-                ▶ Start Election
-              </button>
+                >
+                  ▶ Start Election
+                </button>
+              )}
               {electionStatus === "active" && (
                 <button
                   onClick={async () => {
@@ -940,6 +1025,18 @@ const CandidateDashboard = () => {
                   className="flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-semibold bg-red-600 text-white hover:bg-red-700 shadow-lg"
                 >
                   ⛔ End Election
+                </button>
+              )}
+              {electionStatus === "ended" && (
+                <button
+                  onClick={() => {
+                    setShowStartElection(true); // reuse same modal
+                  }}
+                  className="flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-semibold
+    bg-gradient-to-r from-blue-500 to-indigo-600 text-white
+    hover:from-blue-600 hover:to-indigo-700 shadow-lg min-w-[160px]"
+                >
+                  🔁 Restart Election
                 </button>
               )}
 
@@ -966,47 +1063,194 @@ const CandidateDashboard = () => {
           </div>
         </div>
         {showStartElection && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
-              <h2 className="text-xl font-bold text-slate-900 mb-4">
-                Start Election
-              </h2>
-
-              <div className="space-y-4">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+            <div className="w-full max-w-lg rounded-2xl bg-white shadow-xl border border-slate-200">
+              {/* Header */}
+              <div className="px-6 py-5 border-b border-slate-200 flex items-center justify-between">
                 <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1">
-                    Start Time
-                  </label>
-                  <input
-                    type="datetime-local"
-                    value={startTime}
-                    onChange={(e) => setStartTime(e.target.value)}
-                    className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1">
-                    End Time
-                  </label>
-                  <input
-                    type="datetime-local"
-                    value={endTime}
-                    onChange={(e) => setEndTime(e.target.value)}
-                    className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                  />
-                </div>
-                {validateElectionTimeUI(startTime, endTime) && (
-                  <p className="mt-2 text-sm text-red-600 font-medium">
-                    ⚠ {validateElectionTimeUI(startTime, endTime)}
+                  <h2 className="text-xl font-bold text-slate-900">
+                    Schedule Election
+                  </h2>
+                  <p className="text-sm text-slate-500">
+                    Set start and end date & time
                   </p>
+                </div>
+                <button
+                  onClick={() => setShowStartElection(false)}
+                  className="text-slate-400 hover:text-slate-600 text-xl"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Body */}
+              <div className="px-6 py-6 space-y-5">
+                {/* Start Date and Time */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Start Date */}
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1">
+                      Start Date
+                    </label>
+                    <input
+                      type="date"
+                      value={startDate}
+                      onChange={(e) => {
+                        setStartDate(e.target.value);
+                        updateStartTime(e.target.value, startHour, startMinute);
+                      }}
+                      className="w-full rounded-lg border border-slate-300 px-4 py-3
+                focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500"
+                      min={getCurrentDate()}
+                    />
+                  </div>
+
+                  {/* Start Time */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 mb-1">
+                        Start Hour
+                      </label>
+                      <select
+                        value={startHour}
+                        onChange={(e) => {
+                          setStartHour(e.target.value);
+                          updateStartTime(
+                            startDate,
+                            e.target.value,
+                            startMinute
+                          );
+                        }}
+                        className="w-full rounded-lg border border-slate-300 px-4 py-3
+                  focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500"
+                      >
+                        {Array.from({ length: 24 }, (_, i) =>
+                          i.toString().padStart(2, "0")
+                        ).map((hour) => (
+                          <option key={hour} value={hour}>
+                            {hour}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 mb-1">
+                        Start Minute
+                      </label>
+                      <select
+                        value={startMinute}
+                        onChange={(e) => {
+                          setStartMinute(e.target.value);
+                          updateStartTime(startDate, startHour, e.target.value);
+                        }}
+                        className="w-full rounded-lg border border-slate-300 px-4 py-3
+                  focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500"
+                      >
+                        {Array.from({ length: 60 }, (_, i) =>
+                          i.toString().padStart(2, "0")
+                        ).map((minute) => (
+                          <option key={minute} value={minute}>
+                            {minute}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                {/* End Date and Time */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* End Date */}
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1">
+                      End Date
+                    </label>
+                    <input
+                      type="date"
+                      value={endDate}
+                      onChange={(e) => {
+                        setEndDate(e.target.value);
+                        updateEndTime(e.target.value, endHour, endMinute);
+                      }}
+                      className="w-full rounded-lg border border-slate-300 px-4 py-3
+                focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500"
+                      min={startDate || getCurrentDate()}
+                    />
+                  </div>
+
+                  {/* End Time */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 mb-1">
+                        End Hour
+                      </label>
+                      <select
+                        value={endHour}
+                        onChange={(e) => {
+                          setEndHour(e.target.value);
+                          updateEndTime(endDate, e.target.value, endMinute);
+                        }}
+                        className="w-full rounded-lg border border-slate-300 px-4 py-3
+                  focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500"
+                      >
+                        {Array.from({ length: 24 }, (_, i) =>
+                          i.toString().padStart(2, "0")
+                        ).map((hour) => (
+                          <option key={hour} value={hour}>
+                            {hour}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 mb-1">
+                        End Minute
+                      </label>
+                      <select
+                        value={endMinute}
+                        onChange={(e) => {
+                          setEndMinute(e.target.value);
+                          updateEndTime(endDate, endHour, e.target.value);
+                        }}
+                        className="w-full rounded-lg border border-slate-300 px-4 py-3
+                  focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500"
+                      >
+                        {Array.from({ length: 60 }, (_, i) =>
+                          i.toString().padStart(2, "0")
+                        ).map((minute) => (
+                          <option key={minute} value={minute}>
+                            {minute}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Info Messages */}
+                <div className="space-y-1">
+                  <p className="text-xs text-slate-500">
+                    • Start must be at least 10 minutes from now
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    • End must be after the start time
+                  </p>
+                </div>
+
+                {/* Validation Error */}
+                {validateElectionTimeUI(startTime, endTime) && (
+                  <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 font-medium">
+                    ⚠ {validateElectionTimeUI(startTime, endTime)}
+                  </div>
                 )}
               </div>
 
-              <div className="flex gap-3 mt-6">
+              {/* Footer */}
+              <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-slate-200">
                 <button
                   onClick={() => setShowStartElection(false)}
-                  className="flex-1 px-4 py-3 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 font-semibold"
+                  className="rounded-lg border border-slate-300 px-5 py-2.5
+            text-slate-700 font-semibold hover:bg-slate-50"
                 >
                   Cancel
                 </button>
@@ -1017,8 +1261,20 @@ const CandidateDashboard = () => {
                     startingElection ||
                     !!validateElectionTimeUI(startTime, endTime)
                   }
+                  className={`rounded-lg px-5 py-2.5 font-semibold text-white
+            ${
+              startingElection || validateElectionTimeUI(startTime, endTime)
+                ? "bg-slate-300 cursor-not-allowed"
+                : "bg-emerald-600 hover:bg-emerald-700"
+            }`}
                 >
-                  {startingElection ? "Starting..." : "Start Election"}
+                  {startingElection
+                    ? electionStatus === "ended"
+                      ? "Restarting..."
+                      : "Starting..."
+                    : electionStatus === "ended"
+                    ? "Restart Election"
+                    : "Start Election"}
                 </button>
               </div>
             </div>
@@ -1213,30 +1469,32 @@ const CandidateDashboard = () => {
                         </div>
                       )}
 
-                      {section.candidates.length > 0 && !winner && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeclareWinner(section.id);
-                          }}
-                          className="flex items-center gap-2 px-4 py-3 py-1.5 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white text-xs sm:text-sm font-semibold rounded-lg hover:from-emerald-600 hover:to-emerald-700 transition-all shadow-md hover:shadow-lg"
-                        >
-                          <svg
-                            className="w-4 h-4"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
+                      {section.candidates.length > 0 &&
+                        !winner &&
+                        electionStatus === "ended" && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeclareWinnerBackend(section.id);
+                            }}
+                            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white text-sm font-semibold rounded-lg hover:from-emerald-600 hover:to-emerald-700 shadow-md"
                           >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"
-                            />
-                          </svg>
-                          Declare Winner
-                        </button>
-                      )}
+                            <svg
+                              className="w-4 h-4"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"
+                              />
+                            </svg>
+                            🏆 Declare Winner
+                          </button>
+                        )}
 
                       <button
                         onClick={(e) => {
@@ -1732,96 +1990,6 @@ const CandidateDashboard = () => {
                   </button>
                 </div>
               </form>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Winner Selection Popup */}
-      {showWinnerPopup && selectedWinnerSection && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div
-            ref={winnerPopupRef}
-            className="bg-white rounded-2xl shadow-2xl w-[95vw] max-w-2xl max-h-[90vh] overflow-y-auto mx-2"
-          >
-            <div className="sticky top-0 bg-white border-b border-slate-200 z-10 rounded-t-2xl p-6">
-              <div className="flex justify-between items-center">
-                <div>
-                  <h2 className="text-xl font-bold text-slate-900">
-                    Declare Winner
-                  </h2>
-                  <p className="text-slate-600 text-sm mt-1">
-                    Select the winner for {selectedWinnerSection.name}
-                  </p>
-                </div>
-                <button
-                  onClick={() => {
-                    setShowWinnerPopup(false);
-                    setSelectedWinnerSection(null);
-                  }}
-                  className="w-8 h-8 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 flex items-center justify-center"
-                >
-                  ×
-                </button>
-              </div>
-            </div>
-
-            <div className="p-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {selectedWinnerSection.candidates.map((candidate) => (
-                  <div
-                    key={candidate.id}
-                    className="p-4 border border-slate-200 rounded-xl hover:border-blue-300 hover:shadow-md transition-all"
-                  >
-                    <div className="flex items-center gap-4">
-                      {candidate.photoUrl ? (
-                        <img
-                          src={candidate.photoUrl}
-                          alt={candidate.name}
-                          className="w-16 h-16 rounded-full object-cover border-2 border-blue-100"
-                        />
-                      ) : (
-                        <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center">
-                          <span className="text-white font-medium text-lg">
-                            {getInitials(candidate.name)}
-                          </span>
-                        </div>
-                      )}
-                      <div className="flex-1">
-                        <h4 className="font-semibold text-slate-900">
-                          {candidate.name}
-                        </h4>
-                        <p className="text-sm text-slate-600">
-                          {candidate.position}
-                        </p>
-                        {candidate.candidate_id && (
-                          <p className="text-xs text-slate-500">
-                            ID: {candidate.candidate_id}
-                          </p>
-                        )}
-                      </div>
-                      <button
-                        onClick={() => handleSelectWinner(candidate)}
-                        className="px-4 py-2 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white text-sm font-semibold rounded-lg hover:from-emerald-600 hover:to-emerald-700 transition-all"
-                      >
-                        Select Winner
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="mt-6 pt-6 border-t border-slate-200">
-                <button
-                  onClick={() => {
-                    setShowWinnerPopup(false);
-                    setSelectedWinnerSection(null);
-                  }}
-                  className="w-full px-4 py-3 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 font-semibold"
-                >
-                  Cancel
-                </button>
-              </div>
             </div>
           </div>
         </div>

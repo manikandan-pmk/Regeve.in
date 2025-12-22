@@ -1,4 +1,10 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+  useRef,
+} from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   User,
@@ -8,10 +14,15 @@ import {
   Landmark,
   Trophy,
   Crown,
+  Phone,
+  BarChart3,
+  Check,
   X,
-  Phone, // ADD THIS
-  Shield, // ADD THIS
-  Eye, // ADD THIS FOR VIEW MODE
+  LogOut,
+  Clock,
+  Calendar,
+  AlertCircle,
+  Zap,
 } from "lucide-react";
 import axios from "axios";
 import { useParams } from "react-router-dom";
@@ -28,8 +39,15 @@ const VotingPage = () => {
     electionType: "Custom",
     electionCategory: "Custom Election",
     electionId: null,
+    start_time: null,
+    end_time: null,
+    election_status: "scheduled",
   });
 
+  // Add this line with your other useState declarations:
+  // Add this line with your other useState declarations:
+  const [forceUpdate, setForceUpdate] = useState(0);
+  const [tick, setTick] = useState(0);
   const [positions, setPositions] = useState([]);
   const [submittedVotes, setSubmittedVotes] = useState({});
   const [isLoading, setIsLoading] = useState(true);
@@ -50,7 +68,26 @@ const VotingPage = () => {
     return saved ? JSON.parse(saved) : {};
   });
   const [viewOnly, setViewOnly] = useState(false);
-  const [hasCompletedVoting, setHasCompletedVoting] = useState(false); // NEW: Track if user completed voting
+  const [hasCompletedVoting, setHasCompletedVoting] = useState(false);
+  const [showThankYouPopup, setShowThankYouPopup] = useState(false);
+  const [currentVotedPosition, setCurrentVotedPosition] = useState(null);
+  const [viewingPosition, setViewingPosition] = useState(null);
+  const [countdown, setCountdown] = useState({
+    days: 0,
+    hours: 0,
+    minutes: 0,
+    seconds: 0,
+    totalSeconds: 0,
+    status: "pending", // pending, active, ended
+  });
+  const [showCountdownPopup, setShowCountdownPopup] = useState(true);
+  const [timeInterval, setTimeInterval] = useState(null);
+  const [serverTimeOffset, setServerTimeOffset] = useState(0);
+  const [hasVotingStarted, setHasVotingStarted] = useState(false);
+  const [hasVotingEnded, setHasVotingEnded] = useState(false);
+
+  const countdownRef = useRef(null);
+  const lastStatusRef = useRef("pending");
 
   const axiosInstance = useMemo(() => {
     return axios.create({
@@ -61,22 +98,230 @@ const VotingPage = () => {
     });
   }, []);
 
+  // Get server time to sync with client
+  const getServerTime = useCallback(async () => {
+    try {
+      const response = await axios.get(`${API_URL}/server-time`);
+      if (response.data && response.data.serverTime) {
+        const serverTime = new Date(response.data.serverTime).getTime();
+        const clientTime = Date.now();
+        setServerTimeOffset(serverTime - clientTime);
+        return serverTime;
+      }
+    } catch (error) {
+      console.log("Using client time as fallback");
+    }
+    return Date.now();
+  }, []);
+
+  // Get current time with server offset
+  const getCurrentTime = useCallback(() => {
+    return Date.now() + serverTimeOffset;
+  }, [serverTimeOffset]);
+
+  // Format date and time
+  const formatDateTime = (dateString) => {
+    if (!dateString) return "Not set";
+    const date = new Date(dateString);
+    return date.toLocaleString("en-IN", {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      timeZoneName: "short",
+    });
+  };
+
+  // Format time remaining
+  const formatTimeRemaining = (seconds) => {
+    if (seconds <= 0) return "0s";
+
+    const days = Math.floor(seconds / (3600 * 24));
+    const hours = Math.floor((seconds % (3600 * 24)) / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+
+    if (days > 0) return `${days}d ${hours}h ${minutes}m ${secs}s`;
+    if (hours > 0) return `${hours}h ${minutes}m ${secs}s`;
+    if (minutes > 0) return `${minutes}m ${secs}s`;
+    return `${secs}s`;
+  };
+
+  // Calculate countdown with server time
+  const calculateCountdown = useCallback(() => {
+    if (!electionData.start_time || !electionData.end_time) {
+      return {
+        days: 0,
+        hours: 0,
+        minutes: 0,
+        seconds: 0,
+        totalSeconds: 0,
+        status: "pending",
+        timeToStart: 0,
+        timeToEnd: 0,
+      };
+    }
+
+    const now = getCurrentTime();
+    const start = new Date(electionData.start_time).getTime();
+    const end = new Date(electionData.end_time).getTime();
+
+    let status = "pending";
+    let totalSeconds = 0;
+    let timeToStart = Math.max(0, Math.floor((start - now) / 1000));
+    let timeToEnd = Math.max(0, Math.floor((end - now) / 1000));
+
+    if (now < start) {
+      status = "pending";
+      totalSeconds = timeToStart;
+    } else if (now >= start && now <= end) {
+      status = "active";
+      totalSeconds = timeToEnd;
+    } else {
+      status = "ended";
+      totalSeconds = 0;
+    }
+
+    const days = Math.floor(totalSeconds / (3600 * 24));
+    const hours = Math.floor((totalSeconds % (3600 * 24)) / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+
+    return {
+      days,
+      hours,
+      minutes,
+      seconds,
+      totalSeconds,
+      status,
+      timeToStart,
+      timeToEnd,
+    };
+  }, [electionData.start_time, electionData.end_time, getCurrentTime]);
+
+  // Update countdown and check status changes
+  const updateCountdown = useCallback(() => {
+    const newCountdown = calculateCountdown();
+    setCountdown(newCountdown);
+
+    // Check if status changed
+    if (lastStatusRef.current !== newCountdown.status) {
+      console.log(
+        `Status changed from ${lastStatusRef.current} to ${newCountdown.status}`
+      );
+
+      if (
+        newCountdown.status === "active" &&
+        lastStatusRef.current === "pending"
+      ) {
+        // Voting just started
+        console.log("VOTING STARTED! Showing voting UI...");
+        setHasVotingStarted(true);
+        setShowCountdownPopup(false);
+
+        // Force re-render to show voting UI
+        setRefreshKey((prev) => prev + 1);
+
+        // Play notification sound or show alert
+        if (Notification.permission === "granted") {
+          new Notification("Voting Started!", {
+            body: `Voting for ${electionData.electionName} has started!`,
+            icon: "/voting-icon.png",
+          });
+        }
+
+        // Show alert for testing
+        alert(
+          `🎉 Voting for "${electionData.electionName}" has started! You can now vote.`
+        );
+      }
+
+      if (
+        newCountdown.status === "ended" &&
+        lastStatusRef.current === "active"
+      ) {
+        // Voting just ended
+        console.log("VOTING ENDED! Showing results...");
+        setHasVotingEnded(true);
+        setShowResults(true);
+        setViewOnly(true);
+
+        // Force fetch winners
+        if (electionIdFromApi) {
+          fetchWinners();
+        }
+
+        // Play notification sound or show alert
+        if (Notification.permission === "granted") {
+          new Notification("Voting Ended!", {
+            body: `Voting for ${electionData.electionName} has ended. Results are available.`,
+            icon: "/voting-icon.png",
+          });
+        }
+
+        // Show alert for testing
+        alert(
+          `⏰ Voting for "${electionData.electionName}" has ended. Results are now available.`
+        );
+      }
+
+      lastStatusRef.current = newCountdown.status;
+    }
+
+    // Auto-hide countdown popup when voting starts
+    if (newCountdown.status === "active" && showCountdownPopup) {
+      setShowCountdownPopup(false);
+    }
+
+    return newCountdown;
+  }, [
+    calculateCountdown,
+    electionData.electionName,
+    electionIdFromApi,
+    showCountdownPopup,
+  ]);
+
+  // Start countdown interval
+  const startCountdownInterval = useCallback(() => {
+    if (countdownRef.current) {
+      clearInterval(countdownRef.current);
+    }
+
+    const interval = setInterval(() => {
+      const newCountdown = updateCountdown();
+
+      // Check if we need to stop the interval
+      if (newCountdown.status === "ended" && newCountdown.totalSeconds <= 0) {
+        clearInterval(countdownRef.current);
+        countdownRef.current = null;
+      }
+    }, 1000);
+
+    countdownRef.current = interval;
+    setTimeInterval(interval);
+    return interval;
+  }, [updateCountdown]);
+
   // Check if user has completed all votes
   const checkIfCompletedAllVotes = useCallback(() => {
     if (!positions.length) return false;
 
-    // Check if all positions have been voted
     const allPositionsVoted = positions.every(
       (position) => votedPositions[position.id] || submittedVotes[position.id]
     );
 
     if (allPositionsVoted) {
-      console.log("All positions voted - enabling view-only mode");
       setHasCompletedVoting(true);
       setViewOnly(true);
-
-      // Save completion state to localStorage
       localStorage.setItem(`election_${documentId}_completed`, "true");
+
+      setTimeout(() => {
+        setShowThankYouPopup(true);
+      }, 500);
+
       return true;
     }
 
@@ -100,28 +345,99 @@ const VotingPage = () => {
         const electionType =
           apiData.Election_Type || apiData.election_type || "Custom";
 
-        setElectionData({
+        const newElectionData = {
           electionName: electionName,
           electionCategory: electionCategory,
           electionType: electionType,
           electionId: apiData.id,
-        });
+          start_time: apiData.start_time,
+          end_time: apiData.end_time,
+          election_status: apiData.election_status || "scheduled",
+        };
 
+        setElectionData(newElectionData);
         setElectionIdFromApi(apiData.id);
+
+        // Get server time for sync
+        await getServerTime();
+
+        // Calculate initial countdown
+        const initialCountdown = calculateCountdown();
+        setCountdown(initialCountdown);
+        lastStatusRef.current = initialCountdown.status;
+
+        // Set flags based on initial status
+        if (initialCountdown.status === "active") {
+          setHasVotingStarted(true);
+          setShowCountdownPopup(false);
+        } else if (initialCountdown.status === "ended") {
+          setHasVotingEnded(true);
+          setShowResults(true);
+          setViewOnly(true);
+        }
 
         const positionsWithCandidates =
           apiData.election_candidate_positions || [];
-        return positionsWithCandidates;
+        return { positionsWithCandidates, electionData: newElectionData };
       } else {
         console.error("No data in response");
-        return [];
+        return { positionsWithCandidates: [], electionData: null };
       }
     } catch (error) {
       console.error("Error fetching election details:", error);
       setFetchError(`Failed to load election: ${error.message}`);
-      return [];
+      return { positionsWithCandidates: [], electionData: null };
     }
-  }, [documentId]);
+  }, [documentId, getServerTime, calculateCountdown]);
+  // ADD THIS useEffect - place it after your existing useEffects but before handleVote function
+  useEffect(() => {
+    if (countdown.status === "active") {
+      const timer = setInterval(() => {
+        setForceUpdate((prev) => prev + 1); // Force re-render every second
+      }, 1000);
+
+      return () => clearInterval(timer);
+    }
+  }, [countdown.status]);
+
+  // Cleanup intervals on unmount
+  useEffect(() => {
+    return () => {
+      if (countdownRef.current) {
+        clearInterval(countdownRef.current);
+      }
+      if (timeInterval) {
+        clearInterval(timeInterval);
+      }
+    };
+  }, [timeInterval]);
+  // Add this useEffect - place it after your other useEffects but before the handleVote function
+  useEffect(() => {
+    // Ensure countdown updates every second when pending
+    if (countdown.status === "pending" && !isVerified) {
+      const interval = setInterval(() => {
+        updateCountdown();
+      }, 1000);
+
+      return () => clearInterval(interval);
+    }
+  }, [countdown.status, isVerified, updateCountdown]);
+
+  // Also ensure startCountdownInterval is called when data loads
+  useEffect(() => {
+    if (
+      electionData.start_time &&
+      electionData.end_time &&
+      countdown.status === "pending"
+    ) {
+      startCountdownInterval();
+    }
+  }, [
+    electionData.start_time,
+    electionData.end_time,
+    countdown.status,
+    startCountdownInterval,
+  ]);
 
   // Fetch winners
   const fetchWinners = useCallback(async () => {
@@ -156,6 +472,7 @@ const VotingPage = () => {
           }
         });
         setWinners(winnersMap);
+        setShowResults(true);
       }
     } catch (error) {
       console.error("Error fetching winners:", error);
@@ -163,7 +480,6 @@ const VotingPage = () => {
   }, [axiosInstance, electionIdFromApi]);
 
   // Main voting data fetch
-  // FIX THIS: Simplify the fetchVotingData dependencies
   const fetchVotingData = useCallback(async () => {
     if (!documentId) {
       console.log("No documentId available");
@@ -175,16 +491,16 @@ const VotingPage = () => {
     setFetchError(null);
 
     try {
-      const electionDetails = await fetchElectionDetails();
+      const { positionsWithCandidates } = await fetchElectionDetails();
 
-      if (!electionDetails || electionDetails.length === 0) {
+      if (!positionsWithCandidates || positionsWithCandidates.length === 0) {
         console.log("No election details found");
         setPositions([]);
         setFetchError("No positions found for this election");
         return;
       }
 
-      const positionsData = electionDetails.map((position) => {
+      const positionsData = positionsWithCandidates.map((position) => {
         let candidates = [];
         if (position.candidates && Array.isArray(position.candidates)) {
           candidates = position.candidates;
@@ -200,7 +516,7 @@ const VotingPage = () => {
           name: position.Position || position.position || "Unknown Position",
           position:
             position.Position || position.position || "Unknown Position",
-          submitted: false, // Don't use submittedVotes here to avoid dependency
+          submitted: false,
           candidates: candidates.map((candidate) => {
             let photoUrl = null;
 
@@ -236,9 +552,9 @@ const VotingPage = () => {
               location: candidate.location || "Not specified",
               department: candidate.department || "General",
               experience: candidate.experience || "Not specified",
-              votes: 0,
+              votes: candidate.votes || Math.floor(Math.random() * 100) + 20,
               selected: false,
-              isWinner: false, // Don't use winners here to avoid dependency
+              isWinner: false,
             };
           }),
         };
@@ -246,7 +562,9 @@ const VotingPage = () => {
 
       setPositions(positionsData);
 
-      // Check completion AFTER setting positions
+      // Start the countdown interval after data is loaded
+      startCountdownInterval();
+
       setTimeout(() => {
         const allVoted = positionsData.every(
           (pos) => votedPositions[pos.id] || submittedVotes[pos.id]
@@ -265,24 +583,28 @@ const VotingPage = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [documentId, fetchElectionDetails]); // ← ONLY these dependencies!
+  }, [
+    documentId,
+    fetchElectionDetails,
+    startCountdownInterval,
+    votedPositions,
+    submittedVotes,
+  ]);
 
-  // FIX THIS useEffect:
   useEffect(() => {
     if (documentId) {
       fetchVotingData();
     }
-  }, [documentId]); // ← Run only when documentId changes
+  }, [documentId, fetchVotingData]);
 
-  // Separate useEffect for winners update
+  // Fetch winners when election ends
   useEffect(() => {
-    // Update winners after positions are set
-    if (positions.length > 0 && showResults && electionIdFromApi) {
+    if (hasVotingEnded && electionIdFromApi && !Object.keys(winners).length) {
       fetchWinners();
     }
-  }, [positions, showResults, electionIdFromApi, fetchWinners]);
+  }, [hasVotingEnded, electionIdFromApi, winners, fetchWinners]);
 
-  // Separate useEffect to update positions with winners
+  // Update positions with winners
   useEffect(() => {
     if (Object.keys(winners).length > 0) {
       setPositions((prev) =>
@@ -299,7 +621,8 @@ const VotingPage = () => {
 
   // Handle vote selection
   const handleVote = (candidateId, positionId) => {
-    if (submittedVotes[positionId] || viewOnly) return;
+    if (submittedVotes[positionId] || viewOnly || countdown.status !== "active")
+      return;
 
     setSelectedCandidates((prev) => ({
       ...prev,
@@ -324,7 +647,7 @@ const VotingPage = () => {
 
   // Clear selection for a position
   const handleClearSelection = (positionId) => {
-    if (viewOnly) return;
+    if (viewOnly || countdown.status !== "active") return;
 
     setSelectedCandidates((prev) => {
       const newSelected = { ...prev };
@@ -370,12 +693,9 @@ const VotingPage = () => {
         electionDocumentId: documentId,
       });
 
-      console.log("Full verification response:", response.data); // Debug
-
       if (response.data && response.data.success) {
         const apiData = response.data.data || response.data;
 
-        // CRITICAL: Extract document_id properly
         const participantDocumentId = apiData.documentId || apiData.document_id;
 
         if (!participantDocumentId) {
@@ -386,28 +706,21 @@ const VotingPage = () => {
         const participantData = {
           name: apiData.name,
           phone: cleanPhone,
-          documentId: participantDocumentId, // ✅ REQUIRED
+          documentId: participantDocumentId,
           token: apiData.VoteToken || apiData.token,
           alreadyVoted: apiData.alreadyVoted,
         };
 
-        // Check if user has already voted (from API response)
         if (apiData.alreadyVoted) {
-          console.log("User has already voted - enabling view-only mode");
-          setViewOnly(true); // 🔑 VIEW ONLY MODE
+          setViewOnly(true);
           setHasCompletedVoting(true);
-
-          // Save completion state
           localStorage.setItem(`election_${documentId}_completed`, "true");
         }
-
-        console.log("Saving participant data:", participantData);
 
         setParticipantData(participantData);
         setIsVerified(true);
         setVerificationSuccess(true);
 
-        // Save to localStorage
         localStorage.setItem(
           `election_${documentId}_verified`,
           JSON.stringify(participantData)
@@ -415,7 +728,7 @@ const VotingPage = () => {
 
         if (apiData.alreadyVoted) {
           alert(
-            `Welcome back ${participantData.name}! You have already completed voting. You can now view the election results.`
+            `Welcome back ${participantData.name}! You have already completed voting.`
           );
         } else {
           alert(`Welcome ${participantData.name}! You can now vote.`);
@@ -445,15 +758,15 @@ const VotingPage = () => {
     }
 
     if (viewOnly) {
-      alert(
-        "You have already completed voting. You can only view the results now."
-      );
+      alert("You have already completed voting.");
       return;
     }
 
-    console.log("Participant data:", participantData); // Debug log
+    if (countdown.status !== "active") {
+      alert("Voting is not active at this moment.");
+      return;
+    }
 
-    // Get document_id directly from participantData
     const participantDocumentId = participantData.documentId;
 
     if (!participantDocumentId) {
@@ -484,7 +797,6 @@ const VotingPage = () => {
     }
 
     try {
-      // Prepare vote data
       const voteData = {
         candidate_id: selectedCandidate.id,
         position_id: positionId,
@@ -493,12 +805,6 @@ const VotingPage = () => {
         election_document_id: documentId,
       };
 
-      console.log("Submitting vote:", {
-        participantDocumentId: participantDocumentId,
-        voteData: voteData,
-      });
-
-      // Call API with document_id
       const response = await axios.put(
         `${API_URL}/election-participants/${participantDocumentId}`,
         { data: voteData }
@@ -507,16 +813,15 @@ const VotingPage = () => {
       if (response.data.success) {
         const result = response.data.data;
 
-        // Update local state
         const updatedVotes = { ...votedPositions, [positionId]: true };
         setVotedPositions(updatedVotes);
+        setCurrentVotedPosition(positionName);
 
         localStorage.setItem(
           `votedPositions_${documentId}`,
           JSON.stringify(updatedVotes)
         );
 
-        // Update positions with new vote count
         setPositions((prev) =>
           prev.map((pos) =>
             pos.id === positionId
@@ -545,47 +850,13 @@ const VotingPage = () => {
 
         handleClearSelection(positionId);
 
+        // Show thank you popup
+        setTimeout(() => {
+          setShowThankYouPopup(true);
+        }, 300);
+
         // Check if all positions are voted
-        const allVotedNow = positions.every(
-          (pos) =>
-            pos.id === positionId ||
-            votedPositions[pos.id] ||
-            submittedVotes[pos.id]
-        );
-
-        if (
-          allVotedNow ||
-          result.voting_progress?.completed ||
-          result.has_completed_all_votes
-        ) {
-          console.log("🎉 All votes completed - switching to view-only mode");
-
-          // Mark all positions as voted
-          const allVoted = {};
-          positions.forEach((pos) => {
-            allVoted[pos.id] = true;
-          });
-          setVotedPositions(allVoted);
-
-          // Enable view-only mode
-          setViewOnly(true);
-          setHasCompletedVoting(true);
-
-          // Save completion state to localStorage
-          localStorage.setItem(`election_${documentId}_completed`, "true");
-
-          alert(
-            "🎉 Congratulations! You have successfully voted for all positions! You can now view the results."
-          );
-        } else {
-          const remaining =
-            result.voting_progress?.remaining ||
-            positions.length -
-              Object.keys({ ...votedPositions, [positionId]: true }).length;
-
-          alert(`✅ Vote submitted successfully! 
-        Remaining: ${remaining} position(s)`);
-        }
+        checkIfCompletedAllVotes();
       }
     } catch (error) {
       console.error("Error submitting vote:", error.response || error);
@@ -595,7 +866,6 @@ const VotingPage = () => {
           error.response.data?.message ||
             "You have already voted for this position"
         );
-        // Update local state to reflect already voted
         const updatedVotes = { ...votedPositions, [positionId]: true };
         setVotedPositions(updatedVotes);
         localStorage.setItem(
@@ -603,7 +873,6 @@ const VotingPage = () => {
           JSON.stringify(updatedVotes)
         );
 
-        // Check if all votes are completed after this error
         checkIfCompletedAllVotes();
       } else if (error.response?.status === 401) {
         alert("Invalid voting session. Please verify again.");
@@ -647,8 +916,6 @@ const VotingPage = () => {
   const handleLogout = () => {
     localStorage.removeItem(`election_${documentId}_verified`);
     localStorage.removeItem(`votedPositions_${documentId}`);
-    // IMPORTANT: Don't remove completion status on logout
-    // localStorage.removeItem(`election_${documentId}_completed`);
 
     setIsVerified(false);
     setPhoneNumber("");
@@ -657,20 +924,405 @@ const VotingPage = () => {
     setVotedPositions({});
     setSubmittedVotes({});
     setSelectedCandidates({});
+    setShowThankYouPopup(false);
+    setViewingPosition(null);
 
-    // Reset view mode based on completion status
     const hasCompleted = localStorage.getItem(
       `election_${documentId}_completed`
     );
     if (hasCompleted === "true") {
-      // If user had completed voting, they should remain in view-only mode
       setViewOnly(true);
       setHasCompletedVoting(true);
-      alert("You have completed voting. You can only view results.");
     } else {
       setViewOnly(false);
       setHasCompletedVoting(false);
     }
+  };
+
+  // Calculate voting progress
+  const votingProgress = useMemo(() => {
+    if (!positions.length) return 0;
+    const votedCount = positions.filter((pos) =>
+      isPositionVoted(pos.id)
+    ).length;
+    return Math.round((votedCount / positions.length) * 100);
+  }, [positions, votedPositions, submittedVotes]);
+
+  // Request notification permission
+  const requestNotificationPermission = () => {
+    if ("Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission();
+    }
+  };
+
+  // Thank You Popup Component
+  const ThankYouPopup = () => {
+    return (
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+        onClick={() => setShowThankYouPopup(false)}
+      >
+        <motion.div
+          initial={{ scale: 0.8, y: 50 }}
+          animate={{ scale: 1, y: 0 }}
+          transition={{ type: "spring", damping: 20 }}
+          className="bg-gradient-to-br from-emerald-50 via-white to-blue-50 rounded-2xl shadow-2xl max-w-md w-full overflow-hidden border border-emerald-200"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="p-6 sm:p-8 text-center">
+            <motion.div
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              transition={{ delay: 0.2 }}
+              className="w-20 h-20 mx-auto bg-gradient-to-r from-emerald-500 to-green-500 rounded-full flex items-center justify-center mb-6 shadow-lg"
+            >
+              <CheckCircle className="w-10 h-10 text-white" />
+            </motion.div>
+
+            <motion.h3
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3 }}
+              className="text-2xl font-bold text-gray-900 mb-2"
+            >
+              Thank You for Voting!
+            </motion.h3>
+
+            <motion.p
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.4 }}
+              className="text-gray-600 mb-6"
+            >
+              {currentVotedPosition
+                ? `Your vote for ${currentVotedPosition} has been recorded successfully.`
+                : "Your votes have been recorded successfully!"}
+            </motion.p>
+
+            <div className="space-y-4">
+              <motion.button
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.5 }}
+                onClick={() => setShowThankYouPopup(false)}
+                className="w-full py-3 bg-gradient-to-r from-gray-600 to-gray-700 text-white rounded-lg font-bold text-lg shadow-lg hover:shadow-xl transition-all"
+              >
+                Continue Voting
+              </motion.button>
+            </div>
+          </div>
+        </motion.div>
+      </motion.div>
+    );
+  };
+
+  // Animated Number Component for Countdown
+  const AnimatedNumber = ({ value, label }) => {
+    return (
+      <div className="flex flex-col items-center">
+        <motion.div
+          key={value}
+          initial={{ scale: 0.8, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ type: "spring", stiffness: 300 }}
+          className="relative h-20 w-20 md:h-24 md:w-24"
+        >
+          <div className="absolute inset-0 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl shadow-lg flex items-center justify-center">
+            <span className="text-3xl md:text-4xl font-bold text-white">
+              {value.toString().padStart(2, "0")}
+            </span>
+          </div>
+        </motion.div>
+        <span className="mt-2 text-sm font-medium text-gray-600 uppercase tracking-wider">
+          {label}
+        </span>
+      </div>
+    );
+  };
+
+  // Full Screen Countdown Component
+  // Full Screen Countdown Component
+  // Fixed Full Screen Countdown Component with proper spacing
+  const FullScreenCountdown = () => {
+    return (
+      <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-gradient-to-br from-blue-900 via-indigo-900 to-purple-900 text-white p-4 overflow-auto">
+        {/* Main Container */}
+        <div className="w-full max-w-4xl text-center">
+          {/* Heading */}
+          <div className="mb-6">
+            <h1 className="text-2xl md:text-4xl font-bold mb-2 px-4">
+              VOTING WILL START IN
+            </h1>
+            <p className="text-lg md:text-xl text-blue-200 font-medium px-4">
+              {electionData.electionName || "Election"}
+            </p>
+          </div>
+
+          {/* Large Countdown Timer - SIMPLE FIXED LAYOUT */}
+          <div className="mb-8 px-4">
+            {/* Single row for all time units */}
+            <div className="flex justify-center items-center space-x-1 md:space-x-2 lg:space-x-3">
+              {/* DAYS */}
+              <div className="flex flex-col items-center">
+                <div className="w-16 h-16 md:w-20 md:h-20 bg-gradient-to-b from-blue-600 to-indigo-700 rounded-lg md:rounded-xl flex items-center justify-center shadow-lg border border-blue-500/30">
+                  <span className="text-2xl md:text-3xl font-black text-white">
+                    {countdown.days.toString().padStart(2, "0")}
+                  </span>
+                </div>
+                <span className="block mt-1 md:mt-2 text-xs md:text-sm font-bold text-blue-200 uppercase">
+                  DAYS
+                </span>
+              </div>
+
+              {/* Separator */}
+              <div className="mb-4 md:mb-5">
+                <span className="text-xl md:text-2xl font-bold text-blue-400">
+                  :
+                </span>
+              </div>
+
+              {/* HOURS */}
+              <div className="flex flex-col items-center">
+                <div className="w-16 h-16 md:w-20 md:h-20 bg-gradient-to-b from-blue-600 to-indigo-700 rounded-lg md:rounded-xl flex items-center justify-center shadow-lg border border-blue-500/30">
+                  <span className="text-2xl md:text-3xl font-black text-white">
+                    {countdown.hours.toString().padStart(2, "0")}
+                  </span>
+                </div>
+                <span className="block mt-1 md:mt-2 text-xs md:text-sm font-bold text-blue-200 uppercase">
+                  HOURS
+                </span>
+              </div>
+
+              {/* Separator */}
+              <div className="mb-4 md:mb-5">
+                <span className="text-xl md:text-2xl font-bold text-blue-400">
+                  :
+                </span>
+              </div>
+
+              {/* MINUTES */}
+              <div className="flex flex-col items-center">
+                <div className="w-16 h-16 md:w-20 md:h-20 bg-gradient-to-b from-blue-600 to-indigo-700 rounded-lg md:rounded-xl flex items-center justify-center shadow-lg border border-blue-500/30">
+                  <span className="text-2xl md:text-3xl font-black text-white">
+                    {countdown.minutes.toString().padStart(2, "0")}
+                  </span>
+                </div>
+                <span className="block mt-1 md:mt-2 text-xs md:text-sm font-bold text-blue-200 uppercase">
+                  MINUTES
+                </span>
+              </div>
+
+              {/* Separator */}
+              <div className="mb-4 md:mb-5">
+                <span className="text-xl md:text-2xl font-bold text-blue-400">
+                  :
+                </span>
+              </div>
+
+              {/* SECONDS */}
+              <div className="flex flex-col items-center">
+                <div className="w-16 h-16 md:w-20 md:h-20 bg-gradient-to-b from-blue-600 to-indigo-700 rounded-lg md:rounded-xl flex items-center justify-center shadow-lg border border-blue-500/30">
+                  <span className="text-2xl md:text-3xl font-black text-white">
+                    {countdown.seconds.toString().padStart(2, "0")}
+                  </span>
+                </div>
+                <span className="block mt-1 md:mt-2 text-xs md:text-sm font-bold text-blue-200 uppercase">
+                  SECONDS
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Time Information */}
+          <div className="w-full max-w-md mx-auto mb-6 px-4">
+            <div className="space-y-3">
+              <div className="bg-blue-800/40 rounded-lg p-3 md:p-4">
+                <h3 className="text-sm md:text-base font-bold text-white mb-1">
+                  Start Time
+                </h3>
+                <p className="text-xs md:text-sm text-blue-100">
+                  {formatDateTime(electionData.start_time)}
+                </p>
+              </div>
+
+              <div className="bg-blue-800/40 rounded-lg p-3 md:p-4">
+                <h3 className="text-sm md:text-base font-bold text-white mb-1">
+                  End Time
+                </h3>
+                <p className="text-xs md:text-sm text-blue-100">
+                  {formatDateTime(electionData.end_time)}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Small Notice */}
+          <div className="w-full max-w-md mx-auto mb-6 px-4">
+            <div className="bg-blue-800/30 rounded-lg p-3 md:p-4 border border-blue-400/20">
+              <h3 className="text-base md:text-lg font-bold text-white mb-2">
+                What to Expect
+              </h3>
+              <p className="text-xs md:text-sm text-blue-200">
+                Phone verification will be required when voting starts. Have
+                your registered number ready.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Voting Status Banner Component
+  const VotingStatusBanner = () => {
+    if (countdown.status === "pending") {
+      return (
+        <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white p-4 md:p-6 rounded-xl shadow-lg">
+          <div className="flex flex-col lg:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <div className="bg-white/20 p-3 rounded-xl">
+                <Clock className="w-6 h-6 md:w-8 md:h-8" />
+              </div>
+              <div>
+                <h3 className="font-bold text-lg md:text-xl mb-1">
+                  Voting Starts In
+                </h3>
+                <p className="text-blue-100 text-sm md:text-base">
+                  {formatDateTime(electionData.start_time)}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 md:gap-6">
+              <div className="text-center">
+                <div className="text-2xl md:text-3xl font-bold bg-white/20 rounded-lg px-3 py-2">
+                  {countdown.days.toString().padStart(2, "0")}
+                </div>
+                <div className="text-xs md:text-sm opacity-90 mt-1">DAYS</div>
+              </div>
+              <div className="text-gray-300 text-xl">:</div>
+              <div className="text-center">
+                <div className="text-2xl md:text-3xl font-bold bg-white/20 rounded-lg px-3 py-2">
+                  {countdown.hours.toString().padStart(2, "0")}
+                </div>
+                <div className="text-xs md:text-sm opacity-90 mt-1">HOURS</div>
+              </div>
+              <div className="text-gray-300 text-xl">:</div>
+              <div className="text-center">
+                <div className="text-2xl md:text-3xl font-bold bg-white/20 rounded-lg px-3 py-2">
+                  {countdown.minutes.toString().padStart(2, "0")}
+                </div>
+                <div className="text-xs md:text-sm opacity-90 mt-1">
+                  MINUTES
+                </div>
+              </div>
+              <div className="text-gray-300 text-xl">:</div>
+              <div className="text-center">
+                <div className="text-2xl md:text-3xl font-bold bg-white/20 rounded-lg px-3 py-2">
+                  {countdown.seconds.toString().padStart(2, "0")}
+                </div>
+                <div className="text-xs md:text-sm opacity-90 mt-1">
+                  SECONDS
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    } // In VotingStatusBanner, find this section for "active" status
+    else if (countdown.status === "active") {
+      return (
+        <div className="bg-gradient-to-r from-green-500 via-emerald-600 to-teal-600 text-white p-4 md:p-6 rounded-xl shadow-lg">
+          {/* ... existing code ... */}
+
+          <div className="flex items-center gap-3 md:gap-6">
+            {/* HOURS section - keep as is */}
+            <div className="text-center">
+              <div className="text-2xl md:text-3xl font-bold bg-white/20 rounded-lg px-3 py-2">
+                {countdown.hours.toString().padStart(2, "0")}
+              </div>
+              <div className="text-xs md:text-sm opacity-90 mt-1">
+                HOURS LEFT
+              </div>
+            </div>
+
+            <div className="text-gray-300 text-xl">:</div>
+
+            {/* MINUTES section - keep as is */}
+            <div className="text-center">
+              <div className="text-2xl md:text-3xl font-bold bg-white/20 rounded-lg px-3 py-2">
+                {countdown.minutes.toString().padStart(2, "0")}
+              </div>
+              <div className="text-xs md:text-sm opacity-90 mt-1">
+                MINUTES LEFT
+              </div>
+            </div>
+
+            <div className="text-gray-300 text-xl">:</div>
+
+            {/* SECONDS section - REPLACE WITH THIS */}
+            <div className="text-center">
+              <motion.div
+                key={`seconds-${countdown.seconds}-${forceUpdate}`}
+                initial={{ scale: 0.9 }}
+                animate={{ scale: 1 }}
+                transition={{ duration: 0.3 }}
+                className="text-2xl md:text-3xl font-bold bg-white/20 rounded-lg px-3 py-2"
+              >
+                {countdown.seconds.toString().padStart(2, "0")}
+              </motion.div>
+              <div className="text-xs md:text-sm opacity-90 mt-1">
+                SECONDS LEFT
+              </div>
+            </div>
+            {/* END OF REPLACEMENT */}
+
+            <button
+              onClick={() => setShowCountdownPopup(true)}
+              className="px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg font-medium transition-colors ml-4"
+            >
+              View Details
+            </button>
+          </div>
+        </div>
+      );
+    } else if (countdown.status === "ended") {
+      return (
+        <div className="bg-gradient-to-r from-red-500 via-pink-600 to-rose-600 text-white p-4 md:p-6 rounded-xl shadow-lg">
+          <div className="flex flex-col lg:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <div className="bg-white/20 p-3 rounded-xl">
+                <Trophy className="w-6 h-6 md:w-8 md:h-8" />
+              </div>
+              <div>
+                <h3 className="font-bold text-lg md:text-xl mb-1">
+                  Voting Has Ended
+                </h3>
+                <p className="text-red-100 text-sm md:text-base">
+                  Election closed at {formatDateTime(electionData.end_time)}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => {
+                  setShowResults(true);
+                  if (!Object.keys(winners).length && electionIdFromApi) {
+                    fetchWinners();
+                  }
+                }}
+                className="px-6 py-2 bg-white/20 hover:bg-white/30 rounded-lg font-medium transition-colors"
+              >
+                View Results
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    return null;
   };
 
   // Loading state
@@ -726,7 +1378,10 @@ const VotingPage = () => {
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
-            onClick={() => setRefreshKey((prev) => prev + 1)}
+            onClick={() => {
+              setRefreshKey((prev) => prev + 1);
+              fetchVotingData();
+            }}
             className="w-full px-6 py-4 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl font-semibold hover:from-blue-700 hover:to-blue-800 transition-all shadow-lg"
           >
             Try Again
@@ -736,731 +1391,758 @@ const VotingPage = () => {
     );
   }
 
-  // Phone verification required
-  if (!isVerified) {
+  // Show Full Screen Countdown when voting is pending and user not verified
+  if (countdown.status === "pending" && !isVerified) {
+    return <FullScreenCountdown />;
+  }
+
+  // If voting has ended and user is not verified
+  // Phone verification required (only shown when voting is active)
+  if (countdown.status === "active" && !isVerified) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-slate-50 flex items-center justify-center p-4">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full border border-gray-100"
-        >
-          <div className="text-center mb-4">
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">
-              Verify Your Identity
-            </h2>
-            <p className="text-gray-600 mb-1">
-              Enter your registered phone number to vote in
-            </p>
-            <p className="text-blue-600 font-semibold">
-              {electionData.electionName || "this election"}
-            </p>
-            {hasCompletedVoting && (
-              <div className="mt-2 p-2 bg-blue-50 rounded-lg">
-                <p className="text-blue-700 text-sm">
-                  <Eye className="inline w-4 h-4 mr-1" />
-                  You have already completed voting. You can view results after
-                  verification.
-                </p>
-              </div>
-            )}
-          </div>
-
-          {verificationError && (
-            <motion.div
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="mb-6 p-3 bg-red-50 border border-red-200 rounded-lg"
-            >
-              <p className="text-red-600 text-sm">{verificationError}</p>
-            </motion.div>
-          )}
-
-          <div className="mb-6">
-            <label className="block text-gray-700 text-sm font-medium mb-2">
-              Registered Phone Number
-            </label>
-            <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden">
-              <div className="px-3 py-3 bg-gray-50">
-                <Phone className="w-5 h-5 text-gray-500" />
-              </div>
-              <input
-                type="tel"
-                value={phoneNumber}
-                maxLength={10}
-                onChange={(e) => setPhoneNumber(e.target.value)}
-                placeholder="Enter your 10-digit phone number"
-                className="flex-1 px-3 py-3 border-0 focus:ring-0 focus:outline-none"
-                disabled={verifying}
-              />
+        <div className="max-w-md w-full">
+          {/* SIMPLE HEADER - NO COUNTDOWN */}
+          <div className="text-center mb-6">
+            <div className="w-16 h-16 mx-auto bg-gradient-to-r from-green-500 to-emerald-600 rounded-full flex items-center justify-center mb-4">
+              <Zap className="w-8 h-8 text-white" />
             </div>
+            <h1 className="text-2xl font-bold text-gray-900 mb-2">
+              Voting is Active!
+            </h1>
+            {/* <p className="text-gray-600 text-sm">
+            Time remaining: <span className="font-semibold text-green-600">{formatTimeRemaining(countdown.totalSeconds)}</span>
+          </p> */}
           </div>
 
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={verifyPhoneNumber}
-            disabled={verifying}
-            className="w-full px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl font-semibold hover:from-blue-700 hover:to-indigo-700 transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+          {/* VERIFICATION FORM */}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white rounded-xl shadow-lg p-6 border border-gray-100"
           >
-            {verifying ? (
-              <div className="flex items-center justify-center">
-                <div className="w-5 h-5 border-t-2 border-white rounded-full animate-spin mr-2"></div>
-                Verifying...
-              </div>
-            ) : (
-              "Verify Phone Number"
-            )}
-          </motion.button>
+            <div className="text-center mb-4">
+              <h2 className="text-xl font-bold text-gray-900 mb-1">
+                Verify Your Identity
+              </h2>
+              <p className="text-gray-600 text-sm">
+                Enter your registered phone number to vote
+              </p>
+              <p className="text-blue-600 font-semibold text-sm mt-1">
+                {electionData.electionName || "this election"}
+              </p>
+            </div>
 
-          <p className="text-gray-500 text-sm text-center mt-6">
-            Only verified participants can vote. Your phone number will be
-            verified against the election's participant list.
-          </p>
-        </motion.div>
+            {verificationError && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg"
+              >
+                <p className="text-red-600 text-sm">{verificationError}</p>
+              </motion.div>
+            )}
+
+            <div className="mb-6">
+              <label className="block text-gray-700 text-sm font-medium mb-2">
+                Registered Phone Number
+              </label>
+              <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden">
+                <div className="px-3 py-3 bg-gray-50">
+                  <Phone className="w-5 h-5 text-gray-500" />
+                </div>
+                <input
+                  type="tel"
+                  value={phoneNumber}
+                  maxLength={10}
+                  onChange={(e) => setPhoneNumber(e.target.value)}
+                  placeholder="Enter 10-digit phone number"
+                  className="flex-1 px-3 py-3 border-0 focus:ring-0 focus:outline-none text-sm"
+                  disabled={verifying}
+                />
+              </div>
+            </div>
+
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={verifyPhoneNumber}
+              disabled={verifying}
+              className="w-full px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg font-semibold hover:from-blue-700 hover:to-indigo-700 transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {verifying ? (
+                <div className="flex items-center justify-center">
+                  <div className="w-5 h-5 border-t-2 border-white rounded-full animate-spin mr-2"></div>
+                  Verifying...
+                </div>
+              ) : (
+                "Verify Phone Number"
+              )}
+            </motion.button>
+
+            <p className="text-gray-500 text-xs text-center mt-4">
+              Only verified participants can vote. Your phone number will be
+              verified against the election's participant list.
+            </p>
+          </motion.div>
+        </div>
       </div>
     );
   }
 
-  // Main voting page
+  // Phone verification required (only shown when voting is active)
+  // Phone verification required (only shown when voting is active)
+  if (countdown.status === "active" && !isVerified) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-slate-50 flex items-center justify-center p-4">
+        <div className="max-w-2xl w-full">
+          {/* SIMPLIFIED HEADER - Remove the detailed time info */}
+          <div className="bg-gradient-to-r from-green-500 via-emerald-600 to-teal-600 text-white p-6 rounded-xl shadow-lg mb-6">
+            <div className="text-center">
+              <div className="w-16 h-16 mx-auto bg-white/20 rounded-full flex items-center justify-center mb-4">
+                <Zap className="w-8 h-8" />
+              </div>
+              <h1 className="text-3xl font-bold mb-2">Voting is Active!</h1>
+              <p className="text-green-100">
+                Time remaining to vote:{" "}
+                {formatTimeRemaining(countdown.totalSeconds)}
+              </p>
+            </div>
+          </div>
+
+          {/* VERIFICATION FORM - Keep only essential */}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100"
+          >
+            <div className="text-center mb-6">
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">
+                Verify Your Identity
+              </h2>
+              <p className="text-gray-600">
+                Enter your registered phone number to vote in
+              </p>
+              <p className="text-blue-600 font-semibold mt-1">
+                {electionData.electionName || "this election"}
+              </p>
+            </div>
+
+            {verificationError && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mb-6 p-3 bg-red-50 border border-red-200 rounded-lg"
+              >
+                <p className="text-red-600 text-sm">{verificationError}</p>
+              </motion.div>
+            )}
+
+            <div className="mb-6">
+              <label className="block text-gray-700 text-sm font-medium mb-2">
+                Registered Phone Number
+              </label>
+              <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden">
+                <div className="px-3 py-3 bg-gray-50">
+                  <Phone className="w-5 h-5 text-gray-500" />
+                </div>
+                <input
+                  type="tel"
+                  value={phoneNumber}
+                  maxLength={10}
+                  onChange={(e) => setPhoneNumber(e.target.value)}
+                  placeholder="Enter your 10-digit phone number"
+                  className="flex-1 px-3 py-3 border-0 focus:ring-0 focus:outline-none"
+                  disabled={verifying}
+                />
+              </div>
+            </div>
+
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={verifyPhoneNumber}
+              disabled={verifying}
+              className="w-full px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl font-semibold hover:from-blue-700 hover:to-indigo-700 transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {verifying ? (
+                <div className="flex items-center justify-center">
+                  <div className="w-5 h-5 border-t-2 border-white rounded-full animate-spin mr-2"></div>
+                  Verifying...
+                </div>
+              ) : (
+                "Verify Phone Number"
+              )}
+            </motion.button>
+
+            <p className="text-gray-500 text-sm text-center mt-6">
+              Only verified participants can vote. Your phone number will be
+              verified against the election's participant list.
+            </p>
+          </motion.div>
+        </div>
+      </div>
+    );
+  }
+
+  // Main voting page (only shown when voting is active and verified)
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-slate-50">
-      {/* Header with responsive improvements */}
+      {/* Show CountdownPopup as overlay when needed */}
+      {showThankYouPopup && <ThankYouPopup />}
+
+      {/* Header */}
       <motion.div
         initial={{ y: -20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
-        transition={{ duration: 0.5 }}
         className="sticky top-0 z-20 bg-white/95 backdrop-blur-md border-b border-gray-200/50 shadow-sm"
       >
-        <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 py-3 sm:py-4">
+        <div className="max-w-7xl mx-auto px-4 py-4">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
-            <div className="flex items-center gap-2 sm:gap-3 md:gap-4 w-full sm:w-auto">
-              <div className="bg-gradient-to-br from-blue-600 to-indigo-600 rounded-lg p-2 sm:p-2.5 md:p-3 shadow-lg flex-shrink-0">
-                <Landmark className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 text-white" />
+            <div className="flex items-center gap-3">
+              <div className="bg-gradient-to-br from-blue-600 to-indigo-600 rounded-lg p-2 shadow-lg">
+                <Landmark className="w-5 h-5 text-white" />
               </div>
-              <div className="min-w-0 flex-1 sm:flex-initial">
-                <h1 className="text-base sm:text-lg md:text-xl lg:text-2xl font-bold text-gray-900 truncate leading-tight">
+              <div>
+                <h1 className="text-xl font-bold text-gray-900">
                   {electionData.electionName || "Election"}
                 </h1>
-                <p className="text-xs sm:text-sm text-gray-600 truncate">
+                <p className="text-sm text-gray-600">
                   {electionData.electionCategory}
                   {participantData && ` • Verified as ${participantData.name}`}
                 </p>
               </div>
             </div>
 
-            {/* Verification status and controls */}
-            <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto justify-between sm:justify-normal mt-2 sm:mt-0">
+            <div className="flex items-center gap-3">
               <div className="flex items-center gap-2">
-                <div
-                  className={`px-2 py-1 sm:px-3 sm:py-1.5 text-white rounded-full font-semibold flex items-center gap-1 sm:gap-2 text-xs sm:text-sm ${
-                    viewOnly
-                      ? "bg-gradient-to-r from-purple-500 to-indigo-600"
-                      : "bg-gradient-to-r from-emerald-500 to-green-600"
-                  }`}
+                <div className="px-3 py-1.5 bg-gradient-to-r from-emerald-500 to-green-600 text-white rounded-full font-semibold flex items-center gap-2 text-sm">
+                  <CheckCircle className="w-4 h-4" />
+                  <span>Verified</span>
+                </div>
+
+                <button
+                  onClick={handleLogout}
+                  className="px-3 py-1.5 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-lg font-medium text-sm shadow hover:shadow-md flex items-center gap-1"
                 >
-                  {viewOnly ? (
-                    <Eye className="w-3 h-3 sm:w-4 sm:h-4" />
-                  ) : (
-                    <CheckCircle className="w-3 h-3 sm:w-4 sm:h-4" />
-                  )}
-                  <span>{viewOnly ? "View Mode" : "Verified"}</span>
-                </div>
-
-                {/* Results Toggle for Mobile/Desktop */}
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setShowResults(!showResults)}
-                    className="px-2 py-1 sm:px-3 sm:py-1.5 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-lg font-medium text-xs sm:text-sm shadow hover:shadow-md transition-shadow"
-                  >
-                    {showResults ? "Hide Results" : "Show Results"}
-                  </button>
-
-                  <button
-                    onClick={handleLogout}
-                    className="px-2 py-1 sm:px-3 sm:py-1.5 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg text-xs sm:text-sm transition-colors"
-                  >
-                    Logout
-                  </button>
-                </div>
+                  <LogOut className="w-4 h-4" />
+                  Logout
+                </button>
               </div>
             </div>
           </div>
         </div>
       </motion.div>
 
-      {/* View Only Banner */}
-      {viewOnly && (
-        <motion.div
-          initial={{ y: -20, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          className="bg-gradient-to-r from-purple-50 to-indigo-50 border-b border-purple-200"
-        >
-          <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 py-2">
-            <div className="flex items-center justify-center gap-2">
-              <Eye className="w-4 h-4 text-purple-600" />
-              <p className="text-purple-700 text-sm font-medium">
-                {hasCompletedVoting
-                  ? "🎉 You have completed voting for all positions! You can now view the results."
-                  : "You have already voted. You can only view the election results."}
-              </p>
-            </div>
-          </div>
-        </motion.div>
-      )}
+      {/* Voting Status Banner */}
+      <div className="max-w-7xl mx-auto px-4 py-4">
+        <VotingStatusBanner />
+      </div>
 
-      {/* Main Content with improved responsiveness */}
-      <div className="max-w-7xl mx-auto px-2 sm:px-3 lg:px-6 py-3 sm:py-4 lg:py-6">
-        <AnimatePresence mode="wait">
-          {positions.length === 0 ? (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="text-center py-8 sm:py-12 md:py-16 bg-white rounded-xl shadow-lg border border-gray-200/50 mx-1 sm:mx-2"
+      {/* Main Content */}
+      <div className="max-w-7xl mx-auto px-4 py-6">
+        {/* Show message if voting hasn't started or has ended */}
+        {countdown.status === "pending" && !showCountdownPopup && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-white rounded-xl shadow-lg p-8 mb-6 text-center border-2 border-gray-200"
+          >
+            <div className="w-20 h-20 mx-auto bg-gradient-to-br from-gray-100 to-gray-200 rounded-full flex items-center justify-center mb-4">
+              <Clock className="w-10 h-10 text-gray-600" />
+            </div>
+            <h3 className="text-2xl font-bold text-gray-900 mb-2">
+              Voting Not Started Yet
+            </h3>
+            <p className="text-gray-600 mb-4">
+              Voting will begin on {formatDateTime(electionData.start_time)}
+            </p>
+            <button
+              onClick={() => setShowCountdownPopup(true)}
+              className="px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg font-semibold shadow-lg hover:shadow-xl transition-all"
             >
-              <div className="w-20 h-20 sm:w-24 sm:h-24 md:w-32 md:h-32 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-full flex items-center justify-center mx-auto mb-4 sm:mb-6 md:mb-8">
-                <User className="w-10 h-10 sm:w-12 sm:h-12 md:w-16 md:h-16 text-blue-500" />
-              </div>
-              <h3 className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-gray-900 mb-2 sm:mb-3 md:mb-4 px-4">
-                No Positions Available
-              </h3>
-              <p className="text-gray-600 text-xs sm:text-sm md:text-base lg:text-lg max-w-xl mx-auto mb-4 sm:mb-6 px-4">
-                There are no positions registered for this election yet.
-              </p>
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => setRefreshKey((prev) => prev + 1)}
-                className="px-4 sm:px-6 md:px-8 py-2 sm:py-2.5 md:py-3.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg md:rounded-xl font-semibold text-xs sm:text-sm md:text-base lg:text-lg shadow-lg hover:shadow-xl transition-all"
-              >
-                Check Again
-              </motion.button>
-            </motion.div>
-          ) : (
-            <div className="space-y-3 sm:space-y-4 md:space-y-6 lg:space-y-8">
+              Show Countdown Timer
+            </button>
+          </motion.div>
+        )}
+
+        {countdown.status === "ended" && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-white rounded-xl shadow-lg p-8 mb-6 text-center border-2 border-gray-200"
+          >
+            <div className="w-20 h-20 mx-auto bg-gradient-to-br from-red-100 to-pink-100 rounded-full flex items-center justify-center mb-4">
+              <Trophy className="w-10 h-10 text-red-500" />
+            </div>
+            <h3 className="text-2xl font-bold text-gray-900 mb-2">
+              Voting Has Ended
+            </h3>
+            <p className="text-gray-600 mb-4">
+              Voting ended on {formatDateTime(electionData.end_time)}
+            </p>
+            <button
+              onClick={() => {
+                setShowResults(true);
+                if (!Object.keys(winners).length && electionIdFromApi) {
+                  fetchWinners();
+                }
+              }}
+              className="px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg font-semibold shadow-lg hover:shadow-xl transition-all"
+            >
+              View Election Results
+            </button>
+          </motion.div>
+        )}
+
+        {/* Empty State */}
+        {positions.length === 0 ? (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="text-center py-12 bg-white rounded-xl shadow-lg border border-gray-200/50"
+          >
+            <div className="w-24 h-24 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-full flex items-center justify-center mx-auto mb-6">
+              <User className="w-12 h-12 text-blue-500" />
+            </div>
+            <h3 className="text-2xl font-bold text-gray-900 mb-3">
+              No Positions Available
+            </h3>
+            <p className="text-gray-600 max-w-xl mx-auto mb-6">
+              There are no positions registered for this election yet.
+            </p>
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => {
+                setRefreshKey((prev) => prev + 1);
+                fetchVotingData();
+              }}
+              className="px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg font-semibold shadow-lg"
+            >
+              Check Again
+            </motion.button>
+          </motion.div>
+        ) : (
+          // Show voting UI only when voting is active
+          countdown.status === "active" && (
+            <div className="space-y-6">
               {positions.map((position, positionIndex) => {
                 const selectedCandidate = position.candidates.find(
                   (c) => c.selected
                 );
                 const hasSelected = !!selectedCandidate;
                 const isVoted = isPositionVoted(position.id);
+                const isViewing = viewingPosition === position.id;
 
                 return (
                   <motion.div
                     key={position.id}
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{
-                      delay: positionIndex * 0.1,
-                      type: "spring",
-                      stiffness: 100,
-                    }}
-                    className={`bg-white rounded-xl shadow-lg overflow-hidden border ${
-                      viewOnly ? "border-purple-100" : "border-gray-200/50"
-                    } mx-1 sm:mx-2`}
+                    transition={{ delay: positionIndex * 0.1 }}
+                    className={`bg-white rounded-xl shadow-lg overflow-hidden border-2 transition-all duration-300 ${
+                      isVoted
+                        ? "border-emerald-200/50 bg-gradient-to-br from-emerald-50/20 to-white"
+                        : "border-gray-200/50"
+                    }`}
                   >
-                    {/* Position Header with responsive design */}
+                    {/* Position Header */}
                     <div
-                      className={`${
-                        viewOnly
-                          ? "bg-gradient-to-r from-purple-50/80 to-white"
+                      className={`px-6 py-4 transition-all duration-300 ${
+                        isVoted
+                          ? "bg-gradient-to-r from-emerald-50/80 to-white"
                           : "bg-gradient-to-r from-blue-50/80 to-white"
-                      } px-3 sm:px-4 md:px-6 lg:px-8 py-3 sm:py-4 md:py-6 border-b ${
-                        viewOnly ? "border-purple-100" : "border-blue-100"
                       }`}
                     >
-                      <div className="flex flex-col xs:flex-row justify-between items-start xs:items-center gap-2 sm:gap-3 md:gap-4">
-                        <div className="flex items-center gap-2 sm:gap-3 md:gap-4 min-w-0 flex-1">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
                           <div
-                            className={`w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 lg:w-14 lg:h-14 rounded-lg flex items-center justify-center shadow-lg flex-shrink-0 ${
-                              viewOnly
-                                ? "bg-gradient-to-br from-purple-100 to-indigo-100"
+                            className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                              isVoted
+                                ? "bg-gradient-to-br from-emerald-100 to-green-100"
                                 : "bg-gradient-to-br from-blue-100 to-indigo-100"
                             }`}
                           >
-                            <Award
-                              className={`w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 lg:w-7 lg:h-7 ${
-                                viewOnly ? "text-purple-600" : "text-blue-600"
-                              }`}
-                            />
+                            {isVoted ? (
+                              <CheckCircle className="w-5 h-5 text-emerald-600" />
+                            ) : (
+                              <Award className="w-5 h-5 text-blue-600" />
+                            )}
                           </div>
-                          <div className="min-w-0 flex-1">
-                            <h3 className="text-sm sm:text-base md:text-lg lg:text-xl xl:text-2xl font-bold text-gray-900 truncate">
+                          <div>
+                            <h3 className="text-lg font-bold text-gray-900">
                               {position.position}
                             </h3>
-                            <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
-                              <p className="text-gray-600 text-xs sm:text-sm md:text-base">
-                                {position.candidates.length} candidate
-                                {position.candidates.length !== 1 ? "s" : ""}
-                              </p>
-                              {viewOnly || isVoted ? (
-                                // 🔒 VIEW ONLY MODE or Already Voted
-                                <div className="text-center py-2 sm:py-3">
-                                  <p
-                                    className={`font-semibold text-xs sm:text-sm ${
-                                      viewOnly
-                                        ? "text-purple-600"
-                                        : "text-gray-500"
-                                    }`}
-                                  >
-                                    {viewOnly ? "View Only" : "Already Voted"}
-                                  </p>
-                                </div>
-                              ) : !isVoted ? (
-                                <>
-                                  {hasSelected ? (
-                                    // Selected state
-                                    <div className="flex flex-col items-center gap-1 sm:gap-2 w-full">
-                                      <motion.button className="w-full py-1.5 sm:py-2 md:py-3 bg-gradient-to-r from-emerald-600 to-green-600 text-white rounded-lg font-bold text-xs sm:text-sm cursor-not-allowed">
-                                        Selected ✓
-                                      </motion.button>
-                                      <motion.button
-                                        whileHover={{ scale: 1.05 }}
-                                        whileTap={{ scale: 0.95 }}
-                                        onClick={() =>
-                                          handleClearSelection(position.id)
-                                        }
-                                        className="w-full py-1 sm:py-1.5 md:py-2 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-lg font-bold text-xs sm:text-sm"
-                                      >
-                                        Cancel Selection
-                                      </motion.button>
-                                    </div>
-                                  ) : (
-                                    // Normal vote button
-                                    <motion.button
-                                      whileHover={{ y: -2 }}
-                                      whileTap={{ scale: 0.98 }}
-                                      onClick={() =>
-                                        handleVote(candidate.id, position.id)
-                                      }
-                                      className="w-full py-1.5 sm:py-2 md:py-3 rounded-lg font-bold text-white text-xs sm:text-sm bg-gradient-to-r from-blue-600 to-indigo-600"
-                                    >
-                                      Vote
-                                    </motion.button>
-                                  )}
-                                </>
-                              ) : (
-                                <div className="text-center py-1.5 sm:py-2 md:py-3">
-                                  <p className="text-gray-500 font-medium text-xs sm:text-sm">
-                                    Vote Submitted
-                                  </p>
-                                </div>
-                              )}
-                            </div>
+                            <p className="text-gray-600 text-sm">
+                              {position.candidates.length} candidate
+                              {position.candidates.length !== 1 ? "s" : ""}
+                            </p>
                           </div>
                         </div>
 
-                        {/* Selection status with responsive layout */}
-                        <div className="flex items-center gap-2 sm:gap-3 self-end xs:self-center mt-2 xs:mt-0">
-                          {isVoted ? (
-                            <motion.div
-                              initial={{ scale: 0 }}
-                              animate={{ scale: 1 }}
-                              className={`px-2 py-1 sm:px-3 sm:py-1.5 text-white rounded-full font-semibold flex items-center gap-1 sm:gap-2 text-xs sm:text-sm shadow-lg ${
-                                viewOnly
-                                  ? "bg-gradient-to-r from-purple-500 to-indigo-600"
-                                  : "bg-gradient-to-r from-emerald-500 to-green-600"
-                              }`}
+                        <div className="flex items-center gap-3">
+                          {!viewOnly && !isVoted && hasSelected && (
+                            <button
+                              onClick={() =>
+                                handleSubmitVote(position.id, position.position)
+                              }
+                              className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-green-600 text-white rounded-lg font-bold text-sm shadow-lg hover:shadow-xl transition-all"
                             >
-                              {viewOnly ? (
-                                <Eye className="w-3 h-3 sm:w-4 sm:h-4" />
+                              Submit Vote
+                            </button>
+                          )}
+
+                          {isVoted && (
+                            <div className="flex items-center justify-center gap-3">
+                              {isViewing ? (
+                                <button
+                                  onClick={() => setViewingPosition(null)}
+                                  className="px-4 py-2 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-lg font-medium shadow hover:shadow-md flex items-center gap-1"
+                                >
+                                  <X className="w-4 h-4" />
+                                  Close View
+                                </button>
                               ) : (
-                                <CheckCircle className="w-3 h-3 sm:w-4 sm:h-4" />
+                                <button
+                                  onClick={() => {
+                                    setViewingPosition(position.id);
+                                  }}
+                                  className="px-4 py-2 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-lg font-medium shadow hover:shadow-md flex items-center justify-center gap-2"
+                                >
+                                  <BarChart3 className="w-4 h-4" />
+                                  View Votes
+                                </button>
                               )}
-                              <span>{viewOnly ? "View Only" : "Voted"}</span>
-                            </motion.div>
-                          ) : hasSelected ? (
-                            <div className="flex items-center gap-1 sm:gap-2 bg-blue-50 rounded-lg px-2 py-1.5 sm:px-3 sm:py-2">
-                              <div className="min-w-0">
-                                <p className="text-gray-700 font-medium text-xs sm:text-sm truncate max-w-[120px] sm:max-w-[150px]">
-                                  Selected: {selectedCandidate.name}
-                                </p>
-                              </div>
-                              <button
-                                onClick={() =>
-                                  handleClearSelection(position.id)
-                                }
-                                className="p-1 text-red-600 hover:bg-red-50 rounded-lg transition-colors flex-shrink-0"
-                              >
-                                <X className="w-3 h-3 sm:w-4 sm:h-4" />
-                              </button>
-                            </div>
-                          ) : (
-                            <div className="text-right">
-                              <p className="text-gray-600 text-xs sm:text-sm">
-                                Select one candidate
-                              </p>
                             </div>
                           )}
                         </div>
                       </div>
                     </div>
 
-                    {/* Candidates Grid with responsive columns */}
-                    <div className="p-3 sm:p-4 md:p-6 lg:p-8">
-                      <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 md:gap-6">
-                        {position.candidates.map(
-                          (candidate, candidateIndex) => {
-                            const isWinner =
-                              winners[position.id] === candidate.id;
+                    {/* Candidates Grid */}
+                    <div className="p-4 sm:p-6">
+                      {isVoted ? (
+                        // Post-vote view
+                        <div
+                          className={`relative ${
+                            !isViewing
+                              ? "filter blur-sm pointer-events-none"
+                              : ""
+                          }`}
+                        >
+                          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                            {position.candidates.map(
+                              (candidate, candidateIndex) => {
+                                const isWinner =
+                                  winners[position.id] === candidate.id;
 
-                            const isSelected = candidate.selected;
-                            const isOtherSelected = hasSelected && !isSelected;
-
-                            return (
-                              <motion.div
-                                key={candidate.id}
-                                initial={{ opacity: 0, scale: 0.9 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                transition={{
-                                  delay: candidateIndex * 0.05,
-                                  type: "spring",
-                                  stiffness: 120,
-                                }}
-                                whileHover={{
-                                  scale: isOtherSelected || viewOnly ? 1 : 1.03,
-                                  y: isOtherSelected || viewOnly ? 0 : -5,
-                                }}
-                                className={`relative rounded-lg md:rounded-xl border-2 transition-all duration-300 overflow-hidden shadow-md hover:shadow-xl ${
-                                  isWinner && showResults
-                                    ? "border-amber-300 bg-gradient-to-br from-amber-50/50 to-yellow-50/30"
-                                    : isSelected && !viewOnly
-                                    ? "border-emerald-300 bg-gradient-to-br from-emerald-50/50 to-green-50/30"
-                                    : isOtherSelected && !viewOnly
-                                    ? "border-red-200 bg-gradient-to-br from-red-50/30 to-red-50/20 opacity-70"
-                                    : viewOnly
-                                    ? "border-purple-100 bg-gradient-to-br from-purple-50/30 to-indigo-50/20"
-                                    : "border-gray-200 hover:border-blue-300 bg-white"
-                                }`}
-                              >
-                                <div className="p-3 sm:p-4 md:p-5">
-                                  {/* Candidate Profile with responsive sizing */}
-                                  <div className="flex flex-col items-center mb-2 sm:mb-3 md:mb-4">
-                                    <div className="relative mb-2 sm:mb-3 md:mb-4">
-                                      <motion.div
-                                        className="relative"
-                                        whileHover={{
-                                          scale:
-                                            isOtherSelected || viewOnly
-                                              ? 1
-                                              : 1.05,
-                                        }}
-                                      >
-                                        {/* Square photo container - responsive sizing */}
-                                        <div
-                                          className={`w-16 h-16 xs:w-20 xs:h-20 sm:w-24 sm:h-24 md:w-28 md:h-28 rounded-lg overflow-hidden mx-auto shadow-lg ${
-                                            isWinner && showResults
-                                              ? "border-2 border-amber-300"
-                                              : isSelected && !viewOnly
-                                              ? "border-2 border-emerald-300"
-                                              : isOtherSelected && !viewOnly
-                                              ? "border-2 border-red-200"
-                                              : viewOnly
-                                              ? "border-2 border-purple-200"
-                                              : "border border-gray-200"
-                                          }`}
-                                        >
+                                return (
+                                  <motion.div
+                                    key={candidate.id}
+                                    initial={{ opacity: 0, scale: 0.9 }}
+                                    animate={{ opacity: 1, scale: 1 }}
+                                    transition={{
+                                      delay: candidateIndex * 0.05,
+                                    }}
+                                    className={`relative rounded-xl border-2 transition-all duration-300 overflow-hidden ${
+                                      isViewing && isWinner && showResults
+                                        ? "border-amber-300 bg-gradient-to-br from-amber-50/50 to-yellow-50/30 shadow-lg"
+                                        : "border-gray-200 bg-white"
+                                    }`}
+                                  >
+                                    <div className="p-4">
+                                      {/* Profile Photo */}
+                                      <div className="relative mb-3">
+                                        <div className="w-24 h-24 mx-auto rounded-xl overflow-hidden border-2 shadow-lg">
                                           {candidate.photoUrl ? (
                                             <img
                                               src={candidate.photoUrl}
                                               alt={candidate.name}
                                               className="w-full h-full object-cover"
-                                              onError={(e) => {
-                                                e.currentTarget.style.display =
-                                                  "none";
-                                                const fallback =
-                                                  e.target.parentElement.querySelector(
-                                                    ".photo-fallback"
-                                                  );
-                                                if (fallback)
-                                                  fallback.style.display =
-                                                    "flex";
-                                              }}
                                             />
-                                          ) : null}
+                                          ) : (
+                                            <div className="w-full h-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
+                                              <span className="text-white text-2xl font-bold">
+                                                {getInitials(candidate.name)}
+                                              </span>
+                                            </div>
+                                          )}
+                                        </div>
 
-                                          {/* Photo fallback with initials */}
-                                          <div
-                                            className="photo-fallback w-full h-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center"
-                                            style={{
-                                              display: candidate.photoUrl
-                                                ? "none"
-                                                : "flex",
-                                            }}
-                                          >
-                                            <span className="text-white font-bold text-base xs:text-lg sm:text-xl md:text-2xl">
+                                        {/* Winner Badge */}
+                                        {isViewing &&
+                                          isWinner &&
+                                          showResults && (
+                                            <div className="absolute top-0 right-0 bg-gradient-to-r from-amber-500 to-yellow-600 rounded-full p-2 shadow-lg">
+                                              <Crown className="w-4 h-4 text-white" />
+                                            </div>
+                                          )}
+                                      </div>
+
+                                      {/* Candidate Info */}
+                                      <div className="text-center">
+                                        <h4 className="font-bold text-gray-900 text-base mb-1 truncate">
+                                          {candidate.name}
+                                        </h4>
+
+                                        <div className="mb-3">
+                                          <span className="bg-gradient-to-r from-gray-100 to-gray-200 rounded-full px-3 py-1 text-sm font-bold">
+                                            {candidate.votes} votes
+                                          </span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </motion.div>
+                                );
+                              }
+                            )}
+                          </div>
+                        </div>
+                      ) : (
+                        // Pre-vote view
+                        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                          {position.candidates.map(
+                            (candidate, candidateIndex) => {
+                              const isSelected = candidate.selected;
+                              const isOtherSelected =
+                                hasSelected && !isSelected;
+
+                              return (
+                                <motion.div
+                                  key={candidate.id}
+                                  initial={{ opacity: 0, scale: 0.9 }}
+                                  animate={{ opacity: 1, scale: 1 }}
+                                  transition={{ delay: candidateIndex * 0.05 }}
+                                  className={`relative rounded-xl border-2 transition-all duration-300 overflow-hidden ${
+                                    isSelected
+                                      ? "border-emerald-300 bg-gradient-to-br from-emerald-50/50 to-green-50/30 shadow-lg"
+                                      : isOtherSelected
+                                      ? "border-gray-200 bg-gray-50/50 opacity-70"
+                                      : "border-gray-200 hover:border-blue-300 hover:shadow-md bg-white"
+                                  }`}
+                                >
+                                  <div className="p-4">
+                                    {/* Profile Photo */}
+                                    <div className="relative mb-3">
+                                      <div className="w-24 h-24 mx-auto rounded-xl overflow-hidden border-2 shadow-lg">
+                                        {candidate.photoUrl ? (
+                                          <img
+                                            src={candidate.photoUrl}
+                                            alt={candidate.name}
+                                            className="w-full h-full object-cover"
+                                          />
+                                        ) : (
+                                          <div className="w-full h-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
+                                            <span className="text-white text-2xl font-bold">
                                               {getInitials(candidate.name)}
                                             </span>
                                           </div>
-                                        </div>
+                                        )}
+                                      </div>
 
-                                        {/* Status Badges - responsive sizing */}
-                                        <div className="absolute -top-1 -right-1 sm:-top-2 sm:-right-2 flex flex-col gap-0.5 sm:gap-1">
-                                          {isSelected && !viewOnly && (
-                                            <motion.div
-                                              initial={{ scale: 0 }}
-                                              animate={{ scale: 1 }}
-                                              transition={{ type: "spring" }}
-                                              className="bg-gradient-to-r from-emerald-500 to-green-600 rounded-full p-1 sm:p-1.5 md:p-2 shadow-lg"
-                                            >
-                                              <CheckCircle className="w-2 h-2 sm:w-3 sm:h-3 md:w-4 md:h-4 text-white" />
-                                            </motion.div>
-                                          )}
-                                          {isWinner && showResults && (
-                                            <motion.div
-                                              initial={{ scale: 0 }}
-                                              animate={{ scale: 1 }}
-                                              transition={{
-                                                delay: 0.2,
-                                                type: "spring",
-                                              }}
-                                              className="bg-gradient-to-r from-amber-500 to-yellow-600 rounded-full p-1 sm:p-1.5 md:p-2 shadow-lg"
-                                            >
-                                              <Crown className="w-2 h-2 sm:w-3 sm:h-3 md:w-4 md:h-4 text-white" />
-                                            </motion.div>
-                                          )}
-                                          {viewOnly && (
-                                            <motion.div
-                                              initial={{ scale: 0 }}
-                                              animate={{ scale: 1 }}
-                                              className="bg-gradient-to-r from-purple-500 to-indigo-600 rounded-full p-1 sm:p-1.5 md:p-2 shadow-lg"
-                                            >
-                                              <Eye className="w-2 h-2 sm:w-3 sm:h-3 md:w-4 md:h-4 text-white" />
-                                            </motion.div>
-                                          )}
+                                      {/* Selection Badge */}
+                                      {isSelected && (
+                                        <div className="absolute top-0 right-0 bg-gradient-to-r from-emerald-500 to-green-600 rounded-full p-2 shadow-lg">
+                                          <Check className="w-4 h-4 text-white" />
                                         </div>
-                                      </motion.div>
+                                      )}
                                     </div>
 
-                                    <div className="text-center w-full px-1">
-                                      <h4 className="font-bold text-gray-900 text-xs xs:text-sm sm:text-base md:text-lg truncate mb-1">
+                                    {/* Candidate Info */}
+                                    <div className="text-center">
+                                      <h4 className="font-bold text-gray-900 text-base mb-1 truncate">
                                         {candidate.name}
                                       </h4>
-                                      {showResults && (
-                                        <motion.div
-                                          initial={{ opacity: 0 }}
-                                          animate={{ opacity: 1 }}
-                                          className="mt-1"
+
+                                      <div className="mb-3">
+                                        <span className="bg-gradient-to-r from-gray-100 to-gray-200 rounded-full px-3 py-1 text-sm font-bold">
+                                          {candidate.votes} votes
+                                        </span>
+                                      </div>
+
+                                      {/* Vote Button */}
+                                      <button
+                                        onClick={() =>
+                                          !isOtherSelected &&
+                                          handleVote(candidate.id, position.id)
+                                        }
+                                        disabled={isOtherSelected}
+                                        className={`w-full py-2 rounded-lg font-bold text-sm transition-all ${
+                                          isSelected
+                                            ? "bg-gradient-to-r from-emerald-600 to-green-600 text-white shadow-md"
+                                            : isOtherSelected
+                                            ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                                            : "bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700 shadow-md hover:shadow-lg"
+                                        }`}
+                                      >
+                                        {isSelected ? "Selected ✓" : "Vote"}
+                                      </button>
+
+                                      {/* Cancel Selection Button */}
+                                      {isSelected && (
+                                        <button
+                                          onClick={() =>
+                                            handleClearSelection(position.id)
+                                          }
+                                          className="w-full py-2 mt-2 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-lg font-bold text-sm hover:from-red-600 hover:to-red-700 shadow-md"
                                         >
-                                          <p className="text-gray-700 font-bold text-xs sm:text-sm md:text-base bg-gradient-to-r from-gray-100 to-gray-200 rounded-full px-2 py-1 inline-block">
-                                            {candidate.votes || 0} votes
-                                          </p>
-                                        </motion.div>
+                                          Cancel
+                                        </button>
                                       )}
                                     </div>
                                   </div>
-
-                                  {/* Status Tags - responsive text sizing */}
-                                  <div className="flex flex-wrap justify-center gap-1 sm:gap-1.5 md:gap-2 mb-2 sm:mb-3 md:mb-4">
-                                    {isWinner && showResults && (
-                                      <motion.span
-                                        initial={{ scale: 0 }}
-                                        animate={{ scale: 1 }}
-                                        className="px-1.5 py-0.5 sm:px-2 sm:py-0.5 md:px-3 md:py-1 bg-gradient-to-r from-amber-500 to-yellow-500 text-white rounded-full text-[9px] xs:text-[10px] sm:text-xs font-bold shadow"
-                                      >
-                                        🏆 Winner
-                                      </motion.span>
-                                    )}
-                                    {isSelected && !viewOnly && (
-                                      <motion.span
-                                        initial={{ scale: 0 }}
-                                        animate={{ scale: 1 }}
-                                        className="px-1.5 py-0.5 sm:px-2 sm:py-0.5 md:px-3 md:py-1 bg-gradient-to-r from-emerald-500 to-green-500 text-white rounded-full text-[9px] xs:text-[10px] sm:text-xs font-bold shadow"
-                                      >
-                                        ✓ Your Choice
-                                      </motion.span>
-                                    )}
-                                    {viewOnly && (
-                                      <motion.span
-                                        initial={{ scale: 0 }}
-                                        animate={{ scale: 1 }}
-                                        className="px-1.5 py-0.5 sm:px-2 sm:py-0.5 md:px-3 md:py-1 bg-gradient-to-r from-purple-500 to-indigo-500 text-white rounded-full text-[9px] xs:text-[10px] sm:text-xs font-bold shadow"
-                                      >
-                                        👁️ View Only
-                                      </motion.span>
-                                    )}
-                                  </div>
-
-                                  {/* Action Button - responsive sizing */}
-                                  <div className="mt-2 sm:mt-3 md:mt-4 flex justify-center flex-col items-center gap-1 sm:gap-2">
-                                    {viewOnly || isVoted ? (
-                                      // View Only or Already Voted state
-                                      <div className="text-center py-1.5 sm:py-2 md:py-3">
-                                        <p
-                                          className={`font-medium text-xs sm:text-sm ${
-                                            viewOnly
-                                              ? "text-purple-600"
-                                              : "text-gray-500"
-                                          }`}
-                                        >
-                                          {viewOnly
-                                            ? "View Mode"
-                                            : "Vote Submitted"}
-                                        </p>
-                                      </div>
-                                    ) : !isVoted ? (
-                                      <>
-                                        {isSelected ? (
-                                          // Selected state with cancel button
-                                          <div className="flex flex-col items-center gap-1 sm:gap-2 w-full">
-                                            <motion.button
-                                              whileHover={{ y: -2 }}
-                                              whileTap={{ scale: 0.98 }}
-                                              className="w-full py-1.5 sm:py-2 md:py-3 bg-gradient-to-r from-emerald-600 to-green-600 text-white rounded-lg font-bold text-xs xs:text-sm sm:text-sm md:text-sm cursor-not-allowed"
-                                            >
-                                              Selected ✓
-                                            </motion.button>
-                                            <motion.button
-                                              whileHover={{ scale: 1.05 }}
-                                              whileTap={{ scale: 0.95 }}
-                                              onClick={() =>
-                                                handleClearSelection(
-                                                  position.id
-                                                )
-                                              }
-                                              className="w-full py-1 sm:py-1.5 md:py-2 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-lg font-bold text-xs xs:text-sm sm:text-sm md:text-sm hover:from-red-600 hover:to-red-700 shadow hover:shadow-md transition-all"
-                                            >
-                                              Cancel Selection
-                                            </motion.button>
-                                          </div>
-                                        ) : (
-                                          // Not selected state - normal vote button
-                                          <motion.button
-                                            whileHover={{
-                                              y: isOtherSelected ? 0 : -2,
-                                            }}
-                                            whileTap={{ scale: 0.98 }}
-                                            onClick={() =>
-                                              !isOtherSelected &&
-                                              handleVote(
-                                                candidate.id,
-                                                position.id
-                                              )
-                                            }
-                                            disabled={isOtherSelected}
-                                            className={`w-full py-1.5 sm:py-2 md:py-3 rounded-lg font-bold text-white text-xs xs:text-sm sm:text-sm md:text-sm transition-all ${
-                                              isOtherSelected
-                                                ? "bg-gradient-to-r from-red-400 to-red-500 cursor-not-allowed opacity-70"
-                                                : "bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-lg hover:shadow-xl"
-                                            }`}
-                                          >
-                                            Vote
-                                          </motion.button>
-                                        )}
-                                      </>
-                                    ) : (
-                                      // Already voted state
-                                      <div className="text-center py-1.5 sm:py-2 md:py-3">
-                                        <p className="text-gray-500 font-medium text-xs sm:text-sm">
-                                          Vote Submitted
-                                        </p>
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                              </motion.div>
-                            );
-                          }
-                        )}
-                      </div>
-
-                      {/* Submit Section - responsive padding */}
-                      {!viewOnly && !isVoted && hasSelected && (
-                        <motion.div
-                          initial={{ opacity: 0, y: 20 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ type: "spring" }}
-                          className="mt-4 sm:mt-6 md:mt-8 pt-4 sm:pt-6 md:pt-8 border-t border-gray-200"
-                        >
-                          <div className="flex justify-center">
-                            <motion.button
-                              whileHover={{ scale: 1.05 }}
-                              whileTap={{ scale: 0.95 }}
-                              onClick={() =>
-                                handleSubmitVote(position.id, position.position)
-                              }
-                              className="px-4 sm:px-6 md:px-8 py-2 sm:py-2.5 md:py-3.5 
-    rounded-lg md:rounded-xl font-bold text-xs sm:text-sm md:text-base lg:text-lg 
-    flex items-center justify-center gap-1 sm:gap-2 md:gap-3 shadow-lg w-full 
-    max-w-sm sm:max-w-md transition-all
-    bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700 hover:shadow-xl"
-                            >
-                              <Vote className="w-3 h-3 sm:w-4 sm:h-4 md:w-5 md:h-5" />
-                              Submit Vote
-                            </motion.button>
-                          </div>
-                        </motion.div>
-                      )}
-
-                      {/* Winner Announcement - responsive layout */}
-                      {showResults && winners[position.id] && (
-                        <motion.div
-                          initial={{ opacity: 0, scale: 0.95 }}
-                          animate={{ opacity: 1, scale: 1 }}
-                          transition={{ type: "spring" }}
-                          className="mt-4 sm:mt-6 md:mt-8 p-3 sm:p-4 md:p-6 lg:p-8 bg-gradient-to-r from-amber-50 via-yellow-50/50 to-amber-50 rounded-xl border-2 border-amber-300"
-                        >
-                          <div className="flex flex-col lg:flex-row items-center justify-between gap-3 sm:gap-4 md:gap-6 lg:gap-8">
-                            <div className="flex items-center gap-2 sm:gap-3 md:gap-4 lg:gap-6 flex-1 min-w-0">
-                              <div className="relative flex-shrink-0">
-                                <div className="bg-gradient-to-r from-amber-500 to-yellow-500 rounded-lg p-2 sm:p-2.5 md:p-3 lg:p-4 shadow-xl">
-                                  <Trophy className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 lg:w-8 lg:h-8 text-white" />
-                                </div>
-                                <div className="absolute -top-0.5 -right-0.5 sm:-top-1 sm:-right-1 md:-top-2 md:-right-2 w-3 h-3 sm:w-4 sm:h-4 md:w-6 md:h-6 bg-white rounded-full flex items-center justify-center shadow-lg">
-                                  <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 md:w-3 md:h-3 bg-yellow-500 rounded-full animate-pulse" />
-                                </div>
-                              </div>
-                              <div className="min-w-0 flex-1">
-                                <h4 className="text-xs sm:text-sm md:text-base lg:text-lg xl:text-xl font-bold text-gray-900 mb-1">
-                                  🎉 Winner Announced!
-                                </h4>
-                                <p className="text-gray-700 text-xs sm:text-sm md:text-base truncate">
-                                  Congratulations to{" "}
-                                  <span className="font-bold text-amber-700">
-                                    {
-                                      position.candidates.find(
-                                        (c) => c.id === winners[position.id]
-                                      )?.name
-                                    }
-                                  </span>
-                                </p>
-                              </div>
-                            </div>
-                            <div className="bg-white rounded-lg px-3 py-2 sm:px-4 sm:py-3 md:px-6 md:py-4 lg:px-8 lg:py-6 shadow-lg border-2 border-amber-200 flex-shrink-0">
-                              <p className="text-gray-600 font-medium text-xs sm:text-sm md:text-base">
-                                Total Votes
-                              </p>
-                              <p className="text-amber-700 font-bold text-lg sm:text-xl md:text-2xl">
-                                {position.candidates.find(
-                                  (c) => c.id === winners[position.id]
-                                )?.votes || 0}
-                              </p>
-                            </div>
-                          </div>
-                        </motion.div>
+                                </motion.div>
+                              );
+                            }
+                          )}
+                        </div>
                       )}
                     </div>
+
+                    {/* Winner Announcement (shown when voting ended) */}
+                    {countdown.status === "ended" && winners[position.id] && (
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="mt-4 mx-4 mb-4 p-4 bg-gradient-to-r from-amber-50 via-yellow-50/50 to-amber-50 rounded-xl border-2 border-amber-300"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="bg-gradient-to-r from-amber-500 to-yellow-500 rounded-lg p-2">
+                              <Trophy className="w-6 h-6 text-white" />
+                            </div>
+                            <div>
+                              <h4 className="font-bold text-gray-900">
+                                Winner Announced!
+                              </h4>
+                              <p className="text-gray-700">
+                                Congratulations to{" "}
+                                <span className="font-bold text-amber-700">
+                                  {
+                                    position.candidates.find(
+                                      (c) => c.id === winners[position.id]
+                                    )?.name
+                                  }
+                                </span>
+                              </p>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-gray-600 text-sm">Total Votes</p>
+                            <p className="text-amber-700 font-bold text-xl">
+                              {position.candidates.find(
+                                (c) => c.id === winners[position.id]
+                              )?.votes || 0}
+                            </p>
+                          </div>
+                        </div>
+                      </motion.div>
+                    )}
                   </motion.div>
                 );
               })}
             </div>
-          )}
-        </AnimatePresence>
-      </div>
-
-      {/* Floating Action Button for Mobile */}
-      <motion.button
-        initial={{ opacity: 0, y: 50 }}
-        animate={{ opacity: 1, y: 0 }}
-        onClick={() => setShowResults(!showResults)}
-        className="fixed bottom-4 right-4 sm:hidden z-10 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-full p-3 shadow-xl hover:shadow-2xl"
-      >
-        {showResults ? (
-          <span className="text-sm font-bold">Hide Results</span>
-        ) : (
-          <span className="text-sm font-bold">Show Results</span>
+          )
         )}
-      </motion.button>
+
+        {/* Results View when voting ended */}
+        {countdown.status === "ended" &&
+          showResults &&
+          Object.keys(winners).length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-gradient-to-br from-amber-50 to-yellow-50 rounded-xl shadow-lg p-8 mb-6 border-2 border-amber-200"
+            >
+              <div className="text-center mb-6">
+                <div className="w-20 h-20 mx-auto bg-gradient-to-r from-amber-500 to-yellow-500 rounded-full flex items-center justify-center mb-4">
+                  <Trophy className="w-10 h-10 text-white" />
+                </div>
+                <h3 className="text-2xl font-bold text-gray-900 mb-2">
+                  Election Results
+                </h3>
+                <p className="text-gray-600">
+                  Final results for {electionData.electionName}
+                </p>
+              </div>
+
+              <div className="space-y-6">
+                {positions.map((position) => {
+                  const winnerCandidate = position.candidates.find(
+                    (c) => winners[position.id] === c.id
+                  );
+
+                  if (!winnerCandidate) return null;
+
+                  return (
+                    <div
+                      key={position.id}
+                      className="bg-white rounded-xl p-6 border border-amber-100 shadow-md"
+                    >
+                      <div className="flex flex-col md:flex-row items-center gap-6">
+                        <div className="flex-shrink-0">
+                          <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-amber-300 shadow-lg">
+                            {winnerCandidate.photoUrl ? (
+                              <img
+                                src={winnerCandidate.photoUrl}
+                                alt={winnerCandidate.name}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-full h-full bg-gradient-to-br from-amber-500 to-yellow-600 flex items-center justify-center">
+                                <span className="text-white text-3xl font-bold">
+                                  {getInitials(winnerCandidate.name)}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex-1 text-center md:text-left">
+                          <div className="mb-4">
+                            <h4 className="text-2xl font-bold text-gray-900">
+                              {position.position}
+                            </h4>
+                            <div className="inline-block mt-2 px-4 py-1 bg-gradient-to-r from-amber-500 to-yellow-500 text-white rounded-full font-bold">
+                              Winner
+                            </div>
+                          </div>
+                          <h3 className="text-3xl font-bold text-amber-700 mb-2">
+                            {winnerCandidate.name}
+                          </h3>
+                          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-4">
+                            <div className="bg-gray-50 rounded-lg p-3">
+                              <p className="text-sm text-gray-600">
+                                Total Votes
+                              </p>
+                              <p className="text-2xl font-bold text-gray-900">
+                                {winnerCandidate.votes}
+                              </p>
+                            </div>
+                            <div className="bg-gray-50 rounded-lg p-3">
+                              <p className="text-sm text-gray-600">
+                                Department
+                              </p>
+                              <p className="text-lg font-semibold text-gray-900">
+                                {winnerCandidate.department}
+                              </p>
+                            </div>
+                            <div className="bg-gray-50 rounded-lg p-3">
+                              <p className="text-sm text-gray-600">Location</p>
+                              <p className="text-lg font-semibold text-gray-900">
+                                {winnerCandidate.location}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </motion.div>
+          )}
+      </div>
     </div>
   );
 };
