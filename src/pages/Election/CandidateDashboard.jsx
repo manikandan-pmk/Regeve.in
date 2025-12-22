@@ -42,6 +42,14 @@ const CandidateDashboard = () => {
   const [sectionToDelete, setSectionToDelete] = useState(null);
   const [formErrors, setFormErrors] = useState({});
   const [fieldFocus, setFieldFocus] = useState(null);
+  const [showStartElection, setShowStartElection] = useState(false);
+  const [startTime, setStartTime] = useState("");
+  const [endTime, setEndTime] = useState("");
+  const [startingElection, setStartingElection] = useState(false);
+  const [electionStarted, setElectionStarted] = useState(false);
+  const [timeLeft, setTimeLeft] = useState(null);
+  const [electionStatus, setElectionStatus] = useState(null);
+  const [dashboardRefreshKey, setDashboardRefreshKey] = useState(0);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -66,6 +74,9 @@ const CandidateDashboard = () => {
     electionName: "",
     electionType: "",
     electionCategory: "",
+    start_time: null, // ✅ ADD
+    end_time: null, // ✅ ADD
+    election_status: null, // ✅ ADD
   });
 
   // Show alert message with auto-dismiss
@@ -102,24 +113,15 @@ const CandidateDashboard = () => {
     const fetchElectionMeta = async () => {
       try {
         // Fetch all elections and filter by documentId
-        const res = await axiosInstance.get("/election-names", {
-          params: {
-            populate: "*",
-            "pagination[pageSize]": 100, // Fetch enough to find the election
-          },
-        });
-
-        // Find the election with matching documentId
-        const allElections = res.data?.data || [];
-        const election = allElections.find(
-          (e) => e.documentId === electionDocumentId
+        const res = await axiosInstance.get(
+          `/election-names/${electionDocumentId}`
         );
 
+        // Find the election with matching documentId
+        const election = res.data?.data;
+
         if (!election) {
-          console.error(
-            "Election not found with documentId:",
-            electionDocumentId
-          );
+          console.error("Election not found with documentId:");
           showAlert("error", "Election not found");
           adminNavigate(navigate, "/electionhome");
           return;
@@ -129,6 +131,9 @@ const CandidateDashboard = () => {
           electionName: election.Election_Name || "",
           electionType: election.Election_Type || "",
           electionCategory: election.Election_Category || "",
+          start_time: election.start_time,
+          end_time: election.end_time,
+          election_status: election.election_status,
         });
       } catch (err) {
         console.error("Election meta fetch failed:", err);
@@ -139,6 +144,52 @@ const CandidateDashboard = () => {
 
     fetchElectionMeta();
   }, [electionDocumentId]);
+
+  useEffect(() => {
+    if (!electionMeta.election_status) return;
+    setElectionStatus(electionMeta.election_status);
+  }, [electionMeta.election_status]);
+
+  // ⏱ LIVE COUNTDOWN TIMER (THIS WAS MISSING)
+  useEffect(() => {
+    if (!electionMeta.start_time || !electionMeta.end_time) return;
+
+    const interval = setInterval(() => {
+      const now = Date.now();
+      const start = new Date(electionMeta.start_time).getTime();
+      const end = new Date(electionMeta.end_time).getTime();
+
+      if (now < start) {
+        const diff = start - now;
+
+        const h = Math.floor(diff / (1000 * 60 * 60));
+        const m = Math.floor((diff / (1000 * 60)) % 60);
+        const s = Math.floor((diff / 1000) % 60);
+
+        setElectionStatus("scheduled");
+        setTimeLeft(`Starts in ${h}h ${m}m ${s}s`);
+        return;
+      }
+
+      if (now >= start && now < end) {
+        const diff = end - now;
+
+        const h = Math.floor(diff / (1000 * 60 * 60));
+        const m = Math.floor((diff / (1000 * 60)) % 60);
+        const s = Math.floor((diff / 1000) % 60);
+
+        setElectionStatus("active");
+        setTimeLeft(`Ends in ${h}h ${m}m ${s}s`);
+        return;
+      }
+
+      setElectionStatus("ended");
+      setTimeLeft("Election Ended");
+      clearInterval(interval);
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [electionMeta.start_time, electionMeta.end_time]);
 
   // Click outside to close modals
   useEffect(() => {
@@ -450,6 +501,7 @@ const CandidateDashboard = () => {
 
         // Refresh the list
         await fetchSections();
+        setDashboardRefreshKey((prev) => prev + 1);
       }
     } catch (err) {
       console.error("Error creating candidate:", err);
@@ -468,6 +520,65 @@ const CandidateDashboard = () => {
     }
 
     setLoading(false);
+  };
+
+  const MIN_BUFFER_MINUTES = 10;
+
+  const validateElectionTimeUI = (startTime, endTime) => {
+    if (!startTime || !endTime) {
+      return "Start time and end time are required";
+    }
+
+    const now = new Date();
+    const start = new Date(startTime);
+    const end = new Date(endTime);
+
+    if (start <= now) {
+      return "Start time must be at least 10 minutes from now";
+    }
+
+    const diffMinutes = (start - now) / (1000 * 60);
+    if (diffMinutes < MIN_BUFFER_MINUTES) {
+      return "Election must be started at least 10 minutes before start time";
+    }
+
+    if (end <= start) {
+      return "End time must be after start time";
+    }
+
+    return null; // ✅ valid
+  };
+
+  const handleStartElection = async () => {
+    const error = validateElectionTimeUI(startTime, endTime);
+
+    if (error) {
+      showAlert("error", error);
+      return;
+    }
+
+    try {
+      setStartingElection(true);
+
+      const startUTC = new Date(startTime).toISOString();
+      const endUTC = new Date(endTime).toISOString();
+
+      await axiosInstance.put(`/elections/${electionDocumentId}/start`, {
+        start_time: startUTC,
+        end_time: endUTC,
+      });
+
+      showAlert("success", "Election scheduled successfully");
+      setShowStartElection(false);
+      window.location.reload();
+    } catch (err) {
+      showAlert(
+        "error",
+        err.response?.data?.message || "Failed to start election"
+      );
+    } finally {
+      setStartingElection(false);
+    }
   };
 
   // Create new section (Election Position)
@@ -498,6 +609,7 @@ const CandidateDashboard = () => {
 
       await axiosInstance.post("/election-candidate-positions", payload);
       await fetchSections();
+      setDashboardRefreshKey((prev) => prev + 1);
 
       setNewSectionName("");
       setShowAddSection(false);
@@ -525,6 +637,7 @@ const CandidateDashboard = () => {
       await axiosInstance.delete(`/candidates/${candidateToDelete.id}`);
 
       await fetchSections();
+      setDashboardRefreshKey((prev) => prev + 1);
 
       showAlert("success", "Candidate deleted successfully");
     } catch (err) {
@@ -562,6 +675,7 @@ const CandidateDashboard = () => {
         sections.filter((section) => section.id !== sectionToDelete.id)
       );
       await fetchSections();
+      setDashboardRefreshKey((prev) => prev + 1);
 
       showAlert("success", "Position deleted successfully");
     } catch (err) {
@@ -684,7 +798,7 @@ const CandidateDashboard = () => {
       {/* Main Container */}
       <div className="max-w-7xl mx-auto">
         {/* Back Navigation */}
-        <div className="mb-6">
+        <div className="mb-6 flex justify-between items-center">
           <button
             onClick={() => adminNavigate(navigate, "/electionhome")}
             className="inline-flex items-center gap-2 text-slate-600 hover:text-blue-600 transition-colors duration-200 group"
@@ -703,6 +817,29 @@ const CandidateDashboard = () => {
               />
             </svg>
             <span className="font-medium">Back to select election</span>
+          </button>
+          <button
+            onClick={() =>
+              navigate(
+                `/${adminId}/participant-dashboard/${electionDocumentId}`
+              )
+            }
+            className="flex items-center justify-center gap-2 bg-gradient-to-r from-amber-500 to-amber-600 text-white px-6 py-3 rounded-xl hover:from-amber-600 hover:to-amber-700 transition-all duration-200 font-semibold shadow-lg hover:shadow-xl min-w-[160px]"
+          >
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
+              />
+            </svg>
+            Participations
           </button>
         </div>
 
@@ -728,9 +865,43 @@ const CandidateDashboard = () => {
                 </span>
               </div>
 
-              <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">
-                {electionMeta.electionName}
-              </h1>
+              <div className="flex flex-wrap items-center gap-3 mb-3">
+                {/* Election Name */}
+                <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">
+                  {electionMeta.electionName}
+                </h1>
+
+                {/* Status Badge */}
+                {electionStatus && (
+                  <span
+                    className={`inline-flex items-center gap-2 text-xs sm:text-sm font-semibold px-3 py-1 rounded-full
+        ${
+          electionStatus === "active"
+            ? "bg-emerald-100 text-emerald-700"
+            : electionStatus === "scheduled"
+            ? "bg-yellow-100 text-yellow-700"
+            : "bg-red-100 text-red-700"
+        }`}
+                  >
+                    {electionStatus === "active" && "🟢 Active"}
+                    {electionStatus === "scheduled" && "🟡 Scheduled"}
+                    {electionStatus === "ended" && "🔴 Ended"}
+                  </span>
+                )}
+
+                {/* Timer */}
+                {timeLeft && (
+                  <span className="inline-flex items-center gap-2 text-xs sm:text-sm font-semibold px-3 py-1 rounded-full bg-yellow-50 border border-yellow-200 text-yellow-700">
+                    ⏱ {timeLeft}
+                  </span>
+                )}
+              </div>
+
+              {electionStatus === "ended" && (
+                <div className="mt-3 inline-flex items-center gap-2 px-4 py-2 bg-red-50 border border-red-200 rounded-lg text-red-700 font-semibold">
+                  ❌ Election Ended
+                </div>
+              )}
 
               <p className="text-slate-600 text-lg">
                 {electionMeta.electionType} • Candidate Management
@@ -739,6 +910,39 @@ const CandidateDashboard = () => {
 
             {/* Action Buttons */}
             <div className="flex flex-col xs:flex-row gap-3 w-full sm:w-auto">
+              <button
+                disabled={
+                  electionStatus === "active" || electionStatus === "ended"
+                }
+                onClick={() => setShowStartElection(true)}
+                className={`flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-semibold shadow-lg min-w-[160px]
+    ${
+      electionStarted
+        ? "bg-slate-300 text-slate-600 cursor-not-allowed"
+        : "bg-gradient-to-r from-emerald-500 to-emerald-600 text-white hover:from-emerald-600 hover:to-emerald-700"
+    }`}
+              >
+                ▶ Start Election
+              </button>
+              {electionStatus === "active" && (
+                <button
+                  onClick={async () => {
+                    if (!confirm("Are you sure you want to end this election?"))
+                      return;
+
+                    await axiosInstance.put(
+                      `/elections/${electionDocumentId}/end`
+                    );
+
+                    showAlert("success", "Election ended successfully");
+                    window.location.reload();
+                  }}
+                  className="flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-semibold bg-red-600 text-white hover:bg-red-700 shadow-lg"
+                >
+                  ⛔ End Election
+                </button>
+              )}
+
               <button
                 onClick={() => setShowAddSection(true)}
                 className="flex items-center justify-center gap-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white px-4 sm:px-6 py-3 rounded-xl hover:from-blue-600 hover:to-blue-700 transition-all duration-200 font-semibold shadow-lg w-full xs:w-auto hover:shadow-xl min-w-[160px]"
@@ -758,33 +962,68 @@ const CandidateDashboard = () => {
                 </svg>
                 Add Position
               </button>
-
-              <button
-                onClick={() =>
-                  navigate(
-                    `/${adminId}/participant-dashboard/${electionDocumentId}`
-                  )
-                }
-                className="flex items-center justify-center gap-2 bg-gradient-to-r from-amber-500 to-amber-600 text-white px-6 py-3 rounded-xl hover:from-amber-600 hover:to-amber-700 transition-all duration-200 font-semibold shadow-lg hover:shadow-xl min-w-[160px]"
-              >
-                <svg
-                  className="w-5 h-5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
-                  />
-                </svg>
-                Participations
-              </button>
             </div>
           </div>
         </div>
+        {showStartElection && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+              <h2 className="text-xl font-bold text-slate-900 mb-4">
+                Start Election
+              </h2>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-1">
+                    Start Time
+                  </label>
+                  <input
+                    type="datetime-local"
+                    value={startTime}
+                    onChange={(e) => setStartTime(e.target.value)}
+                    className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-1">
+                    End Time
+                  </label>
+                  <input
+                    type="datetime-local"
+                    value={endTime}
+                    onChange={(e) => setEndTime(e.target.value)}
+                    className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                  />
+                </div>
+                {validateElectionTimeUI(startTime, endTime) && (
+                  <p className="mt-2 text-sm text-red-600 font-medium">
+                    ⚠ {validateElectionTimeUI(startTime, endTime)}
+                  </p>
+                )}
+              </div>
+
+              <div className="flex gap-3 mt-6">
+                <button
+                  onClick={() => setShowStartElection(false)}
+                  className="flex-1 px-4 py-3 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 font-semibold"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  onClick={handleStartElection}
+                  disabled={
+                    startingElection ||
+                    !!validateElectionTimeUI(startTime, endTime)
+                  }
+                >
+                  {startingElection ? "Starting..." : "Start Election"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Add Section Modal */}
         {showAddSection && (
@@ -1947,7 +2186,7 @@ const CandidateDashboard = () => {
       )}
 
       <div className="border-t border-slate-200 pt-8 mt-8">
-        <ElectionDashboard />
+        <ElectionDashboard key={dashboardRefreshKey} />
       </div>
     </div>
   );

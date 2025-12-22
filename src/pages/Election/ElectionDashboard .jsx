@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import {
   Search,
@@ -36,17 +35,13 @@ const ElectionDashboard = () => {
   const [positionFilter, setPositionFilter] = useState("all");
   const [participants, setParticipants] = useState([]);
   const [candidates, setCandidates] = useState([]);
-  const [voteData, setVoteData] = useState({
-    totalVotesCast: 0,
-    voters: [],
-  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   // Extract unique positions from candidates
   const positions = React.useMemo(() => {
     const uniquePositions = new Set();
-    candidates.forEach(candidate => {
+    candidates.forEach((candidate) => {
       if (candidate.position) {
         uniquePositions.add(candidate.position);
       }
@@ -174,91 +169,28 @@ const ElectionDashboard = () => {
 
   const fetchParticipants = async () => {
     try {
-      // Try different API endpoints for participants
-      let participantsData = [];
-
-      // First try: Check if we have a specific endpoint for this election
-      try {
-        const res = await axiosInstance.get(
-          `/election-participants?filters[election_name][documentId][$eq]=${electionDocumentId}&populate=*`
-        );
-
-        if (res.data && Array.isArray(res.data.data)) {
-          participantsData = res.data.data.map((item) => ({
-            id: item.id,
-            name: item.attributes?.name || "Unknown",
-            email: item.attributes?.email || "",
-            isVerified: item.attributes?.isVerified || false,
-            election: item.attributes?.election_name?.data?.documentId,
-            registrationDate: item.attributes?.createdAt,
-            image: `https://api.dicebear.com/7.x/initials/svg?seed=${
-              item.attributes?.name || "User"
-            }`,
-          }));
-        }
-      } catch (e1) {
-        console.log("Trying alternative participants endpoint...");
-
-        // Second try: Fallback to general endpoint
-        try {
-          const res = await axiosInstance.get(
-            "/election-participants?populate=*"
-          );
-
-          if (res.data && Array.isArray(res.data.data)) {
-            participantsData = res.data.data
-              .map((item) => ({
-                id: item.id,
-                name: item.attributes?.name || "Unknown",
-                email: item.attributes?.email || "",
-                isVerified: item.attributes?.isVerified || false,
-                election: item.attributes?.election_name?.data?.documentId,
-                registrationDate: item.attributes?.createdAt,
-                image: `https://api.dicebear.com/7.x/initials/svg?seed=${
-                  item.attributes?.name || "User"
-                }`,
-              }))
-              .filter((p) => {
-                // Filter by election ID and verified status
-                const isSameElection = p.election === electionDocumentId;
-                const isVerified = p.isVerified === true;
-                return isSameElection && isVerified;
-              });
-          }
-        } catch (e2) {
-          console.error("Both participant endpoints failed:", e2);
-          // Return empty array but don't throw - we can still show candidates
-          return [];
-        }
-      }
-
-      return participantsData;
-    } catch (err) {
-      console.error("Error in fetchParticipants:", err);
-      return [];
-    }
-  };
-
-  const fetchVoteData = async () => {
-    try {
-      const voteRes = await axiosInstance.get(
-        `/election-votes?electionId=${electionDocumentId}`
+      const res = await axiosInstance.get(
+        `/election-participants?electionDocumentId=${electionDocumentId}`
       );
 
-      const voteData = voteRes.data.data || voteRes.data || [];
-      const totalVotesCast = voteData.length || 0;
+      if (!res.data?.success || !Array.isArray(res.data.data)) {
+        return [];
+      }
 
-      return {
-        totalVotesCast,
-        voters: voteData,
-      };
-    } catch (voteErr) {
-      console.warn("Could not fetch vote data:", voteErr);
-      // Fallback - will be calculated from candidates
-      return {
-        totalVotesCast: 0,
-        voters: [],
-      };
+      return res.data.data.map((item) => ({
+        id: item.id,
+        documentId: item.documentId,
+        name: item.name || "Unknown",
+        email: item.email || "",
+        isVerified: item.isVerified === true,
+        registrationDate: item.createdAt,
+        image: `https://api.dicebear.com/7.x/initials/svg?seed=${
+          item.name || "User"
+        }`,
+      }));
+    } catch (err) {
+      console.error("Participants fetch failed:", err);
+      return [];
     }
   };
 
@@ -269,15 +201,13 @@ const ElectionDashboard = () => {
 
     try {
       // Fetch all data in parallel
-      const [candidatesData, participantsData, voteData] = await Promise.all([
+      const [candidatesData, participantsData] = await Promise.all([
         fetchCandidates(),
         fetchParticipants(),
-        fetchVoteData(),
       ]);
 
       setCandidates(candidatesData);
       setParticipants(participantsData);
-      setVoteData(voteData);
 
       // If no participants found but we have candidates, log it
       if (participantsData.length === 0 && candidatesData.length > 0) {
@@ -306,8 +236,10 @@ const ElectionDashboard = () => {
       const matchesSearch =
         candidate.name.toLowerCase().includes(search.toLowerCase()) ||
         candidate.email.toLowerCase().includes(search.toLowerCase()) ||
-        (candidate.party && candidate.party.toLowerCase().includes(search.toLowerCase())) ||
-        (candidate.position && candidate.position.toLowerCase().includes(search.toLowerCase()));
+        (candidate.party &&
+          candidate.party.toLowerCase().includes(search.toLowerCase())) ||
+        (candidate.position &&
+          candidate.position.toLowerCase().includes(search.toLowerCase()));
 
       const matchesPositionFilter =
         positionFilter === "all" ||
@@ -322,14 +254,6 @@ const ElectionDashboard = () => {
     hidden: { opacity: 0, y: 20 },
     visible: { opacity: 1, y: 0 },
   };
-
-  // Calculate votes for voteData if not available from API
-  const displayedTotalVotes = React.useMemo(() => {
-    if (voteData.totalVotesCast > 0) {
-      return voteData.totalVotesCast;
-    }
-    return totalVotes;
-  }, [voteData.totalVotesCast, totalVotes]);
 
   return (
     <div className="pt-6 md:pt-10 px-3 md:px-4 lg:px-6 max-w-7xl mx-auto">
@@ -417,7 +341,8 @@ const ElectionDashboard = () => {
                 <div className="mt-3 md:mt-4 flex items-center text-xs md:text-sm text-gray-500">
                   <UserCheck className="w-3 h-3 md:w-4 md:h-4 mr-1 md:mr-2 animate-bounce-once" />
                   <span>
-                    {positions.length} position{positions.length !== 1 ? 's' : ''} available
+                    {positions.length} position
+                    {positions.length !== 1 ? "s" : ""} available
                   </span>
                 </div>
               </div>
@@ -455,19 +380,19 @@ const ElectionDashboard = () => {
                     <Vote className="w-5 h-5 md:w-6 md:h-6 text-purple-600" />
                   </div>
                   <span className="text-xs md:text-sm text-purple-600 font-medium animate-fade-in">
-                    {displayedTotalVotes > 0 ? "Cast" : "No Votes"}
+                    {totalVotes > 0 ? "Cast" : "No Votes"}
                   </span>
                 </div>
                 <p className="text-gray-500 text-xs md:text-sm font-medium mb-1 md:mb-2">
                   Total Votes
                 </p>
                 <p className="text-2xl md:text-3xl font-bold text-gray-900 animate-count-up animation-delay-200">
-                  {displayedTotalVotes.toLocaleString()}
+                  {totalVotes.toLocaleString()}
                 </p>
                 <div className="mt-3 md:mt-4 flex items-center text-xs md:text-sm text-gray-500">
                   <Calendar className="w-3 h-3 md:w-4 md:h-4 mr-1 md:mr-2 animate-bounce-once animation-delay-200" />
                   <span>
-                    {displayedTotalVotes > 0
+                    {totalVotes > 0
                       ? "Votes recorded to date"
                       : "Awaiting first vote"}
                   </span>
@@ -664,9 +589,7 @@ const ElectionDashboard = () => {
                       {/* Votes Performance */}
                       <div className="space-y-2">
                         <div className="flex items-center justify-between">
-                          <span className="text-xs text-gray-600">
-                            Votes:
-                          </span>
+                          <span className="text-xs text-gray-600">Votes:</span>
                           <span className="font-bold text-gray-900 text-sm animate-count-up">
                             {(candidate.votes || 0).toLocaleString()}
                           </span>
@@ -675,15 +598,18 @@ const ElectionDashboard = () => {
                           <div
                             className="bg-gradient-to-r from-green-500 to-emerald-600 h-1.5 rounded-full shadow-sm transition-all duration-1000 ease-out"
                             style={{
-                              width: `${((candidate.votes || 0) / maxVotes) * 100}%`,
+                              width: `${
+                                ((candidate.votes || 0) / maxVotes) * 100
+                              }%`,
                             }}
                           ></div>
                         </div>
                         <div className="text-xs text-gray-500">
                           {maxVotes > 0
-                            ? `${(((candidate.votes || 0) / maxVotes) * 100).toFixed(
-                                1
-                              )}% of highest votes`
+                            ? `${(
+                                ((candidate.votes || 0) / maxVotes) *
+                                100
+                              ).toFixed(1)}% of highest votes`
                             : "No votes yet"}
                         </div>
                       </div>
@@ -837,15 +763,18 @@ const ElectionDashboard = () => {
                               <div
                                 className="bg-gradient-to-r from-green-500 to-emerald-600 h-2 rounded-full shadow-sm transition-all duration-1000 ease-out"
                                 style={{
-                                  width: `${((candidate.votes || 0) / maxVotes) * 100}%`,
+                                  width: `${
+                                    ((candidate.votes || 0) / maxVotes) * 100
+                                  }%`,
                                 }}
                               ></div>
                             </div>
                             <div className="text-xs text-gray-500">
                               {maxVotes > 0
-                                ? `${(((candidate.votes || 0) / maxVotes) * 100).toFixed(
-                                    1
-                                  )}% of highest votes`
+                                ? `${(
+                                    ((candidate.votes || 0) / maxVotes) *
+                                    100
+                                  ).toFixed(1)}% of highest votes`
                                 : "No votes yet"}
                             </div>
                           </div>
@@ -891,7 +820,7 @@ const ElectionDashboard = () => {
                   <div className="w-2 h-2 md:w-3 md:h-3 rounded-full bg-gradient-to-r from-green-500 to-green-600 animate-pulse animation-delay-200"></div>
                   <span className="text-gray-600">Total Votes:</span>
                   <span className="font-semibold text-gray-900">
-                    {displayedTotalVotes.toLocaleString()}
+                    {totalVotes.toLocaleString()}
                   </span>
                 </div>
                 <div className="flex items-center gap-1.5 md:gap-2">
@@ -908,7 +837,7 @@ const ElectionDashboard = () => {
       </div>
 
       {/* Add CSS animations */}
-      <style jsx>{`
+      <style>{`
         @keyframes fadeIn {
           from {
             opacity: 0;
