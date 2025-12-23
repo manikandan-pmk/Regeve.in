@@ -323,129 +323,265 @@ const ElectionHome = () => {
         ) : (
           /* Election Cards */
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {elections.map((election) => (
+            {elections.map((election, index) => (
               <div
                 key={election.documentId}
-                className="relative group bg-white/80 backdrop-blur
-                     rounded-2xl border border-slate-200 p-6
-                     hover:border-blue-400 hover:shadow-2xl
-                     transition-all duration-300 ease-out
-                     hover:-translate-y-1 animate-fade-in-up"
+                className="relative group bg-gradient-to-br from-white to-slate-50/80 backdrop-blur-sm
+               rounded-2xl border border-slate-200/80 p-6
+               hover:border-blue-300/50 hover:shadow-2xl hover:shadow-blue-100/50
+               transition-all duration-500 ease-out
+               hover:-translate-y-2 hover:scale-[1.02]
+               animate-fade-in-up"
+                style={{ animationDelay: `${index * 100}ms` }}
               >
-                {/* Accent Bar */}
+                {/* Accent Bar with subtle animation */}
                 <div
-                  className="absolute top-0 left-0 w-1 h-full rounded-l-2xl
-                       bg-gradient-to-b from-blue-600 via-blue-500 to-indigo-500"
+                  className="absolute top-0 left-0 w-1.5 h-full rounded-l-2xl
+                 bg-gradient-to-b from-blue-500 via-blue-400 to-indigo-400
+                 group-hover:from-blue-600 group-hover:via-blue-500 group-hover:to-indigo-500
+                 transition-all duration-500"
                 />
 
-                <div className="ml-3">
-                  {/* Title + Delete */}
-                  <div className="flex items-start justify-between mb-4">
-                    <h3
-                      className="text-lg font-bold text-slate-900 leading-snug
-               line-clamp-2
-               group-hover:text-blue-700 transition-colors"
-                    >
-                      {election.Election_Name}
-                    </h3>
+                {/* Floating status indicator */}
+                <div className="absolute -top-2 -right-2 z-10">
+                  <div className="relative">
+                    <div className="absolute inset-0 bg-white rounded-full blur-sm"></div>
+                    <div className="relative bg-gradient-to-r from-slate-50 to-white rounded-full p-1.5 shadow-lg shadow-slate-200/50">
+                      {election.election_status && (
+                        <div
+                          className={`w-2 h-2 rounded-full animate-pulse
+                ${
+                  election.election_status === "active"
+                    ? "bg-emerald-500"
+                    : election.election_status === "scheduled"
+                    ? "bg-yellow-500"
+                    : "bg-rose-500"
+                }`}
+                        />
+                      )}
+                    </div>
+                  </div>
+                </div>
 
-                    {/* Delete Button */}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDeleteElection(election.documentId);
-                      }}
-                      title="Delete election"
-                      className="p-2 rounded-lg text-red-500
-               hover:bg-red-50 hover:text-red-600
-               hover:scale-110
-               transition-all duration-200"
+                <div className="ml-4">
+                  {/* Header Section */}
+                  <div className="flex items-start justify-between mb-5">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center space-x-2 mb-2">
+                      </div>
+                      <h3
+                        className="text-xl font-bold text-slate-900 leading-tight line-clamp-2
+                       group-hover:text-blue-700 transition-colors duration-300
+                       pr-4"
+                      >
+                        {election.Election_Name}
+                      </h3>
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="flex items-center space-x-1 shrink-0">
+                      {/* Status Badge */}
+                      {election.election_status && (
+                        <div className="relative group/status">
+                          <span
+                            className={`text-xs font-semibold px-3 py-1.5 rounded-full border
+                    ${
+                      election.election_status === "active"
+                        ? "bg-emerald-50/80 text-emerald-700 border-emerald-200/60"
+                        : election.election_status === "scheduled"
+                        ? "bg-yellow-50/80 text-yellow-700 border-yellow-200/60"
+                        : "bg-rose-50/80 text-rose-700 border-rose-200/60"
+                    } backdrop-blur-sm shadow-sm`}
+                          >
+                            {election.election_status === "active" && "Active"}
+                            {election.election_status === "scheduled" &&
+                              "Scheduled"}
+                            {election.election_status === "ended" && "Ended"}
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Delete Button with tooltip */}
+                      <div className="relative group/delete">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteElection(election.documentId);
+                          }}
+                          title="Delete election"
+                          className="p-2 rounded-xl text-slate-400 hover:text-rose-500
+                         bg-gradient-to-b from-slate-50 to-white
+                         border border-slate-200/60
+                         hover:border-rose-200 hover:bg-gradient-to-b hover:from-rose-50 hover:to-white
+                         hover:scale-110 active:scale-95
+                         transition-all duration-300 shadow-sm hover:shadow-md"
+                        >
+                          <svg
+                            className="w-4.5 h-4.5"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                            />
+                          </svg>
+                        </button>
+                        <div className="absolute right-0 top-full mt-2 px-2 py-1 text-xs font-medium text-white bg-slate-900 rounded-md opacity-0 group-hover/delete:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-20">
+                          Delete Election
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Stats Cards */}
+                  <div className="grid grid-cols-2 gap-3 mb-6">
+                    <div
+                      className="relative overflow-hidden rounded-xl p-4 text-center
+                       bg-gradient-to-br from-white to-slate-50
+                       border border-slate-200/40
+                       group-hover:from-blue-50/80 group-hover:to-blue-100/50
+                       transition-all duration-500"
                     >
-                      {/* Trash Icon */}
+                      <div className="absolute -right-4 -top-4 w-16 h-16 bg-blue-100/20 rounded-full blur-xl"></div>
+                      <p className="text-3xl font-black text-slate-900 mb-1">
+                        {election.positionsCount ?? 0}
+                      </p>
+                      <div className="flex items-center justify-center space-x-1">
+                        <div className="p-0.5 rounded bg-blue-100/60">
+                          <svg
+                            className="w-3 h-3 text-blue-600"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2.5}
+                              d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
+                            />
+                          </svg>
+                        </div>
+                        <p className="text-xs font-semibold uppercase tracking-wider text-slate-600">
+                          Positions
+                        </p>
+                      </div>
+                    </div>
+
+                    <div
+                      className="relative overflow-hidden rounded-xl p-4 text-center
+                       bg-gradient-to-br from-white to-slate-50
+                       border border-slate-200/40
+                       group-hover:from-indigo-50/80 group-hover:to-indigo-100/50
+                       transition-all duration-500"
+                    >
+                      <div className="absolute -right-4 -top-4 w-16 h-16 bg-indigo-100/20 rounded-full blur-xl"></div>
+                      <p className="text-3xl font-black text-slate-900 mb-1">
+                        {election.candidatesCount ?? 0}
+                      </p>
+                      <div className="flex items-center justify-center space-x-1">
+                        <div className="p-0.5 rounded bg-indigo-100/60">
+                          <svg
+                            className="w-3 h-3 text-indigo-600"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2.5}
+                              d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                            />
+                          </svg>
+                        </div>
+                        <p className="text-xs font-semibold uppercase tracking-wider text-slate-600">
+                          Candidates
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Meta Information */}
+                  <div className="mb-6 space-y-3">
+                    <div className="flex items-center justify-between text-sm">
+                      <div className="flex items-center space-x-2">
+                        <div className="p-1 rounded bg-slate-100/60">
+                          <svg
+                            className="w-3.5 h-3.5 text-slate-500"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                            />
+                          </svg>
+                        </div>
+                        <span className="font-medium text-slate-600">
+                          Created
+                        </span>
+                      </div>
+                      <span className="text-slate-500 font-medium">
+                        {election.createdAt
+                          ? new Date(election.createdAt).toLocaleDateString(
+                              "en-US",
+                              {
+                                month: "short",
+                                day: "numeric",
+                                year: "numeric",
+                              }
+                            )
+                          : "—"}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Action Button */}
+                  <button
+                    onClick={() =>
+                      navigate(
+                        `/${adminId}/candidate-dashboard/${election.documentId}`
+                      )
+                    }
+                    className="group/btn w-full py-3.5 rounded-xl
+                   bg-gradient-to-r from-blue-500 via-blue-600 to-indigo-600
+                   text-white font-semibold text-sm tracking-wide
+                   hover:from-blue-600 hover:via-blue-700 hover:to-indigo-700
+                   active:scale-[0.98]
+                   transition-all duration-300 ease-out
+                   shadow-lg hover:shadow-xl hover:shadow-blue-500/20
+                   relative overflow-hidden"
+                  >
+                    {/* Shine effect */}
+                    <div
+                      className="absolute inset-0 -translate-x-full group-hover/btn:translate-x-full 
+                       transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/20 to-transparent"
+                    />
+
+                    <div className="relative flex items-center justify-center space-x-2">
+                      <span>Open Dashboard</span>
                       <svg
-                        className="w-5 h-5"
+                        className="w-4 h-4 group-hover/btn:translate-x-1 transition-transform duration-300"
                         fill="none"
                         stroke="currentColor"
-                        strokeWidth="1.8"
                         viewBox="0 0 24 24"
                       >
                         <path
                           strokeLinecap="round"
                           strokeLinejoin="round"
-                          d="M6 7h12M9 7V4h6v3m-7 3v8m4-8v8m4-8v8M5 7l1 13a2 2 0 002 2h8a2 2 0 002-2l1-13"
+                          strokeWidth={2}
+                          d="M14 5l7 7m0 0l-7 7m7-7H3"
                         />
                       </svg>
-                    </button>
-                  </div>
-
-                  {/* Stats */}
-                  <div className="grid grid-cols-2 gap-4 mb-5">
-                    <div
-                      className="rounded-xl p-4 text-center
-                           bg-gradient-to-br from-slate-50 to-slate-100
-                           group-hover:from-blue-50 group-hover:to-blue-100
-                           transition-colors"
-                    >
-                      <p className="text-2xl font-extrabold text-slate-900">
-                        {election.positionsCount ?? 0}
-                      </p>
-                      <p className="text-xs uppercase tracking-wide text-slate-500">
-                        Positions
-                      </p>
                     </div>
-
-                    <div
-                      className="rounded-xl p-4 text-center
-                           bg-gradient-to-br from-slate-50 to-slate-100
-                           group-hover:from-indigo-50 group-hover:to-indigo-100
-                           transition-colors"
-                    >
-                      <p className="text-2xl font-extrabold text-slate-900">
-                        {election.candidatesCount ?? 0}
-                      </p>
-                      <p className="text-xs uppercase tracking-wide text-slate-500">
-                        Candidates
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Meta */}
-                  <div className="text-sm text-slate-500 mb-5 space-y-1">
-                    <p>
-                      <span className="font-medium text-slate-600">
-                        Created:
-                      </span>{" "}
-                      {election.createdAt
-                        ? new Date(election.createdAt).toLocaleDateString()
-                        : "—"}
-                    </p>
-                    <p>
-                      <span className="font-medium text-slate-600">
-                        Updated:
-                      </span>{" "}
-                      {election.updatedAt
-                        ? new Date(election.updatedAt).toLocaleDateString()
-                        : "—"}
-                    </p>
-                  </div>
-
-                  {/* Action */}
-                  <button
-                    onClick={() =>
-                      // FIXED: Use adminNavigate function
-                      navigate(
-                        `/${adminId}/candidate-dashboard/${election.documentId}`
-                      )
-                    }
-                    className="w-full py-2.5 rounded-xl
-                         bg-gradient-to-r from-blue-600 to-indigo-600
-                         text-white font-semibold
-                         hover:from-blue-700 hover:to-indigo-700
-                         active:scale-[0.98]
-                         transition-all duration-200
-                         shadow-md hover:shadow-xl"
-                  >
-                    Open Dashboard →
                   </button>
                 </div>
               </div>

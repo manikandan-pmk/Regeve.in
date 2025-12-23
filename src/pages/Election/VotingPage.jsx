@@ -44,8 +44,6 @@ const VotingPage = () => {
     election_status: "scheduled",
   });
 
-  // Add this line with your other useState declarations:
-  // Add this line with your other useState declarations:
   const [forceUpdate, setForceUpdate] = useState(0);
   const [tick, setTick] = useState(0);
   const [positions, setPositions] = useState([]);
@@ -389,16 +387,18 @@ const VotingPage = () => {
       return { positionsWithCandidates: [], electionData: null };
     }
   }, [documentId, getServerTime, calculateCountdown]);
-  // ADD THIS useEffect - place it after your existing useEffects but before handleVote function
+
+  // Force countdown update every second when active
   useEffect(() => {
     if (countdown.status === "active") {
       const timer = setInterval(() => {
-        setForceUpdate((prev) => prev + 1); // Force re-render every second
+        setForceUpdate((prev) => prev + 1);
+        updateCountdown();
       }, 1000);
 
       return () => clearInterval(timer);
     }
-  }, [countdown.status]);
+  }, [countdown.status, updateCountdown]);
 
   // Cleanup intervals on unmount
   useEffect(() => {
@@ -411,9 +411,9 @@ const VotingPage = () => {
       }
     };
   }, [timeInterval]);
-  // Add this useEffect - place it after your other useEffects but before the handleVote function
+
+  // Ensure countdown updates every second when pending
   useEffect(() => {
-    // Ensure countdown updates every second when pending
     if (countdown.status === "pending" && !isVerified) {
       const interval = setInterval(() => {
         updateCountdown();
@@ -822,6 +822,7 @@ const VotingPage = () => {
           JSON.stringify(updatedVotes)
         );
 
+        // Update positions state
         setPositions((prev) =>
           prev.map((pos) =>
             pos.id === positionId
@@ -848,15 +849,23 @@ const VotingPage = () => {
           [positionId]: true,
         }));
 
+        // Clear selection
         handleClearSelection(positionId);
 
-        // Show thank you popup
-        setTimeout(() => {
-          setShowThankYouPopup(true);
-        }, 300);
+        // Check if all votes completed
+        const allCompleted = checkIfCompletedAllVotes();
 
-        // Check if all positions are voted
-        checkIfCompletedAllVotes();
+        // Show popup after a short delay to allow state updates
+        setTimeout(() => {
+          if (!allCompleted) {
+            setShowThankYouPopup(true);
+
+            // Auto-close after 5 seconds
+            setTimeout(() => {
+              setShowThankYouPopup(false);
+            }, 5000);
+          }
+        }, 300);
       }
     } catch (error) {
       console.error("Error submitting vote:", error.response || error);
@@ -957,100 +966,261 @@ const VotingPage = () => {
 
   // Thank You Popup Component
   const ThankYouPopup = () => {
+    const remainingPositions = positions.filter(
+      (p) => !isPositionVoted(p.id)
+    ).length;
+
+    const totalPositions = positions.length;
+    const votedPositionsCount = totalPositions - remainingPositions;
+
     return (
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
         onClick={() => setShowThankYouPopup(false)}
       >
         <motion.div
           initial={{ scale: 0.8, y: 50 }}
           animate={{ scale: 1, y: 0 }}
-          transition={{ type: "spring", damping: 20 }}
-          className="bg-gradient-to-br from-emerald-50 via-white to-blue-50 rounded-2xl shadow-2xl max-w-md w-full overflow-hidden border border-emerald-200"
+          transition={{
+            type: "spring",
+            damping: 20,
+            stiffness: 200,
+          }}
+          className="bg-gradient-to-br from-white via-emerald-50 to-green-50 rounded-3xl shadow-2xl max-w-md w-full overflow-hidden border-2 border-emerald-300"
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="p-6 sm:p-8 text-center">
+          {/* Header with gradient */}
+          <div className="bg-gradient-to-r from-emerald-500 to-green-600 p-6 text-center relative overflow-hidden">
+            <div className="absolute inset-0 bg-white/10"></div>
             <motion.div
               initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              transition={{ delay: 0.2 }}
-              className="w-20 h-20 mx-auto bg-gradient-to-r from-emerald-500 to-green-500 rounded-full flex items-center justify-center mb-6 shadow-lg"
+              animate={{ scale: 1, rotate: 360 }}
+              transition={{ delay: 0.2, type: "spring" }}
+              className="w-24 h-24 mx-auto bg-white rounded-full flex items-center justify-center mb-4 relative z-10 shadow-xl"
             >
-              <CheckCircle className="w-10 h-10 text-white" />
+              <CheckCircle className="w-12 h-12 text-emerald-600" />
             </motion.div>
-
             <motion.h3
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3 }}
-              className="text-2xl font-bold text-gray-900 mb-2"
+              className="text-3xl font-bold text-white mb-2 relative z-10"
             >
-              Thank You for Voting!
+              Vote Submitted!
             </motion.h3>
-
             <motion.p
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.4 }}
+              className="text-emerald-100 font-medium relative z-10"
+            >
+              Your voice has been heard
+            </motion.p>
+          </div>
+
+          {/* Content */}
+          <div className="p-8 text-center">
+            <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.4 }}
-              className="text-gray-600 mb-6"
+              transition={{ delay: 0.5 }}
+              className="space-y-6"
             >
-              {currentVotedPosition
-                ? `Your vote for ${currentVotedPosition} has been recorded successfully.`
-                : "Your votes have been recorded successfully!"}
-            </motion.p>
+              {/* Vote Confirmation */}
+              <div className="space-y-2">
+                <div className="text-5xl">🎉</div>
+                <p className="text-gray-700 text-lg font-medium">
+                  {currentVotedPosition
+                    ? `Your vote for "${currentVotedPosition}" has been recorded successfully!`
+                    : "Your vote has been recorded successfully!"}
+                </p>
+              </div>
 
-            <div className="space-y-4">
-              <motion.button
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.5 }}
-                onClick={() => setShowThankYouPopup(false)}
-                className="w-full py-3 bg-gradient-to-r from-gray-600 to-gray-700 text-white rounded-lg font-bold text-lg shadow-lg hover:shadow-xl transition-all"
-              >
-                Continue Voting
-              </motion.button>
-            </div>
+              {/* Progress */}
+              <div className="bg-gray-50 rounded-2xl p-4 border border-gray-200">
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-sm font-medium text-gray-600">
+                    Voting Progress
+                  </span>
+                  <span className="text-sm font-bold text-emerald-600">
+                    {votedPositionsCount}/{totalPositions}
+                  </span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-3">
+                  <motion.div
+                    initial={{ width: 0 }}
+                    animate={{
+                      width: `${(votedPositionsCount / totalPositions) * 100}%`,
+                    }}
+                    transition={{ duration: 1, ease: "easeOut" }}
+                    className="bg-gradient-to-r from-emerald-500 to-green-500 h-3 rounded-full"
+                  />
+                </div>
+              </div>
+
+              {/* Remaining Positions Message */}
+              {remainingPositions > 0 ? (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.7 }}
+                  className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-xl border border-blue-200"
+                >
+                  <div className="flex items-center justify-center gap-3 mb-2">
+                    <AlertCircle className="w-5 h-5 text-blue-600" />
+                    <h4 className="font-bold text-blue-800">
+                      {remainingPositions} Position
+                      {remainingPositions > 1 ? "s" : ""} Remaining
+                    </h4>
+                  </div>
+                  <p className="text-blue-700 text-sm">
+                    Please continue voting for the remaining position
+                    {remainingPositions > 1 ? "s" : ""} to complete your ballot.
+                  </p>
+                  <div className="mt-3 text-xs text-blue-600 font-medium">
+                    ⚡ Your progress is saved automatically
+                  </div>
+                </motion.div>
+              ) : (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.7 }}
+                  className="bg-gradient-to-r from-emerald-50 to-green-50 p-4 rounded-xl border border-emerald-200"
+                >
+                  <div className="flex items-center justify-center gap-3 mb-2">
+                    <Trophy className="w-5 h-5 text-emerald-600" />
+                    <h4 className="font-bold text-emerald-800">
+                      🎊 Voting Complete!
+                    </h4>
+                  </div>
+                  <p className="text-emerald-700 text-sm">
+                    You have voted for all positions. Thank you for
+                    participating!
+                  </p>
+                  <div className="mt-3 text-xs text-emerald-600 font-medium">
+                    ✅ Your ballot has been submitted successfully
+                  </div>
+                </motion.div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="space-y-3 pt-4">
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => setShowThankYouPopup(false)}
+                  className="w-full py-3 bg-gradient-to-r from-emerald-600 to-green-600 text-white rounded-xl font-bold text-lg shadow-lg hover:shadow-xl transition-all duration-300"
+                >
+                  {remainingPositions > 0 ? "Continue Voting" : "View Summary"}
+                </motion.button>
+
+                {remainingPositions > 0 && (
+                  <button
+                    onClick={() => {
+                      setShowThankYouPopup(false);
+                      // Scroll to next unvoted position
+                      const nextPosition = positions.find(
+                        (p) => !isPositionVoted(p.id)
+                      );
+                      if (nextPosition) {
+                        setTimeout(() => {
+                          const element = document.getElementById(
+                            `position-${nextPosition.id}`
+                          );
+                          if (element) {
+                            element.scrollIntoView({
+                              behavior: "smooth",
+                              block: "center",
+                            });
+                          }
+                        }, 100);
+                      }
+                    }}
+                    className="w-full py-2 text-emerald-600 font-medium text-sm hover:text-emerald-700 transition-colors"
+                  >
+                    Jump to next position →
+                  </button>
+                )}
+              </div>
+            </motion.div>
           </div>
+
+          {/* Auto-close indicator */}
+          <motion.div
+            initial={{ width: "100%" }}
+            animate={{ width: "0%" }}
+            transition={{ duration: 5, ease: "linear" }}
+            className="h-1 bg-gradient-to-r from-emerald-400 to-green-400"
+          />
         </motion.div>
       </motion.div>
     );
   };
 
-  // Animated Number Component for Countdown
-  const AnimatedNumber = ({ value, label }) => {
+  // Pending Votes Notification Component
+  const PendingVotesNotification = () => {
+    const remainingPositions = positions.filter(
+      (p) => !isPositionVoted(p.id)
+    ).length;
+
+    if (remainingPositions === 0 || !hasVotingStarted || showThankYouPopup)
+      return null;
+
     return (
-      <div className="flex flex-col items-center">
-        <motion.div
-          key={value}
-          initial={{ scale: 0.8, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={{ type: "spring", stiffness: 300 }}
-          className="relative h-20 w-20 md:h-24 md:w-24"
-        >
-          <div className="absolute inset-0 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl shadow-lg flex items-center justify-center">
-            <span className="text-3xl md:text-4xl font-bold text-white">
-              {value.toString().padStart(2, "0")}
-            </span>
+      <motion.div
+        initial={{ opacity: 0, y: 100 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="fixed bottom-4 right-4 z-40"
+      >
+        <div className="bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-xl shadow-2xl p-4 max-w-sm">
+          <div className="flex items-center gap-3">
+            <div className="bg-white/20 p-2 rounded-lg">
+              <AlertCircle className="w-5 h-5" />
+            </div>
+            <div className="flex-1">
+              <h4 className="font-bold">Pending Votes</h4>
+              <p className="text-sm opacity-90">
+                {remainingPositions} position{remainingPositions > 1 ? "s" : ""}{" "}
+                remaining
+              </p>
+            </div>
+            <button
+              onClick={() => {
+                const nextPosition = positions.find(
+                  (p) => !isPositionVoted(p.id)
+                );
+                if (nextPosition) {
+                  const element = document.getElementById(
+                    `position-${nextPosition.id}`
+                  );
+                  if (element) {
+                    element.scrollIntoView({
+                      behavior: "smooth",
+                      block: "center",
+                    });
+                  }
+                }
+              }}
+              className="bg-white text-amber-600 px-3 py-1 rounded-lg text-sm font-bold hover:bg-gray-100 transition-colors"
+            >
+              Vote Now
+            </button>
           </div>
-        </motion.div>
-        <span className="mt-2 text-sm font-medium text-gray-600 uppercase tracking-wider">
-          {label}
-        </span>
-      </div>
+        </div>
+      </motion.div>
     );
   };
 
   // Full Screen Countdown Component
-  // Full Screen Countdown Component
-  // Fixed Full Screen Countdown Component with proper spacing
   const FullScreenCountdown = () => {
     return (
       <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-gradient-to-br from-blue-900 via-indigo-900 to-purple-900 text-white p-4 overflow-auto">
         {/* Main Container */}
-        <div className="w-full max-w-4xl text-center">
+        <div className="w-full max-w-4xl text-center mx-auto">
           {/* Heading */}
           <div className="mb-6">
             <h1 className="text-2xl md:text-4xl font-bold mb-2 px-4">
@@ -1061,10 +1231,9 @@ const VotingPage = () => {
             </p>
           </div>
 
-          {/* Large Countdown Timer - SIMPLE FIXED LAYOUT */}
+          {/* Large Countdown Timer */}
           <div className="mb-8 px-4">
-            {/* Single row for all time units */}
-            <div className="flex justify-center items-center space-x-1 md:space-x-2 lg:space-x-3">
+            <div className="flex justify-center items-center space-x-1 md:space-x-2 lg:space-x-3 mx-auto w-fit">
               {/* DAYS */}
               <div className="flex flex-col items-center">
                 <div className="w-16 h-16 md:w-20 md:h-20 bg-gradient-to-b from-blue-600 to-indigo-700 rounded-lg md:rounded-xl flex items-center justify-center shadow-lg border border-blue-500/30">
@@ -1231,60 +1400,69 @@ const VotingPage = () => {
           </div>
         </div>
       );
-    } // In VotingStatusBanner, find this section for "active" status
-    else if (countdown.status === "active") {
+    } else if (countdown.status === "active") {
       return (
         <div className="bg-gradient-to-r from-green-500 via-emerald-600 to-teal-600 text-white p-4 md:p-6 rounded-xl shadow-lg">
-          {/* ... existing code ... */}
-
-          <div className="flex items-center gap-3 md:gap-6">
-            {/* HOURS section - keep as is */}
-            <div className="text-center">
-              <div className="text-2xl md:text-3xl font-bold bg-white/20 rounded-lg px-3 py-2">
-                {countdown.hours.toString().padStart(2, "0")}
+          <div className="flex flex-col lg:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <div className="bg-white/20 p-3 rounded-xl">
+                <Zap className="w-6 h-6 md:w-8 md:h-8" />
               </div>
-              <div className="text-xs md:text-sm opacity-90 mt-1">
-                HOURS LEFT
-              </div>
-            </div>
-
-            <div className="text-gray-300 text-xl">:</div>
-
-            {/* MINUTES section - keep as is */}
-            <div className="text-center">
-              <div className="text-2xl md:text-3xl font-bold bg-white/20 rounded-lg px-3 py-2">
-                {countdown.minutes.toString().padStart(2, "0")}
-              </div>
-              <div className="text-xs md:text-sm opacity-90 mt-1">
-                MINUTES LEFT
+              <div>
+                <h3 className="font-bold text-lg md:text-xl mb-1">
+                  Voting is Active!
+                </h3>
+                <p className="text-green-100 text-sm">
+                  {electionData.electionName}
+                </p>
               </div>
             </div>
-
-            <div className="text-gray-300 text-xl">:</div>
-
-            {/* SECONDS section - REPLACE WITH THIS */}
-            <div className="text-center">
-              <motion.div
-                key={`seconds-${countdown.seconds}-${forceUpdate}`}
-                initial={{ scale: 0.9 }}
-                animate={{ scale: 1 }}
-                transition={{ duration: 0.3 }}
-                className="text-2xl md:text-3xl font-bold bg-white/20 rounded-lg px-3 py-2"
-              >
-                {countdown.seconds.toString().padStart(2, "0")}
-              </motion.div>
-              <div className="text-xs md:text-sm opacity-90 mt-1">
-                SECONDS LEFT
+            <div className="flex items-center gap-3 md:gap-6 justify-center">
+              {/* HOURS */}
+              <div className="text-center">
+                <motion.div
+                  key={`hours-${forceUpdate}`}
+                  initial={{ scale: 0.9 }}
+                  animate={{ scale: 1 }}
+                  className="text-2xl md:text-3xl font-bold bg-white/20 rounded-lg px-4 py-2"
+                >
+                  {countdown.hours.toString().padStart(2, "0")}
+                </motion.div>
+                <div className="text-xs md:text-sm opacity-90 mt-1">
+                  HOURS LEFT
+                </div>
+              </div>
+              <div className="text-gray-300 text-xl">:</div>
+              {/* MINUTES */}
+              <div className="text-center">
+                <motion.div
+                  key={`minutes-${forceUpdate}`}
+                  initial={{ scale: 0.9 }}
+                  animate={{ scale: 1 }}
+                  className="text-2xl md:text-3xl font-bold bg-white/20 rounded-lg px-4 py-2"
+                >
+                  {countdown.minutes.toString().padStart(2, "0")}
+                </motion.div>
+                <div className="text-xs md:text-sm opacity-90 mt-1">
+                  MINUTES LEFT
+                </div>
+              </div>
+              <div className="text-gray-300 text-xl">:</div>
+              {/* SECONDS */}
+              <div className="text-center">
+                <motion.div
+                  key={`seconds-${forceUpdate}`}
+                  initial={{ scale: 0.9 }}
+                  animate={{ scale: 1 }}
+                  className="text-2xl md:text-3xl font-bold bg-white/20 rounded-lg px-4 py-2"
+                >
+                  {countdown.seconds.toString().padStart(2, "0")}
+                </motion.div>
+                <div className="text-xs md:text-sm opacity-90 mt-1">
+                  SECONDS LEFT
+                </div>
               </div>
             </div>
-            {/* END OF REPLACEMENT */}
-
-            <button
-              onClick={() => setShowCountdownPopup(true)}
-              className="px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg font-medium transition-colors ml-4"
-            >
-              View Details
-            </button>
           </div>
         </div>
       );
@@ -1396,13 +1574,11 @@ const VotingPage = () => {
     return <FullScreenCountdown />;
   }
 
-  // If voting has ended and user is not verified
   // Phone verification required (only shown when voting is active)
   if (countdown.status === "active" && !isVerified) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-slate-50 flex items-center justify-center p-4">
         <div className="max-w-md w-full">
-          {/* SIMPLE HEADER - NO COUNTDOWN */}
           <div className="text-center mb-6">
             <div className="w-16 h-16 mx-auto bg-gradient-to-r from-green-500 to-emerald-600 rounded-full flex items-center justify-center mb-4">
               <Zap className="w-8 h-8 text-white" />
@@ -1410,9 +1586,6 @@ const VotingPage = () => {
             <h1 className="text-2xl font-bold text-gray-900 mb-2">
               Voting is Active!
             </h1>
-            {/* <p className="text-gray-600 text-sm">
-            Time remaining: <span className="font-semibold text-green-600">{formatTimeRemaining(countdown.totalSeconds)}</span>
-          </p> */}
           </div>
 
           {/* VERIFICATION FORM */}
@@ -1481,101 +1654,6 @@ const VotingPage = () => {
             </motion.button>
 
             <p className="text-gray-500 text-xs text-center mt-4">
-              Only verified participants can vote. Your phone number will be
-              verified against the election's participant list.
-            </p>
-          </motion.div>
-        </div>
-      </div>
-    );
-  }
-
-  // Phone verification required (only shown when voting is active)
-  // Phone verification required (only shown when voting is active)
-  if (countdown.status === "active" && !isVerified) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-slate-50 flex items-center justify-center p-4">
-        <div className="max-w-2xl w-full">
-          {/* SIMPLIFIED HEADER - Remove the detailed time info */}
-          <div className="bg-gradient-to-r from-green-500 via-emerald-600 to-teal-600 text-white p-6 rounded-xl shadow-lg mb-6">
-            <div className="text-center">
-              <div className="w-16 h-16 mx-auto bg-white/20 rounded-full flex items-center justify-center mb-4">
-                <Zap className="w-8 h-8" />
-              </div>
-              <h1 className="text-3xl font-bold mb-2">Voting is Active!</h1>
-              <p className="text-green-100">
-                Time remaining to vote:{" "}
-                {formatTimeRemaining(countdown.totalSeconds)}
-              </p>
-            </div>
-          </div>
-
-          {/* VERIFICATION FORM - Keep only essential */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100"
-          >
-            <div className="text-center mb-6">
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">
-                Verify Your Identity
-              </h2>
-              <p className="text-gray-600">
-                Enter your registered phone number to vote in
-              </p>
-              <p className="text-blue-600 font-semibold mt-1">
-                {electionData.electionName || "this election"}
-              </p>
-            </div>
-
-            {verificationError && (
-              <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="mb-6 p-3 bg-red-50 border border-red-200 rounded-lg"
-              >
-                <p className="text-red-600 text-sm">{verificationError}</p>
-              </motion.div>
-            )}
-
-            <div className="mb-6">
-              <label className="block text-gray-700 text-sm font-medium mb-2">
-                Registered Phone Number
-              </label>
-              <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden">
-                <div className="px-3 py-3 bg-gray-50">
-                  <Phone className="w-5 h-5 text-gray-500" />
-                </div>
-                <input
-                  type="tel"
-                  value={phoneNumber}
-                  maxLength={10}
-                  onChange={(e) => setPhoneNumber(e.target.value)}
-                  placeholder="Enter your 10-digit phone number"
-                  className="flex-1 px-3 py-3 border-0 focus:ring-0 focus:outline-none"
-                  disabled={verifying}
-                />
-              </div>
-            </div>
-
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={verifyPhoneNumber}
-              disabled={verifying}
-              className="w-full px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl font-semibold hover:from-blue-700 hover:to-indigo-700 transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {verifying ? (
-                <div className="flex items-center justify-center">
-                  <div className="w-5 h-5 border-t-2 border-white rounded-full animate-spin mr-2"></div>
-                  Verifying...
-                </div>
-              ) : (
-                "Verify Phone Number"
-              )}
-            </motion.button>
-
-            <p className="text-gray-500 text-sm text-center mt-6">
               Only verified participants can vote. Your phone number will be
               verified against the election's participant list.
             </p>
@@ -1735,9 +1813,10 @@ const VotingPage = () => {
                 const isVoted = isPositionVoted(position.id);
                 const isViewing = viewingPosition === position.id;
 
-                return (
+                return (  
                   <motion.div
                     key={position.id}
+                     id={`position-${position.id}`}
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: positionIndex * 0.1 }}
@@ -1748,6 +1827,7 @@ const VotingPage = () => {
                     }`}
                   >
                     {/* Position Header */}
+                    {/* Position Header */}
                     <div
                       className={`px-6 py-4 transition-all duration-300 ${
                         isVoted
@@ -1755,7 +1835,8 @@ const VotingPage = () => {
                           : "bg-gradient-to-r from-blue-50/80 to-white"
                       }`}
                     >
-                      <div className="flex items-center justify-between">
+                      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                        {/* Position Info - Left Side */}
                         <div className="flex items-center gap-3">
                           <div
                             className={`w-10 h-10 rounded-lg flex items-center justify-center ${
@@ -1781,7 +1862,15 @@ const VotingPage = () => {
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-3">
+                        {/* Action Buttons - Dynamic Positioning */}
+                        <div
+                          className={`flex items-center gap-3 w-full md:w-auto ${
+                            isViewing
+                              ? "justify-end" // Right aligned when viewing
+                              : "justify-end"
+                          }`}
+                        >
+                          {/* Submit Vote Button */}
                           {!viewOnly && !isVoted && hasSelected && (
                             <button
                               onClick={() =>
@@ -1793,28 +1882,31 @@ const VotingPage = () => {
                             </button>
                           )}
 
+                          {/* View/Close Buttons */}
                           {isVoted && (
-                            <div className="flex items-center justify-center gap-3">
+                            <>
                               {isViewing ? (
                                 <button
                                   onClick={() => setViewingPosition(null)}
-                                  className="px-4 py-2 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-lg font-medium shadow hover:shadow-md flex items-center gap-1"
+                                  className="px-4 py-2 sm:px-5 sm:py-2.5 bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 text-white rounded-xl font-bold shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center gap-2 group -mt-1 sm:mt-0"
                                 >
-                                  <X className="w-4 h-4" />
-                                  Close View
+                                  <X className="w-4 h-4 sm:w-5 sm:h-5 transition-transform group-hover:scale-110" />
+                                  <span className="text-sm sm:text-base">
+                                    Close View
+                                  </span>
                                 </button>
                               ) : (
                                 <button
                                   onClick={() => {
                                     setViewingPosition(position.id);
                                   }}
-                                  className="px-4 py-2 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-lg font-medium shadow hover:shadow-md flex items-center justify-center gap-2"
+                                  className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl font-bold shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center gap-2 group"
                                 >
-                                  <BarChart3 className="w-4 h-4" />
-                                  View Votes
+                                  <BarChart3 className="w-5 h-5 transition-transform group-hover:scale-110" />
+                                  <span>View Votes</span>
                                 </button>
                               )}
-                            </div>
+                            </>
                           )}
                         </div>
                       </div>
@@ -1831,7 +1923,17 @@ const VotingPage = () => {
                               : ""
                           }`}
                         >
-                          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                          <div
+                            className={`grid grid-cols-2 gap-3 sm:gap-4 ${
+                              position.candidates.length === 1
+                                ? "max-w-xs mx-auto grid-cols-1"
+                                : position.candidates.length === 2
+                                ? "sm:grid-cols-2"
+                                : position.candidates.length === 3
+                                ? "sm:grid-cols-2 lg:grid-cols-3"
+                                : "sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+                            }`}
+                          >
                             {position.candidates.map(
                               (candidate, candidateIndex) => {
                                 const isWinner =
@@ -1851,45 +1953,49 @@ const VotingPage = () => {
                                         : "border-gray-200 bg-white"
                                     }`}
                                   >
-                                    <div className="p-4">
-                                      {/* Profile Photo */}
-                                      <div className="relative mb-3">
-                                        <div className="w-24 h-24 mx-auto rounded-xl overflow-hidden border-2 shadow-lg">
+                                    <div className="p-5">
+                                      {/* Profile Photo with Better Styling */}
+                                      <div className="relative mb-4">
+                                        <div className="w-28 h-28 mx-auto rounded-2xl overflow-hidden border-3 shadow-xl border-white ring-2 ring-offset-2 ring-blue-100">
                                           {candidate.photoUrl ? (
                                             <img
                                               src={candidate.photoUrl}
                                               alt={candidate.name}
-                                              className="w-full h-full object-cover"
+                                              className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
                                             />
                                           ) : (
-                                            <div className="w-full h-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
-                                              <span className="text-white text-2xl font-bold">
+                                            <div className="w-full h-full bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-600 flex items-center justify-center">
+                                              <span className="text-white text-3xl font-bold">
                                                 {getInitials(candidate.name)}
                                               </span>
                                             </div>
                                           )}
                                         </div>
 
-                                        {/* Winner Badge */}
+                                        {/* Winner Badge - Improved */}
                                         {isViewing &&
                                           isWinner &&
                                           showResults && (
-                                            <div className="absolute top-0 right-0 bg-gradient-to-r from-amber-500 to-yellow-600 rounded-full p-2 shadow-lg">
-                                              <Crown className="w-4 h-4 text-white" />
+                                            <div className="absolute -top-2 -right-2 bg-gradient-to-r from-amber-500 to-yellow-500 rounded-full p-3 shadow-2xl animate-pulse">
+                                              <Crown className="w-5 h-5 text-white" />
                                             </div>
                                           )}
                                       </div>
 
-                                      {/* Candidate Info */}
+                                      {/* Candidate Info - Improved */}
                                       <div className="text-center">
-                                        <h4 className="font-bold text-gray-900 text-base mb-1 truncate">
+                                        <h4 className="font-bold text-gray-900 text-lg mb-2 line-clamp-1">
                                           {candidate.name}
                                         </h4>
 
-                                        <div className="mb-3">
-                                          <span className="bg-gradient-to-r from-gray-100 to-gray-200 rounded-full px-3 py-1 text-sm font-bold">
-                                            {candidate.votes} votes
-                                          </span>
+                                        {/* Votes Display - More Prominent */}
+                                        <div className="mb-4">
+                                          <div className="inline-flex items-center gap-2 bg-gradient-to-r from-blue-50 to-indigo-50 px-4 py-2 rounded-full border border-blue-100">
+                                            <BarChart3 className="w-4 h-4 text-blue-600" />
+                                            <span className="font-bold text-blue-700 text-base">
+                                              {candidate.votes} votes
+                                            </span>
+                                          </div>
                                         </div>
                                       </div>
                                     </div>
@@ -1901,7 +2007,17 @@ const VotingPage = () => {
                         </div>
                       ) : (
                         // Pre-vote view
-                        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                        <div
+                          className={`flex flex-wrap justify-center gap-4 ${
+                            position.candidates.length === 1
+                              ? "max-w-xs mx-auto"
+                              : position.candidates.length === 2
+                              ? "grid grid-cols-1 sm:grid-cols-2"
+                              : position.candidates.length === 3
+                              ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"
+                              : "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+                          }`}
+                        >
                           {position.candidates.map(
                             (candidate, candidateIndex) => {
                               const isSelected = candidate.selected;

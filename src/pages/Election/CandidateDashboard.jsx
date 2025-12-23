@@ -50,6 +50,8 @@ const CandidateDashboard = () => {
   const [timeLeft, setTimeLeft] = useState(null);
   const [electionStatus, setElectionStatus] = useState(null);
   const [dashboardRefreshKey, setDashboardRefreshKey] = useState(0);
+  const [declaringWinner, setDeclaringWinner] = useState(false);
+  const [celebratingWinner, setCelebratingWinner] = useState(false);
 
   // Add these state variables alongside your existing ones
   const [startDate, setStartDate] = useState("");
@@ -58,6 +60,11 @@ const CandidateDashboard = () => {
   const [endDate, setEndDate] = useState("");
   const [endHour, setEndHour] = useState("17");
   const [endMinute, setEndMinute] = useState("00");
+
+  const reloadRef = useRef({
+    started: false,
+    ended: false,
+  });
 
   const [formData, setFormData] = useState({
     name: "",
@@ -77,7 +84,6 @@ const CandidateDashboard = () => {
   const addSectionRef = useRef(null);
   const winnerPopupRef = useRef(null);
   const deleteSectionModalRef = useRef(null);
-  const hasReloadedOnActive = useRef(false);
 
   const [electionMeta, setElectionMeta] = useState({
     electionName: "",
@@ -167,19 +173,15 @@ const CandidateDashboard = () => {
   }, [fieldFocus]);
 
   // Fetch sections from backend
-  // In CandidateDashboard.jsx, replace the fetchElectionMeta function with:
-
   useEffect(() => {
     if (!electionDocumentId) return;
 
     const fetchElectionMeta = async () => {
       try {
-        // Fetch all elections and filter by documentId
         const res = await axiosInstance.get(
           `/election-names/${electionDocumentId}`
         );
 
-        // Find the election with matching documentId
         const election = res.data?.data;
 
         if (!election) {
@@ -190,9 +192,9 @@ const CandidateDashboard = () => {
         }
 
         setElectionMeta({
-          electionName: election.Election_Name || "",
-          electionType: election.Election_Type || "",
-          electionCategory: election.Election_Category || "",
+          electionName: election.Election_Name,
+          electionType: election.Election_Type,
+          electionCategory: election.Election_Category,
           start_time: election.start_time,
           end_time: election.end_time,
           election_status: election.election_status,
@@ -207,52 +209,102 @@ const CandidateDashboard = () => {
     fetchElectionMeta();
   }, [electionDocumentId]);
 
+  const refetchElectionMeta = async () => {
+    const res = await axiosInstance.get(
+      `/election-names/${electionDocumentId}`
+    );
+    const election = res.data?.data;
+    setElectionMeta({
+      electionName: election.Election_Name,
+      electionType: election.Election_Type,
+      electionCategory: election.Election_Category,
+      start_time: election.start_time,
+      end_time: election.end_time,
+      election_status: election.election_status,
+    });
+  };
+
   useEffect(() => {
     if (!electionMeta.election_status) return;
     setElectionStatus(electionMeta.election_status);
   }, [electionMeta.election_status]);
 
-  // ⏱ LIVE COUNTDOWN TIMER (THIS WAS MISSING)
   useEffect(() => {
     if (!electionMeta.start_time || !electionMeta.end_time) return;
+    if (!electionDocumentId) return;
+
+    const START_KEY = `election_${electionDocumentId}_start_reloaded`;
+    const END_KEY = `election_${electionDocumentId}_end_reloaded`;
 
     const interval = setInterval(() => {
       const now = Date.now();
       const start = new Date(electionMeta.start_time).getTime();
       const end = new Date(electionMeta.end_time).getTime();
 
+      // ⏳ BEFORE START
       if (now < start) {
         const diff = start - now;
-
         const h = Math.floor(diff / (1000 * 60 * 60));
         const m = Math.floor((diff / (1000 * 60)) % 60);
         const s = Math.floor((diff / 1000) % 60);
 
-        setElectionStatus("scheduled");
-        setTimeLeft(`Starts in ${h}h ${m}m ${s}s`);
+        if (diff <= 1000) {
+          setTimeLeft("Starting...");
+
+          if (!sessionStorage.getItem(START_KEY)) {
+            sessionStorage.setItem(START_KEY, "true");
+            clearInterval(interval);
+
+            setTimeout(() => {
+              window.location.reload();
+            }, 1500);
+          }
+        } else {
+          setTimeLeft(`Starts in ${h}h ${m}m ${s}s`);
+        }
         return;
       }
 
+      // 🟢 ACTIVE
       if (now >= start && now < end) {
         const diff = end - now;
-
         const h = Math.floor(diff / (1000 * 60 * 60));
         const m = Math.floor((diff / (1000 * 60)) % 60);
         const s = Math.floor((diff / 1000) % 60);
 
-        setElectionStatus("active");
         setTimeLeft(`Ends in ${h}h ${m}m ${s}s`);
         return;
       }
 
-      setElectionStatus("ended");
-      setTimeLeft("Election Ended");
-      hasReloadedOnActive.current = false; // reset for restart
-      clearInterval(interval);
+      // 🔴 ENDED → reload ONCE per election
+      if (now >= end) {
+        setTimeLeft("Election Ended");
+
+        if (!sessionStorage.getItem(END_KEY)) {
+          sessionStorage.setItem(END_KEY, "true");
+          clearInterval(interval);
+
+          setTimeout(() => {
+            window.location.reload();
+          }, 1500);
+        }
+      }
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [electionMeta.start_time, electionMeta.end_time]);
+  }, [electionMeta.start_time, electionMeta.end_time, electionDocumentId]);
+
+  useEffect(() => {
+    if (!electionDocumentId) return;
+
+    const START_KEY = `election_${electionDocumentId}_start_reloaded`;
+    const END_KEY = `election_${electionDocumentId}_end_reloaded`;
+
+    // If page loaded AFTER a reload-trigger
+    if (sessionStorage.getItem(START_KEY)) {
+      sessionStorage.removeItem(START_KEY);
+    }
+  }, [electionDocumentId]);
 
   // Click outside to close modals
   useEffect(() => {
@@ -493,13 +545,9 @@ const CandidateDashboard = () => {
     try {
       let photoId = null;
 
-      // Upload photo if exists
-      // In handleSubmit function, update the photo upload section:
-      // Add this at the beginning of handleSubmit to debug
       console.log("Token exists:", !!localStorage.getItem("jwt"));
       console.log("Token:", localStorage.getItem("jwt"));
 
-      // And modify the upload section:
       if (photo) {
         const fd = new FormData();
         fd.append("files", photo);
@@ -659,6 +707,13 @@ const CandidateDashboard = () => {
         end_time: endUTC,
       });
 
+      // 🔐 RESET reload guards HERE
+      const START_KEY = `election_${electionDocumentId}_start_reloaded`;
+      const END_KEY = `election_${electionDocumentId}_end_reloaded`;
+
+      sessionStorage.removeItem(START_KEY);
+      sessionStorage.removeItem(END_KEY);
+
       showAlert(
         "success",
         electionStatus === "ended"
@@ -667,7 +722,7 @@ const CandidateDashboard = () => {
       );
 
       setShowStartElection(false);
-      window.location.reload();
+      await refetchElectionMeta(); // 👈 ADD HERE
     } catch (err) {
       showAlert(
         "error",
@@ -808,13 +863,21 @@ const CandidateDashboard = () => {
 
   const handleDeclareWinnerBackend = async (sectionId) => {
     try {
+      setDeclaringWinner(true);
+      setCelebratingWinner(true);
+
+      // Start celebration animation
+      setTimeout(() => {
+        setCelebratingWinner(false);
+      }, 3000);
+
       await axiosInstance.post("/election-winners/declare", {
         adminId: Number(adminId),
         electionId: electionDocumentId, // documentId string
         positionId: Number(sectionId),
       });
 
-      showAlert("success", "Winner declared successfully");
+      showAlert("success", "🎉 Winner declared successfully!");
 
       await fetchSections(); // refresh UI
       setDashboardRefreshKey((prev) => prev + 1);
@@ -824,6 +887,8 @@ const CandidateDashboard = () => {
         "error",
         err.response?.data?.message || "Failed to declare winner"
       );
+    } finally {
+      setDeclaringWinner(false);
     }
   };
 
@@ -839,6 +904,24 @@ const CandidateDashboard = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-3 sm:p-4 md:p-6 lg:p-8">
+      {/* Celebration Animation Overlay */}
+      {celebratingWinner && (
+        <div className="fixed inset-0 z-[9999] pointer-events-none">
+          <div className="absolute inset-0 bg-gradient-to-br from-yellow-400/20 to-emerald-400/20 animate-pulse"></div>
+          <div className="absolute top-1/4 left-1/2 transform -translate-x-1/2">
+            <div className="animate-bounce text-6xl">🏆</div>
+          </div>
+          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
+            <div className="text-4xl font-bold text-center bg-gradient-to-r from-yellow-600 via-amber-500 to-yellow-600 bg-clip-text text-transparent animate-glow">
+              WINNER DECLARED!
+            </div>
+          </div>
+          <div className="absolute bottom-1/4 left-1/2 transform -translate-x-1/2">
+            <div className="animate-float text-5xl">🎉</div>
+          </div>
+        </div>
+      )}
+
       {/* Alert Message Container */}
       {message && (
         <div
@@ -887,7 +970,7 @@ const CandidateDashboard = () => {
         <div className="mb-6 flex justify-between items-center">
           <button
             onClick={() => adminNavigate(navigate, "/electionhome")}
-            className="inline-flex items-center gap-2 text-slate-600 hover:text-blue-600 transition-colors duration-200 group"
+            className="inline-flex items-center gap-2 text-slate-600 hover:text-blue-600 transition-colors duration-200 group animate-fadeIn"
           >
             <svg
               className="w-4 h-4 transform group-hover:-translate-x-1 transition-transform duration-200"
@@ -910,7 +993,7 @@ const CandidateDashboard = () => {
                 `/${adminId}/participant-dashboard/${electionDocumentId}`
               )
             }
-            className="flex items-center justify-center gap-2 bg-gradient-to-r from-amber-500 to-amber-600 text-white px-6 py-3 rounded-xl hover:from-amber-600 hover:to-amber-700 transition-all duration-200 font-semibold shadow-lg hover:shadow-xl min-w-[160px]"
+            className="flex items-center justify-center gap-2 bg-gradient-to-r from-amber-500 to-amber-600 text-white px-6 py-3 rounded-xl hover:from-amber-600 hover:to-amber-700 transition-all duration-200 font-semibold shadow-lg hover:shadow-xl min-w-[160px] animate-pulse hover:animate-none"
           >
             <svg
               className="w-5 h-5"
@@ -930,64 +1013,78 @@ const CandidateDashboard = () => {
         </div>
 
         {/* Main Dashboard Card */}
-        <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-6 mb-8">
+        <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-6 mb-8 animate-scaleIn">
           <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
             {/* Election Info */}
             <div className="flex-1">
               <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-3">
                 <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                  <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
                   <span className="text-sm font-semibold text-slate-600 uppercase tracking-wide">
                     {electionMeta.electionCategory}
                   </span>
                 </div>
                 <div className="w-px h-4 bg-slate-300"></div>
-                <span className="text-sm font-semibold text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full">
+                <span className="text-sm font-semibold text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full hover:scale-105 transition-transform duration-200">
                   {totalCandidates} Candidate{totalCandidates !== 1 ? "s" : ""}
                 </span>
                 <div className="w-px h-4 bg-slate-300"></div>
-                <span className="text-sm font-semibold text-blue-600 bg-blue-50 px-3 py-1 rounded-full">
+                <span className="text-sm font-semibold text-blue-600 bg-blue-50 px-3 py-1 rounded-full hover:scale-105 transition-transform duration-200">
                   {sections.length} Position{sections.length !== 1 ? "s" : ""}
                 </span>
               </div>
 
               <div className="flex flex-wrap items-center gap-3 mb-3">
                 {/* Election Name */}
-                <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">
+                <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 bg-gradient-to-r from-slate-900 to-blue-900 bg-clip-text text-transparent">
                   {electionMeta.electionName}
                 </h1>
 
                 {/* Status Badge */}
                 {electionStatus && (
                   <span
-                    className={`inline-flex items-center gap-2 text-xs sm:text-sm font-semibold px-3 py-1 rounded-full
+                    className={`inline-flex items-center gap-2 text-xs sm:text-sm font-semibold px-3 py-1 rounded-full animate-bounceIn
         ${
           electionStatus === "active"
-            ? "bg-emerald-100 text-emerald-700"
+            ? "bg-emerald-100 text-emerald-700 border border-emerald-300"
             : electionStatus === "scheduled"
-            ? "bg-yellow-100 text-yellow-700"
-            : "bg-red-100 text-red-700"
+            ? "bg-yellow-100 text-yellow-700 border border-yellow-300"
+            : "bg-red-100 text-red-700 border border-red-300"
         }`}
                   >
-                    {electionStatus === "active" && "🟢 Active"}
-                    {electionStatus === "scheduled" && "🟡 Scheduled"}
-                    {electionStatus === "ended" && "🔴 Ended"}
+                    <span
+                      className={`w-2 h-2 rounded-full ${
+                        electionStatus === "active"
+                          ? "bg-emerald-500 animate-pulse"
+                          : electionStatus === "scheduled"
+                          ? "bg-yellow-500"
+                          : "bg-red-500"
+                      }`}
+                    ></span>
+                    {electionStatus === "active" && "Active"}
+                    {electionStatus === "scheduled" && "Scheduled"}
+                    {electionStatus === "ended" && "Ended"}
                   </span>
                 )}
 
                 {/* Timer */}
                 {timeLeft && (
-                  <span className="inline-flex items-center gap-2 text-xs sm:text-sm font-semibold px-3 py-1 rounded-full bg-yellow-50 border border-yellow-200 text-yellow-700">
-                    ⏱ {timeLeft}
+                  <span className="inline-flex items-center gap-2 text-xs sm:text-sm font-semibold px-3 py-1 rounded-full bg-gradient-to-r from-yellow-50 to-amber-50 border border-yellow-200 text-yellow-700 animate-pulse">
+                    <svg
+                      className="w-4 h-4"
+                      fill="currentColor"
+                      viewBox="0 0 20 20"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                    {timeLeft}
                   </span>
                 )}
               </div>
-
-              {electionStatus === "ended" && (
-                <div className="mt-3 inline-flex items-center gap-2 px-4 py-2 bg-red-50 border border-red-200 rounded-lg text-red-700 font-semibold">
-                  ❌ Election Ended
-                </div>
-              )}
 
               <p className="text-slate-600 text-lg">
                 {electionMeta.electionType} • Candidate Management
@@ -999,14 +1096,33 @@ const CandidateDashboard = () => {
               {electionStatus === "scheduled" && (
                 <button
                   onClick={() => setShowStartElection(true)}
-                  className={`flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-semibold shadow-lg min-w-[160px]
+                  className={`flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-semibold shadow-lg min-w-[160px] hover:scale-105 transition-all duration-300
     ${
       electionStarted
         ? "bg-slate-300 text-slate-600 cursor-not-allowed"
-        : "bg-gradient-to-r from-emerald-500 to-emerald-600 text-white hover:from-emerald-600 hover:to-emerald-700"
+        : "bg-gradient-to-r from-emerald-500 to-emerald-600 text-white hover:from-emerald-600 hover:to-emerald-700 hover:shadow-xl"
     }`}
                 >
-                  ▶ Start Election
+                  <svg
+                    className="w-5 h-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"
+                    />
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
+                  </svg>
+                  Start Election
                 </button>
               )}
               {electionStatus === "active" && (
@@ -1020,11 +1136,24 @@ const CandidateDashboard = () => {
                     );
 
                     showAlert("success", "Election ended successfully");
-                    window.location.reload();
+                    await refetchElectionMeta();
                   }}
-                  className="flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-semibold bg-red-600 text-white hover:bg-red-700 shadow-lg"
+                  className="flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-semibold bg-gradient-to-r from-red-500 to-red-600 text-white hover:from-red-600 hover:to-red-700 shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300"
                 >
-                  ⛔ End Election
+                  <svg
+                    className="w-5 h-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+                    />
+                  </svg>
+                  End Election
                 </button>
               )}
               {electionStatus === "ended" && (
@@ -1034,15 +1163,28 @@ const CandidateDashboard = () => {
                   }}
                   className="flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-semibold
     bg-gradient-to-r from-blue-500 to-indigo-600 text-white
-    hover:from-blue-600 hover:to-indigo-700 shadow-lg min-w-[160px]"
+    hover:from-blue-600 hover:to-indigo-700 shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300 min-w-[160px]"
                 >
-                  🔁 Restart Election
+                  <svg
+                    className="w-5 h-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                    />
+                  </svg>
+                  Restart Election
                 </button>
               )}
 
               <button
                 onClick={() => setShowAddSection(true)}
-                className="flex items-center justify-center gap-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white px-4 sm:px-6 py-3 rounded-xl hover:from-blue-600 hover:to-blue-700 transition-all duration-200 font-semibold shadow-lg w-full xs:w-auto hover:shadow-xl min-w-[160px]"
+                className="flex items-center justify-center gap-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white px-4 sm:px-6 py-3 rounded-xl hover:from-blue-600 hover:to-blue-700 transition-all duration-300 font-semibold shadow-lg w-full xs:w-auto hover:shadow-xl hover:scale-105 min-w-[160px]"
               >
                 <svg
                   className="w-5 h-5"
@@ -1062,11 +1204,12 @@ const CandidateDashboard = () => {
             </div>
           </div>
         </div>
+
         {showStartElection && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-            <div className="w-full max-w-lg rounded-2xl bg-white shadow-xl border border-slate-200">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 animate-fadeIn">
+            <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl border border-slate-200 animate-scaleIn">
               {/* Header */}
-              <div className="px-6 py-5 border-b border-slate-200 flex items-center justify-between">
+              <div className="px-6 py-5 border-b border-slate-200 flex items-center justify-between bg-gradient-to-r from-emerald-50 to-white">
                 <div>
                   <h2 className="text-xl font-bold text-slate-900">
                     Schedule Election
@@ -1077,7 +1220,7 @@ const CandidateDashboard = () => {
                 </div>
                 <button
                   onClick={() => setShowStartElection(false)}
-                  className="text-slate-400 hover:text-slate-600 text-xl"
+                  className="w-8 h-8 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg transition-colors duration-200 flex items-center justify-center hover:rotate-90 transition-transform"
                 >
                   ✕
                 </button>
@@ -1099,8 +1242,7 @@ const CandidateDashboard = () => {
                         setStartDate(e.target.value);
                         updateStartTime(e.target.value, startHour, startMinute);
                       }}
-                      className="w-full rounded-lg border border-slate-300 px-4 py-3
-                focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500"
+                      className="w-full rounded-lg border border-slate-300 px-4 py-3 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500 transition-all duration-300 hover:border-emerald-400"
                       min={getCurrentDate()}
                     />
                   </div>
@@ -1121,8 +1263,7 @@ const CandidateDashboard = () => {
                             startMinute
                           );
                         }}
-                        className="w-full rounded-lg border border-slate-300 px-4 py-3
-                  focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500"
+                        className="w-full rounded-lg border border-slate-300 px-4 py-3 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500 transition-all duration-300 hover:border-emerald-400"
                       >
                         {Array.from({ length: 24 }, (_, i) =>
                           i.toString().padStart(2, "0")
@@ -1143,8 +1284,7 @@ const CandidateDashboard = () => {
                           setStartMinute(e.target.value);
                           updateStartTime(startDate, startHour, e.target.value);
                         }}
-                        className="w-full rounded-lg border border-slate-300 px-4 py-3
-                  focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500"
+                        className="w-full rounded-lg border border-slate-300 px-4 py-3 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500 transition-all duration-300 hover:border-emerald-400"
                       >
                         {Array.from({ length: 60 }, (_, i) =>
                           i.toString().padStart(2, "0")
@@ -1172,8 +1312,7 @@ const CandidateDashboard = () => {
                         setEndDate(e.target.value);
                         updateEndTime(e.target.value, endHour, endMinute);
                       }}
-                      className="w-full rounded-lg border border-slate-300 px-4 py-3
-                focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500"
+                      className="w-full rounded-lg border border-slate-300 px-4 py-3 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500 transition-all duration-300 hover:border-emerald-400"
                       min={startDate || getCurrentDate()}
                     />
                   </div>
@@ -1190,8 +1329,7 @@ const CandidateDashboard = () => {
                           setEndHour(e.target.value);
                           updateEndTime(endDate, e.target.value, endMinute);
                         }}
-                        className="w-full rounded-lg border border-slate-300 px-4 py-3
-                  focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500"
+                        className="w-full rounded-lg border border-slate-300 px-4 py-3 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500 transition-all duration-300 hover:border-emerald-400"
                       >
                         {Array.from({ length: 24 }, (_, i) =>
                           i.toString().padStart(2, "0")
@@ -1212,8 +1350,7 @@ const CandidateDashboard = () => {
                           setEndMinute(e.target.value);
                           updateEndTime(endDate, endHour, e.target.value);
                         }}
-                        className="w-full rounded-lg border border-slate-300 px-4 py-3
-                  focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500"
+                        className="w-full rounded-lg border border-slate-300 px-4 py-3 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500 transition-all duration-300 hover:border-emerald-400"
                       >
                         {Array.from({ length: 60 }, (_, i) =>
                           i.toString().padStart(2, "0")
@@ -1229,18 +1366,33 @@ const CandidateDashboard = () => {
 
                 {/* Info Messages */}
                 <div className="space-y-1">
-                  <p className="text-xs text-slate-500">
-                    • Start must be at least 10 minutes from now
+                  <p className="text-xs text-slate-500 flex items-center gap-1">
+                    <span className="w-1 h-1 bg-emerald-500 rounded-full"></span>
+                    Start must be at least 10 minutes from now
                   </p>
-                  <p className="text-xs text-slate-500">
-                    • End must be after the start time
+                  <p className="text-xs text-slate-500 flex items-center gap-1">
+                    <span className="w-1 h-1 bg-emerald-500 rounded-full"></span>
+                    End must be after the start time
                   </p>
                 </div>
 
                 {/* Validation Error */}
                 {validateElectionTimeUI(startTime, endTime) && (
-                  <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 font-medium">
-                    ⚠ {validateElectionTimeUI(startTime, endTime)}
+                  <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 font-medium animate-shake">
+                    <div className="flex items-center gap-2">
+                      <svg
+                        className="w-5 h-5"
+                        fill="currentColor"
+                        viewBox="0 0 20 20"
+                      >
+                        <path
+                          fillRule="evenodd"
+                          d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
+                      {validateElectionTimeUI(startTime, endTime)}
+                    </div>
                   </div>
                 )}
               </div>
@@ -1249,8 +1401,7 @@ const CandidateDashboard = () => {
               <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-slate-200">
                 <button
                   onClick={() => setShowStartElection(false)}
-                  className="rounded-lg border border-slate-300 px-5 py-2.5
-            text-slate-700 font-semibold hover:bg-slate-50"
+                  className="rounded-lg border border-slate-300 px-5 py-2.5 text-slate-700 font-semibold hover:bg-slate-50 transition-all duration-300 hover:scale-105"
                 >
                   Cancel
                 </button>
@@ -1261,11 +1412,11 @@ const CandidateDashboard = () => {
                     startingElection ||
                     !!validateElectionTimeUI(startTime, endTime)
                   }
-                  className={`rounded-lg px-5 py-2.5 font-semibold text-white
+                  className={`rounded-lg px-5 py-2.5 font-semibold text-white transition-all duration-300 hover:scale-105
             ${
               startingElection || validateElectionTimeUI(startTime, endTime)
                 ? "bg-slate-300 cursor-not-allowed"
-                : "bg-emerald-600 hover:bg-emerald-700"
+                : "bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 hover:shadow-lg"
             }`}
                 >
                   {startingElection
@@ -1283,13 +1434,13 @@ const CandidateDashboard = () => {
 
         {/* Add Section Modal */}
         {showAddSection && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
             <div
               ref={addSectionRef}
-              className="bg-white rounded-2xl shadow-2xl w-[95vw] max-w-md mx-2 p-4 sm:p-6"
+              className="bg-white rounded-2xl shadow-2xl w-[95vw] max-w-md mx-2 p-4 sm:p-6 animate-scaleIn"
             >
               <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                <div className="w-10 h-10 bg-gradient-to-br from-blue-100 to-blue-200 rounded-lg flex items-center justify-center animate-pulse">
                   <svg
                     className="w-5 h-5 text-blue-600"
                     fill="none"
@@ -1319,7 +1470,7 @@ const CandidateDashboard = () => {
                 value={newSectionName}
                 onChange={(e) => setNewSectionName(e.target.value)}
                 placeholder="Enter position name (e.g., President, Secretary)"
-                className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 mb-4 text-sm"
+                className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 mb-4 text-sm transition-all duration-300 hover:border-blue-400"
                 onKeyPress={(e) => e.key === "Enter" && handleAddSection()}
               />
 
@@ -1329,13 +1480,13 @@ const CandidateDashboard = () => {
                     setShowAddSection(false);
                     setNewSectionName("");
                   }}
-                  className="flex-1 px-4 py-2.5 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 font-medium"
+                  className="flex-1 px-4 py-2.5 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 font-medium transition-all duration-300 hover:scale-105"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleAddSection}
-                  className="flex-1 px-4 py-2.5 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:from-blue-600 hover:to-blue-700 font-medium"
+                  className="flex-1 px-4 py-2.5 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:from-blue-600 hover:to-blue-700 font-medium transition-all duration-300 hover:scale-105 hover:shadow-lg"
                 >
                   Create Position
                 </button>
@@ -1346,18 +1497,25 @@ const CandidateDashboard = () => {
 
         {/* Loading State */}
         {isFetchingCandidates && (
-          <div className="mb-6 text-center py-8">
-            <div className="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-600 mb-2"></div>
-            <p className="text-slate-600">Loading candidates...</p>
+          <div className="mb-6 text-center py-8 animate-fadeIn">
+            <div className="inline-flex flex-col items-center">
+              <div className="relative">
+                <div className="w-16 h-16 border-4 border-blue-200 rounded-full"></div>
+                <div className="absolute top-0 left-0 w-16 h-16 border-4 border-blue-600 rounded-full border-t-transparent animate-spin"></div>
+              </div>
+              <p className="text-slate-600 mt-4 font-medium animate-pulse">
+                Loading candidates...
+              </p>
+            </div>
           </div>
         )}
 
         {/* Sections with Candidates */}
-        <div className="space-y-6">
+        <div className="space-y-6 animate-fadeIn">
           {sections.length === 0 ? (
-            <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-12 text-center">
+            <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-8 sm:p-12 text-center animate-scaleIn">
               <div className="max-w-md mx-auto">
-                <div className="w-20 h-20 bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                <div className="w-20 h-20 bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl flex items-center justify-center mx-auto mb-6 animate-bounce">
                   <svg
                     className="w-10 h-10 text-blue-500"
                     fill="none"
@@ -1384,7 +1542,7 @@ const CandidateDashboard = () => {
                 </p>
                 <button
                   onClick={() => setShowAddSection(true)}
-                  className="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-8 py-3 rounded-xl hover:from-blue-600 hover:to-blue-700 transition-all duration-200 font-semibold inline-flex items-center gap-2 shadow-lg hover:shadow-xl"
+                  className="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-8 py-3 rounded-xl hover:from-blue-600 hover:to-blue-700 transition-all duration-300 font-semibold inline-flex items-center gap-2 shadow-lg hover:shadow-xl hover:scale-105"
                 >
                   <svg
                     className="w-5 h-5"
@@ -1404,135 +1562,34 @@ const CandidateDashboard = () => {
               </div>
             </div>
           ) : (
-            sections.map((section) => {
+            sections.map((section, index) => {
               const winner = getWinnerForSection(section);
+              const hasWinner = !!winner;
 
               return (
                 <div
                   key={section.id}
-                  className="bg-white rounded-xl shadow-lg border border-slate-200 hover:shadow-xl transition-shadow duration-300"
+                  className="relative transition-all duration-700"
+                  style={{ animationDelay: `${index * 100}ms` }}
                 >
-                  {/* Section Header */}
-                  <div
-                    className="p-5 border-b border-slate-200 flex justify-between items-center cursor-pointer hover:bg-slate-50 transition-colors"
-                    onClick={() => toggleSection(section.id)}
-                  >
-                    <div className="flex  flex-wrap  items-center gap-2">
-                      <svg
-                        className={`w-5 h-5 transform transition-transform ${
-                          section.isOpen
-                            ? "rotate-90 text-blue-600"
-                            : "text-slate-400"
-                        }`}
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M9 5l7 7-7 7"
-                        />
-                      </svg>
-                      <div>
-                        <h3 className="text-lg font-bold text-slate-900 bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-transparent">
-                          {section.name}
-                        </h3>
-                        <p className="text-sm text-slate-600">
-                          Position: {section.position}
-                        </p>
-                      </div>
-                      <span className="text-sm font-medium text-slate-700 bg-slate-100 px-3 py-1 rounded-full">
-                        {section.candidates.length} candidate
-                        {section.candidates.length !== 1 ? "s" : ""}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      {winner && (
-                        <div className="flex items-center gap-2 bg-gradient-to-r from-emerald-50 to-green-50 border border-emerald-200 text-emerald-700 px-3 py-1.5 rounded-lg">
+                  {/* Original Section Content (Blurred when winner exists) */}
+                  {/* Background Content */}
+                  <div className="bg-white rounded-xl shadow-lg border border-slate-200">
+                    {/* Section Header */}
+                    <div
+                      className="p-4 sm:p-5 border-b border-slate-200 cursor-pointer"
+                      onClick={() => toggleSection(section.id)}
+                    >
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div className="flex items-start sm:items-center gap-3">
                           <svg
-                            className="w-4 h-4"
-                            fill="currentColor"
-                            viewBox="0 0 20 20"
-                          >
-                            <path
-                              fillRule="evenodd"
-                              d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                              clipRule="evenodd"
-                            />
-                          </svg>
-                          <span className="text-sm font-semibold">
-                            Winner Selected
-                          </span>
-                        </div>
-                      )}
-
-                      {section.candidates.length > 0 &&
-                        !winner &&
-                        electionStatus === "ended" && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeclareWinnerBackend(section.id);
-                            }}
-                            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white text-sm font-semibold rounded-lg hover:from-emerald-600 hover:to-emerald-700 shadow-md"
-                          >
-                            <svg
-                              className="w-4 h-4"
-                              fill="none"
-                              stroke="currentColor"
-                              viewBox="0 0 24 24"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"
-                              />
-                            </svg>
-                            🏆 Declare Winner
-                          </button>
-                        )}
-
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setFormData((prev) => ({
-                            ...prev,
-                            sectionId: section.id,
-                          }));
-                          setShowForm(true);
-                        }}
-                        className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white text-sm font-semibold rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all shadow-md hover:shadow-lg"
-                      >
-                        <svg
-                          className="w-4 h-4"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M12 4v16m8-8H4"
-                          />
-                        </svg>
-                        Add Candidate
-                      </button>
-
-                      {sections.length > 1 && (
-                        <button
-                          onClick={(e) =>
-                            handleDeleteSectionClick(section.id, e)
-                          }
-                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                          title="Delete position"
-                        >
-                          <svg
-                            className="w-4 h-4"
+                            className={`w-5 h-5 transform transition-transform duration-300 mt-1 sm:mt-0 flex-shrink-0 ${
+                              section.isOpen
+                                ? "rotate-90 text-blue-600"
+                                : hasWinner
+                                ? "text-emerald-500"
+                                : "text-slate-400"
+                            }`}
                             fill="none"
                             stroke="currentColor"
                             viewBox="0 0 24 24"
@@ -1541,75 +1598,129 @@ const CandidateDashboard = () => {
                               strokeLinecap="round"
                               strokeLinejoin="round"
                               strokeWidth={2}
-                              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                              d="M9 5l7 7-7 7"
                             />
                           </svg>
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Section Content */}
-                  {section.isOpen && (
-                    <div className="p-5">
-                      {/* Winner Display */}
-                      {winner && (
-                        <div className="mb-8 p-6 bg-gradient-to-r from-emerald-50 to-green-50 border border-emerald-200 rounded-2xl shadow-inner">
-                          <div className="flex flex-col items-center text-center">
-                            <div className="relative mb-4">
-                              {winner.photoUrl ? (
-                                <img
-                                  src={winner.photoUrl}
-                                  alt={winner.name}
-                                  className="w-24 h-24 rounded-full object-cover border-4 border-emerald-400 shadow-xl"
-                                />
-                              ) : (
-                                <div className="w-24 h-24 rounded-full bg-gradient-to-br from-emerald-500 to-green-600 flex items-center justify-center border-4 border-emerald-400 shadow-xl">
-                                  <span className="text-white font-bold text-2xl">
-                                    {getInitials(winner.name)}
+                          <div>
+                            <div className="flex flex-wrap items-center gap-2 mb-1">
+                              <h3
+                                className={`text-lg font-bold ${
+                                  hasWinner
+                                    ? "bg-gradient-to-r from-emerald-600 to-green-600 bg-clip-text text-transparent"
+                                    : "bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-transparent"
+                                }`}
+                              >
+                                {section.name}
+                              </h3>
+                              {hasWinner && (
+                                <div className="flex items-center gap-1 bg-gradient-to-r from-emerald-500 to-green-500 text-white px-3 py-1 rounded-full animate-pulse">
+                                  <svg
+                                    className="w-3 h-3"
+                                    fill="currentColor"
+                                    viewBox="0 0 20 20"
+                                  >
+                                    <path
+                                      fillRule="evenodd"
+                                      d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                                      clipRule="evenodd"
+                                    />
+                                  </svg>
+                                  <span className="text-xs font-bold">
+                                    WINNER
                                   </span>
                                 </div>
                               )}
-                              <div className="absolute -top-2 -right-2 w-10 h-10 bg-emerald-500 rounded-full flex items-center justify-center shadow-lg">
-                                <svg
-                                  className="w-5 h-5 text-white"
-                                  fill="currentColor"
-                                  viewBox="0 0 20 20"
-                                >
-                                  <path
-                                    fillRule="evenodd"
-                                    d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                                    clipRule="evenodd"
-                                  />
-                                </svg>
-                              </div>
                             </div>
-                            <div className="mb-4">
-                              <h4 className="font-bold text-emerald-900 text-xl mb-1">
-                                Winner: {winner.name}
-                              </h4>
-                              <p className="text-emerald-700 text-lg">
-                                {winner.position}
+                            <div className="flex flex-wrap items-center gap-3">
+                              <p
+                                className={`text-sm ${
+                                  hasWinner
+                                    ? "text-emerald-600 font-semibold"
+                                    : "text-slate-600"
+                                }`}
+                              >
+                                Position: {section.position}
                               </p>
-                              <p className="text-emerald-600 text-sm mt-2">
-                                Winner of {section.name}
-                              </p>
+                              <span
+                                className={`text-sm font-medium px-3 py-1 rounded-full ${
+                                  hasWinner
+                                    ? "bg-gradient-to-r from-emerald-100 to-green-100 text-emerald-700 border border-emerald-200"
+                                    : "bg-slate-100 text-slate-700"
+                                }`}
+                              >
+                                {section.candidates.length} candidate
+                                {section.candidates.length !== 1 ? "s" : ""}
+                              </span>
                             </div>
-                            <button
-                              onClick={() => handleViewDetails(winner)}
-                              className="px-6 py-2 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white text-sm font-semibold rounded-lg hover:from-emerald-600 hover:to-emerald-700 transition-all shadow-md hover:shadow-lg"
-                            >
-                              View Winner Profile
-                            </button>
                           </div>
                         </div>
-                      )}
 
-                      {section.candidates.length === 0 ? (
-                        <div className="text-center py-8">
-                          <div className="w-16 h-16 bg-gradient-to-br from-blue-50 to-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <div className="flex items-center gap-2 sm:gap-3">
+                          {section.candidates.length > 0 &&
+                            !hasWinner &&
+                            electionStatus === "ended" && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeclareWinnerBackend(section.id);
+                                }}
+                                disabled={declaringWinner}
+                                className={`relative overflow-hidden group flex items-center gap-2 px-3 sm:px-4 py-2 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white text-xs sm:text-sm font-semibold rounded-lg hover:from-emerald-600 hover:to-emerald-700 shadow-md hover:shadow-xl transition-all duration-300 hover:scale-105 ${
+                                  declaringWinner
+                                    ? "opacity-50 cursor-not-allowed"
+                                    : ""
+                                }`}
+                              >
+                                <div className="absolute inset-0 bg-gradient-to-r from-yellow-400/0 via-yellow-400/20 to-yellow-400/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000"></div>
+                                {declaringWinner ? (
+                                  <span className="flex items-center gap-2">
+                                    <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                                    Declaring...
+                                  </span>
+                                ) : (
+                                  <>
+                                    <svg
+                                      className="w-3 h-3 sm:w-4 sm:h-4 transform group-hover:scale-110 group-hover:rotate-12 transition-transform duration-300"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      viewBox="0 0 24 24"
+                                    >
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2}
+                                        d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"
+                                      />
+                                    </svg>
+                                    <span className="relative hidden sm:inline">
+                                      Declare Winner
+                                    </span>
+                                    <span className="relative sm:hidden">
+                                      🏆
+                                    </span>
+                                  </>
+                                )}
+                              </button>
+                            )}
+
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setFormData((prev) => ({
+                                ...prev,
+                                sectionId: section.id,
+                              }));
+                              setShowForm(true);
+                            }}
+                            disabled={hasWinner}
+                            className={`flex items-center gap-2 px-3 sm:px-4 py-2 text-xs sm:text-sm font-semibold rounded-lg transition-all shadow-md hover:shadow-lg hover:scale-105 ${
+                              hasWinner
+                                ? "bg-slate-100 text-slate-400 cursor-not-allowed"
+                                : "bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:from-blue-600 hover:to-blue-700"
+                            }`}
+                          >
                             <svg
-                              className="w-8 h-8 text-blue-500"
+                              className="w-3 h-3 sm:w-4 sm:h-4"
                               fill="none"
                               stroke="currentColor"
                               viewBox="0 0 24 24"
@@ -1618,93 +1729,333 @@ const CandidateDashboard = () => {
                                 strokeLinecap="round"
                                 strokeLinejoin="round"
                                 strokeWidth={2}
-                                d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"
+                                d="M12 4v16m8-8H4"
                               />
                             </svg>
-                          </div>
-                          <h4 className="text-lg font-semibold text-slate-900 mb-2">
-                            No candidates for {section.position}
-                          </h4>
-                          <button
-                            onClick={() => {
-                              setFormData((prev) => ({
-                                ...prev,
-                                sectionId: section.id,
-                              }));
-                              setShowForm(true);
-                            }}
-                            className="mt-4 px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white text-sm font-semibold rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all shadow-md hover:shadow-lg"
-                          >
-                            Add First Candidate
+                            <span className="hidden sm:inline">
+                              Add Candidate
+                            </span>
+                            <span className="sm:hidden">Add</span>
                           </button>
-                        </div>
-                      ) : (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
-                          {section.candidates.map((candidate) => (
-                            <div
-                              key={candidate.id}
-                              className="bg-white   rounded-lg p-3 border border-gray-200 shadow-sm hover:shadow-md hover:border-blue-300 transition-all"
+
+                          {sections.length > 1 && (
+                            <button
+                              onClick={(e) =>
+                                handleDeleteSectionClick(section.id, e)
+                              }
+                              disabled={hasWinner}
+                              className={`p-2 rounded-lg transition-colors hover:scale-110 ${
+                                hasWinner
+                                  ? "text-slate-300 cursor-not-allowed"
+                                  : hasWinner
+                                  ? "text-emerald-600 hover:bg-emerald-50"
+                                  : "text-red-600 hover:bg-red-50"
+                              }`}
+                              title={
+                                hasWinner
+                                  ? "Cannot delete position with winner"
+                                  : "Delete position"
+                              }
                             >
-                              <div className="flex flex-col items-center text-center">
-                                {/* Candidate Photo */}
-                                <div className="mb-4 w-28 h-28 border border-gray-300 rounded-xl overflow-hidden bg-white flex items-center justify-center">
-                                  {candidate.photoUrl ? (
+                              <svg
+                                className="w-4 h-4"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                                />
+                              </svg>
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Section Content */}
+                    {/* Section Content */}
+                    <div className="relative overflow-hidden">
+                      {/* Winner Overlay - Fixed to be more compact */}
+                      {hasWinner && winner && (
+                        <div className="relative z-40 mb-6 animate-fadeIn">
+                          <div className="w-full max-w-md mx-auto bg-white rounded-2xl shadow-xl overflow-hidden border border-emerald-200">
+                            {/* Compact Header */}
+                            <div className="bg-gradient-to-r from-emerald-500 to-emerald-600 py-3 px-5">
+                              <div className="flex items-center justify-center gap-2">
+                                <span className="text-2xl">🏆</span>
+                                <h3 className="text-lg font-bold text-white">
+                                  Election Winner
+                                </h3>
+                              </div>
+                            </div>
+
+                            {/* Compact Winner Content */}
+                            <div className="p-4 sm:p-5">
+                              <div className="flex flex-col sm:flex-row items-center gap-4">
+                                {/* Winner Image - Smaller */}
+                                <div className="relative shrink-0">
+                                  <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full overflow-hidden border-3 border-emerald-100 shadow-md">
                                     <img
-                                      src={candidate.photoUrl}
-                                      alt={candidate.name}
-                                      className="w-full h-full"
+                                      src={winner.photoUrl}
+                                      alt={winner.name}
+                                      className="w-full h-full object-cover"
+                                      onError={(e) => {
+                                        e.target.onerror = null;
+                                        e.target.src =
+                                          "https://via.placeholder.com/96/10b981/ffffff?text=" +
+                                          winner.name.charAt(0);
+                                      }}
                                     />
-                                  ) : (
-                                    <div className="w-full h-full bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center">
-                                      <span className="text-white font-bold text-lg">
-                                        {getInitials(candidate.name)}
-                                      </span>
-                                    </div>
-                                  )}
+                                  </div>
+                                  <div className="absolute -top-1 -right-1 w-8 h-8 sm:w-9 sm:h-9 bg-yellow-400 rounded-full flex items-center justify-center shadow">
+                                    <span className="text-lg sm:text-xl">
+                                      👑
+                                    </span>
+                                  </div>
                                 </div>
 
-                                <div className="w-full text-center mb-4">
-                                  {/* Candidate Name */}
-                                  <h5 className="font-bold text-slate-900 text-sm truncate">
-                                    {candidate.name}
-                                  </h5>
-
-                                  {/* Position */}
-                                  <div>
-                                    <div className="text-blue-700 font-semibold text-xs bg-blue-50 px-2 py-1 rounded-md inline-block truncate max-w-full">
-                                      {candidate.position}
-                                    </div>
+                                {/* Winner Info - Compact */}
+                                <div className="flex-1 min-w-0 text-center sm:text-left">
+                                  <div className="mb-3">
+                                    <h4 className="text-xl font-bold text-gray-800 truncate">
+                                      {winner.name}
+                                    </h4>
+                                    {winner.position && (
+                                      <p className="text-emerald-600 font-medium text-sm mt-0.5">
+                                        {winner.position}
+                                      </p>
+                                    )}
                                   </div>
 
-                                  {/* Candidate ID */}
-                                  {candidate.candidate_id && (
-                                    <div className="text-xs text-slate-600 font-medium">
-                                      ID: {candidate.candidate_id}
+                                  {/* Vote Count - Compact */}
+                                  <div className="bg-emerald-50 rounded-lg p-3 inline-block">
+                                    <div className="flex items-center gap-2">
+                                      <svg
+                                        className="w-5 h-5 text-emerald-600"
+                                        fill="currentColor"
+                                        viewBox="0 0 20 20"
+                                      >
+                                        <path
+                                          fillRule="evenodd"
+                                          d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z"
+                                          clipRule="evenodd"
+                                        />
+                                      </svg>
+                                      <span className="text-2xl font-bold text-emerald-700">
+                                        {winner.vote_count || 0}
+                                      </span>
                                     </div>
-                                  )}
+                                    <p className="text-emerald-600 font-medium text-sm mt-1">
+                                      Total Votes
+                                    </p>
+                                  </div>
                                 </div>
 
-                                <div className="flex gap-2 w-full">
+                                {/* Action Buttons - Vertical */}
+                                <div className="flex flex-col gap-2 w-full sm:w-auto sm:min-w-[140px]">
                                   <button
-                                    onClick={() => handleViewDetails(candidate)}
-                                    className="flex-1 text-xs bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition-all font-medium"
+                                    className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors font-medium text-sm shadow-sm hover:shadow"
+                                    onClick={() => {
+                                      setSelectedCandidate(winner);
+                                      setShowDetails(true);
+                                    }}
                                   >
-                                    View
+                                    View Profile
                                   </button>
+
                                   <button
-                                    onClick={() => handleDeleteClick(candidate)}
-                                    className="flex-1 text-xs bg-red-500 text-white py-2 rounded-lg hover:bg-red-600 transition-all font-medium"
+                                    className="px-4 py-2 border border-emerald-600 text-emerald-600 rounded-lg hover:bg-emerald-50 transition-colors font-medium text-sm shadow-sm hover:shadow"
+                                    onClick={() => {
+                                      // Toggle section to show results
+                                      if (!section.isOpen) {
+                                        toggleSection(section.id);
+                                      }
+                                      // Scroll to candidates section
+                                      const element = document.getElementById(
+                                        `section-${section.id}`
+                                      );
+                                      if (element) {
+                                        element.scrollIntoView({
+                                          behavior: "smooth",
+                                        });
+                                      }
+                                    }}
                                   >
-                                    Delete
+                                    View Results
                                   </button>
                                 </div>
                               </div>
                             </div>
-                          ))}
+                          </div>
                         </div>
                       )}
+
+                      {/* Candidate List - Always visible but disabled when winner exists */}
+                      <div
+                        id={`section-${section.id}`}
+                        className={`transition-all duration-300 ${
+                          hasWinner
+                            ? "opacity-60 pointer-events-none"
+                            : "opacity-100"
+                        }`}
+                      >
+                        {section.isOpen && (
+                          <>
+                            {section.candidates.length === 0 ? (
+                              <div className="text-center py-10 px-4">
+                                <div className="w-16 h-16 bg-gradient-to-br from-blue-50 to-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                  <svg
+                                    className="w-8 h-8 text-blue-500"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={2}
+                                      d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"
+                                    />
+                                  </svg>
+                                </div>
+                                <h4 className="text-lg font-semibold text-slate-900 mb-2">
+                                  No candidates for {section.position}
+                                </h4>
+                                <p className="text-slate-600 mb-4 text-sm">
+                                  Be the first to add a candidate for this
+                                  position.
+                                </p>
+                                <button
+                                  onClick={() => {
+                                    setFormData((prev) => ({
+                                      ...prev,
+                                      sectionId: section.id,
+                                    }));
+                                    setShowForm(true);
+                                  }}
+                                  disabled={hasWinner}
+                                  className={`px-5 py-2.5 font-medium rounded-lg transition-all ${
+                                    hasWinner
+                                      ? "bg-slate-200 text-slate-500 cursor-not-allowed"
+                                      : "bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:from-blue-600 hover:to-blue-700"
+                                  }`}
+                                >
+                                  {hasWinner
+                                    ? "Cannot add candidates (winner declared)"
+                                    : "Add First Candidate"}
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="p-4 sm:p-5">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                                  {section.candidates.map((candidate, idx) => (
+                                    <div
+                                      key={candidate.id}
+                                      className={`bg-white rounded-xl p-3 border-2 ${
+                                        hasWinner && candidate.id === winner?.id
+                                          ? "border-emerald-300 bg-gradient-to-br from-emerald-50 to-white shadow-lg"
+                                          : "border-gray-200 hover:border-blue-300"
+                                      } shadow-sm hover:shadow transition-all duration-200 hover:-translate-y-1`}
+                                    >
+                                      <div className="flex flex-col items-center text-center">
+                                        {/* Candidate Photo - Smaller */}
+                                        <div className="relative mb-3 w-full aspect-square max-w-32 mx-auto">
+                                          <div className="w-full h-full border border-gray-300 rounded-lg overflow-hidden bg-white">
+                                            {hasWinner &&
+                                              candidate.id === winner?.id && (
+                                                <div className="absolute -top-2 -right-2 z-10 w-8 h-8 bg-gradient-to-r from-yellow-400 to-yellow-500 rounded-full flex items-center justify-center shadow">
+                                                  <svg
+                                                    className="w-4 h-4 text-white"
+                                                    fill="currentColor"
+                                                    viewBox="0 0 20 20"
+                                                  >
+                                                    <path
+                                                      fillRule="evenodd"
+                                                      d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                                                      clipRule="evenodd"
+                                                    />
+                                                  </svg>
+                                                </div>
+                                              )}
+                                            {candidate.photoUrl ? (
+                                              <img
+                                                src={candidate.photoUrl}
+                                                alt={candidate.name}
+                                                className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+                                              />
+                                            ) : (
+                                              <div className="w-full h-full bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center">
+                                                <span className="text-white font-bold text-xl">
+                                                  {getInitials(candidate.name)}
+                                                </span>
+                                              </div>
+                                            )}
+                                          </div>
+                                        </div>
+
+                                        {/* Candidate Info */}
+                                        <div className="w-full mb-3 space-y-1.5">
+                                          <h5 className="font-semibold text-slate-900 text-base truncate">
+                                            {candidate.name}
+                                          </h5>
+
+                                          <div
+                                            className={`text-xs font-semibold px-2 py-1 rounded-md inline-block ${
+                                              hasWinner &&
+                                              candidate.id === winner?.id
+                                                ? "bg-gradient-to-r from-emerald-500 to-emerald-600 text-white"
+                                                : "text-blue-700 bg-blue-50"
+                                            }`}
+                                          >
+                                            {candidate.position}
+                                          </div>
+
+                                          {candidate.candidate_id && (
+                                            <div className="text-xs text-slate-600 font-medium">
+                                              ID: {candidate.candidate_id}
+                                            </div>
+                                          )}
+                                        </div>
+
+                                        {/* Action Buttons */}
+                                        <div className="flex gap-2 w-full">
+                                          <button
+                                            onClick={() =>
+                                              handleViewDetails(candidate)
+                                            }
+                                            className="flex-1 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium text-xs"
+                                          >
+                                            View
+                                          </button>
+                                          <button
+                                            onClick={() =>
+                                              handleDeleteClick(candidate)
+                                            }
+                                            disabled={hasWinner}
+                                            className={`flex-1 px-3 py-2 rounded-lg transition-colors font-medium text-xs ${
+                                              hasWinner
+                                                ? "bg-slate-200 text-slate-500 cursor-not-allowed"
+                                                : "bg-red-500 text-white hover:bg-red-600"
+                                            }`}
+                                          >
+                                            Delete
+                                          </button>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </div>
                     </div>
-                  )}
+                  </div>
                 </div>
               );
             })
@@ -1714,10 +2065,10 @@ const CandidateDashboard = () => {
 
       {/* Add Candidate Modal */}
       {showForm && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
           <div
             ref={formModalRef}
-            className="bg-white rounded-2xl shadow-2xl w-[95vw] max-w-4xl max-h-[90vh] overflow-y-auto mx-2"
+            className="bg-white rounded-2xl shadow-2xl w-[95vw] max-w-4xl max-h-[90vh] overflow-y-auto mx-2 animate-scaleIn"
           >
             <div className="sticky top-0 bg-white border-b border-slate-200 z-10 rounded-t-2xl">
               <div className="p-6">
@@ -1732,7 +2083,7 @@ const CandidateDashboard = () => {
                   </div>
                   <button
                     onClick={() => setShowForm(false)}
-                    className="w-8 h-8 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 transition-colors duration-200 flex items-center justify-center"
+                    className="w-8 h-8 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 transition-colors duration-200 flex items-center justify-center hover:rotate-90 transition-transform"
                   >
                     ×
                   </button>
@@ -1757,7 +2108,7 @@ const CandidateDashboard = () => {
                     value={formData.sectionId || ""}
                     onChange={handleInputChange}
                     required
-                    className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white ${
+                    className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white transition-all duration-300 hover:border-blue-400 ${
                       formErrors.sectionId
                         ? "border-red-500 focus:border-red-500 focus:ring-red-200"
                         : "border-slate-300"
@@ -1772,10 +2123,10 @@ const CandidateDashboard = () => {
                   </select>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-3">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   {/* Personal Information */}
                   <div className="space-y-4">
-                    <div className="bg-gradient-to-br from-blue-50 to-slate-50 rounded-xl p-5 border border-blue-100">
+                    <div className="bg-gradient-to-br from-blue-50 to-slate-50 rounded-xl p-5 border border-blue-100 hover:shadow-md transition-all duration-300">
                       <h3 className="font-semibold text-slate-800 mb-4 flex items-center gap-2">
                         <svg
                           className="w-5 h-5 text-blue-600"
@@ -1809,7 +2160,7 @@ const CandidateDashboard = () => {
                             value={formData.name}
                             onChange={handleInputChange}
                             required
-                            className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white ${
+                            className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white transition-all duration-300 hover:border-blue-400 ${
                               formErrors.name
                                 ? "border-red-500 focus:border-red-500 focus:ring-red-200"
                                 : "border-slate-300"
@@ -1833,7 +2184,7 @@ const CandidateDashboard = () => {
                             value={formData.email}
                             onChange={handleInputChange}
                             required
-                            className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white ${
+                            className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white transition-all duration-300 hover:border-blue-400 ${
                               formErrors.email
                                 ? "border-red-500 focus:border-red-500 focus:ring-red-200"
                                 : "border-slate-300"
@@ -1856,7 +2207,7 @@ const CandidateDashboard = () => {
                               name="age"
                               value={formData.age}
                               onChange={handleInputChange}
-                              className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                              className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white transition-all duration-300 hover:border-blue-400"
                               placeholder="Age"
                               min="1"
                               max="100"
@@ -1871,7 +2222,7 @@ const CandidateDashboard = () => {
                               name="gender"
                               value={formData.gender}
                               onChange={handleInputChange}
-                              className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                              className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white transition-all duration-300 hover:border-blue-400"
                             >
                               <option value="">Select Gender</option>
                               <option value="male">Male</option>
@@ -1886,7 +2237,7 @@ const CandidateDashboard = () => {
 
                   {/* Contact & Professional Information */}
                   <div className="space-y-4">
-                    <div className="bg-gradient-to-br from-blue-50 to-slate-50 rounded-xl p-5 border border-blue-100">
+                    <div className="bg-gradient-to-br from-blue-50 to-slate-50 rounded-xl p-5 border border-blue-100 hover:shadow-md transition-all duration-300">
                       <h3 className="font-semibold text-slate-800 mb-4 flex items-center gap-2">
                         <svg
                           className="w-5 h-5 text-blue-600"
@@ -1920,7 +2271,7 @@ const CandidateDashboard = () => {
                             value={formData.phone_number}
                             onChange={handleInputChange}
                             required
-                            className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white ${
+                            className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white transition-all duration-300 hover:border-blue-400 ${
                               formErrors.phone_number
                                 ? "border-red-500 focus:border-red-500 focus:ring-red-200"
                                 : "border-slate-300"
@@ -1947,7 +2298,7 @@ const CandidateDashboard = () => {
                             name="whatsApp_number"
                             value={formData.whatsApp_number}
                             onChange={handleInputChange}
-                            className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white ${
+                            className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white transition-all duration-300 hover:border-blue-400 ${
                               formErrors.whatsApp_number
                                 ? "border-red-500 focus:border-red-500 focus:ring-red-200"
                                 : "border-slate-300"
@@ -1965,7 +2316,7 @@ const CandidateDashboard = () => {
                             name="photo"
                             onChange={handleInputChange}
                             accept="image/*"
-                            className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-gradient-to-r file:from-blue-500 file:to-blue-600 file:text-white hover:file:from-blue-600 hover:file:to-blue-700"
+                            className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-gradient-to-r file:from-blue-500 file:to-blue-600 file:text-white hover:file:from-blue-600 hover:file:to-blue-700 transition-all duration-300 hover:border-blue-400"
                           />
                         </div>
                       </div>
@@ -1977,16 +2328,23 @@ const CandidateDashboard = () => {
                   <button
                     type="button"
                     onClick={() => setShowForm(false)}
-                    className="flex-1 px-4 py-3 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 font-semibold"
+                    className="flex-1 px-4 py-3 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 font-semibold transition-all duration-300 hover:scale-105"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={loading}
-                    className="flex-1 px-4 py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:from-blue-600 hover:to-blue-700 font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex-1 px-4 py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:from-blue-600 hover:to-blue-700 font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 hover:scale-105 hover:shadow-lg"
                   >
-                    {loading ? "Adding Candidate..." : "Add Candidate"}
+                    {loading ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                        Adding Candidate...
+                      </span>
+                    ) : (
+                      "Add Candidate"
+                    )}
                   </button>
                 </div>
               </form>
@@ -1995,15 +2353,14 @@ const CandidateDashboard = () => {
         </div>
       )}
 
-      {/* Candidate Details Modal - IMPROVED LAYOUT */}
-      {/* Candidate Details Modal - FIXED MOBILE RESPONSIVE */}
+      {/* Candidate Details Modal */}
       {showDetails && selectedCandidate && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 z-50">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 z-50 animate-fadeIn">
           <div
             ref={detailsModalRef}
-            className="bg-white rounded-xl sm:rounded-3xl shadow-2xl w-[90vw] sm:w-[95vw] max-w-md sm:max-w-2xl mx-2 sm:mx-4 overflow-hidden"
+            className="bg-white rounded-xl sm:rounded-3xl shadow-2xl w-[90vw] sm:w-[95vw] max-w-md sm:max-w-2xl mx-2 sm:mx-4 overflow-hidden animate-scaleIn"
           >
-            {/* Header with Gradient - Desktop stays same, mobile optimized */}
+            {/* Header with Gradient */}
             <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-4 sm:px-8 py-4 sm:py-6">
               <div className="flex justify-between items-center">
                 <div>
@@ -2016,30 +2373,30 @@ const CandidateDashboard = () => {
                 </div>
                 <button
                   onClick={() => setShowDetails(false)}
-                  className="w-8 h-8 sm:w-10 sm:h-10 bg-white/20 hover:bg-white/30 rounded-lg sm:rounded-xl flex items-center justify-center text-white transition-colors"
+                  className="w-8 h-8 sm:w-10 sm:h-10 bg-white/20 hover:bg-white/30 rounded-lg sm:rounded-xl flex items-center justify-center text-white transition-colors hover:rotate-90"
                 >
                   ✕
                 </button>
               </div>
             </div>
 
-            {/* Body - Mobile optimized layout, desktop keeps original */}
+            {/* Body */}
             <div className="p-4 sm:p-8">
               <div className="flex flex-col lg:flex-row gap-4 sm:gap-6 lg:gap-8">
                 {/* Left Column - Photo and Basic Info */}
                 <div className="lg:w-1/3">
-                  <div className="bg-gradient-to-br from-blue-50 to-slate-50 rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-blue-100">
+                  <div className="bg-gradient-to-br from-blue-50 to-slate-50 rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-blue-100 hover:shadow-md transition-all duration-300">
                     <div className="flex flex-col items-center">
                       <div className="relative mb-3 sm:mb-4">
-                        <div className="absolute inset-0 bg-black/20 rounded-full blur-lg transform scale-110"></div>
+                        <div className="absolute inset-0 bg-gradient-to-r from-blue-400 to-indigo-400 rounded-full blur-lg transform scale-110 opacity-20 animate-pulse"></div>
                         {selectedCandidate.photoUrl ? (
                           <img
                             src={selectedCandidate.photoUrl}
                             alt={selectedCandidate.name}
-                            className="relative w-20 h-20 sm:w-32 sm:h-32 border-2 border-white shadow-lg sm:shadow-2xl"
+                            className="relative w-20 h-20 sm:w-32 sm:h-32 rounded-full object-cover border-4 border-white shadow-lg sm:shadow-2xl hover:scale-105 transition-transform duration-500"
                           />
                         ) : (
-                          <div className="relative w-20 h-20 sm:w-32 sm:h-32 rounded-full bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center border-4 border-white shadow-lg sm:shadow-2xl">
+                          <div className="relative w-20 h-20 sm:w-32 sm:h-32 rounded-full bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center border-4 border-white shadow-lg sm:shadow-2xl hover:scale-105 transition-transform duration-500">
                             <span className="text-white font-bold text-xl sm:text-3xl">
                               {getInitials(selectedCandidate.name)}
                             </span>
@@ -2050,7 +2407,7 @@ const CandidateDashboard = () => {
                       <h3 className="text-lg sm:text-xl font-bold text-slate-900 text-center mb-1 sm:mb-2">
                         {selectedCandidate.name}
                       </h3>
-                      <div className="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-3 py-1 sm:px-4 sm:py-1.5 rounded-full text-xs sm:text-sm font-semibold mb-3 sm:mb-4">
+                      <div className="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-3 py-1 sm:px-4 sm:py-1.5 rounded-full text-xs sm:text-sm font-semibold mb-3 sm:mb-4 hover:scale-105 transition-transform">
                         {selectedCandidate.position}
                       </div>
 
@@ -2071,8 +2428,8 @@ const CandidateDashboard = () => {
                 {/* Right Column - Details */}
                 <div className="lg:w-2/3">
                   <div className="space-y-4 sm:space-y-6">
-                    {/* Contact Information - Mobile optimized */}
-                    <div className="bg-gradient-to-br from-blue-50 to-slate-50 rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-blue-100">
+                    {/* Contact Information */}
+                    <div className="bg-gradient-to-br from-blue-50 to-slate-50 rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-blue-100 hover:shadow-md transition-all duration-300">
                       <h4 className="text-base sm:text-lg font-semibold text-slate-900 mb-3 sm:mb-4 flex items-center gap-2">
                         <svg
                           className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600"
@@ -2090,11 +2447,11 @@ const CandidateDashboard = () => {
                         Contact Information
                       </h4>
                       <div className="space-y-3 sm:space-y-4">
-                        {/* Email - Mobile optimized */}
+                        {/* Email */}
                         <div className="flex flex-col sm:grid sm:grid-cols-2 gap-3 sm:gap-4">
                           <div>
                             <div className="flex items-center gap-2 mb-1">
-                              <div className="w-6 h-6 sm:w-8 sm:h-8 bg-blue-100 rounded flex items-center justify-center flex-shrink-0">
+                              <div className="w-6 h-6 sm:w-8 sm:h-8 bg-gradient-to-br from-blue-100 to-blue-200 rounded flex items-center justify-center flex-shrink-0">
                                 <span className="text-blue-600 text-xs font-bold">
                                   @
                                 </span>
@@ -2108,10 +2465,10 @@ const CandidateDashboard = () => {
                             </p>
                           </div>
 
-                          {/* Phone - Mobile optimized */}
+                          {/* Phone */}
                           <div>
                             <div className="flex items-center gap-2 mb-1">
-                              <div className="w-6 h-6 sm:w-8 sm:h-8 bg-blue-100 rounded flex items-center justify-center flex-shrink-0">
+                              <div className="w-6 h-6 sm:w-8 sm:h-8 bg-gradient-to-br from-blue-100 to-blue-200 rounded flex items-center justify-center flex-shrink-0">
                                 <svg
                                   className="w-3 h-3 sm:w-4 sm:h-4 text-blue-600"
                                   fill="currentColor"
@@ -2130,11 +2487,11 @@ const CandidateDashboard = () => {
                           </div>
                         </div>
 
-                        {/* WhatsApp - Mobile optimized */}
+                        {/* WhatsApp */}
                         {selectedCandidate.whatsapp && (
                           <div className="mt-3 sm:mt-0">
                             <div className="flex items-center gap-2 mb-1">
-                              <div className="w-6 h-6 sm:w-8 sm:h-8 bg-emerald-100 rounded flex items-center justify-center flex-shrink-0">
+                              <div className="w-6 h-6 sm:w-8 sm:h-8 bg-gradient-to-br from-emerald-100 to-emerald-200 rounded flex items-center justify-center flex-shrink-0">
                                 <span className="text-emerald-600 text-xs font-bold">
                                   W
                                 </span>
@@ -2151,8 +2508,8 @@ const CandidateDashboard = () => {
                       </div>
                     </div>
 
-                    {/* Personal Details - Mobile optimized */}
-                    <div className="bg-gradient-to-br from-blue-50 to-slate-50 rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-blue-100">
+                    {/* Personal Details */}
+                    <div className="bg-gradient-to-br from-blue-50 to-slate-50 rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-blue-100 hover:shadow-md transition-all duration-300">
                       <h4 className="text-base sm:text-lg font-semibold text-slate-900 mb-3 sm:mb-4 flex items-center gap-2">
                         <svg
                           className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600"
@@ -2170,8 +2527,8 @@ const CandidateDashboard = () => {
                         Personal Details
                       </h4>
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
-                        {/* Age - Mobile optimized */}
-                        <div>
+                        {/* Age */}
+                        <div className="bg-white p-3 sm:p-4 rounded-lg border border-slate-200 hover:border-blue-300 transition-colors">
                           <div className="mb-1 sm:mb-2">
                             <span className="text-slate-500 text-xs sm:text-sm font-medium uppercase tracking-wide">
                               AGE
@@ -2184,8 +2541,8 @@ const CandidateDashboard = () => {
                           </div>
                         </div>
 
-                        {/* Gender - Mobile optimized */}
-                        <div>
+                        {/* Gender */}
+                        <div className="bg-white p-3 sm:p-4 rounded-lg border border-slate-200 hover:border-blue-300 transition-colors">
                           <div className="mb-1 sm:mb-2">
                             <span className="text-slate-500 text-xs sm:text-sm font-medium uppercase tracking-wide">
                               GENDER
@@ -2198,8 +2555,8 @@ const CandidateDashboard = () => {
                           </div>
                         </div>
 
-                        {/* Applied Date - Mobile optimized */}
-                        <div className="col-span-2 sm:col-span-2">
+                        {/* Applied Date */}
+                        <div className="col-span-2 bg-white p-3 sm:p-4 rounded-lg border border-slate-200 hover:border-blue-300 transition-colors">
                           <div className="mb-1 sm:mb-2">
                             <span className="text-slate-500 text-xs sm:text-sm font-medium uppercase tracking-wide">
                               APPLIED DATE
@@ -2220,16 +2577,17 @@ const CandidateDashboard = () => {
           </div>
         </div>
       )}
+
       {/* Delete Candidate Confirmation Modal */}
       {showDeleteConfirm && candidateToDelete && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
           <div
             ref={deleteModalRef}
-            className="bg-white rounded-2xl shadow-2xl w-[95vw] max-w-md mx-2"
+            className="bg-white rounded-2xl shadow-2xl w-[95vw] max-w-md mx-2 animate-scaleIn"
           >
             <div className="p-6">
               <div className="flex items-center gap-3 mb-4">
-                <div className="w-12 h-12 bg-gradient-to-br from-red-50 to-red-100 rounded-xl flex items-center justify-center">
+                <div className="w-12 h-12 bg-gradient-to-br from-red-50 to-red-100 rounded-xl flex items-center justify-center animate-pulse">
                   <svg
                     className="w-6 h-6 text-red-600"
                     fill="none"
@@ -2268,13 +2626,13 @@ const CandidateDashboard = () => {
                     setShowDeleteConfirm(false);
                     setCandidateToDelete(null);
                   }}
-                  className="flex-1 px-4 py-3 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 font-semibold"
+                  className="flex-1 px-4 py-3 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 font-semibold transition-all duration-300 hover:scale-105"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleConfirmDelete}
-                  className="flex-1 px-4 py-3 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-lg hover:from-red-600 hover:to-red-700 font-semibold"
+                  className="flex-1 px-4 py-3 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-lg hover:from-red-600 hover:to-red-700 font-semibold transition-all duration-300 hover:scale-105 hover:shadow-lg"
                 >
                   Delete Candidate
                 </button>
@@ -2286,14 +2644,14 @@ const CandidateDashboard = () => {
 
       {/* Delete Section Confirmation Modal */}
       {showDeleteSectionConfirm && sectionToDelete && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
           <div
             ref={deleteSectionModalRef}
-            className="bg-white rounded-2xl shadow-2xl w-[95vw] max-w-md mx-2"
+            className="bg-white rounded-2xl shadow-2xl w-[95vw] max-w-md mx-2 animate-scaleIn"
           >
             <div className="p-6">
               <div className="flex items-center gap-3 mb-4">
-                <div className="w-12 h-12 bg-gradient-to-br from-red-50 to-red-100 rounded-xl flex items-center justify-center">
+                <div className="w-12 h-12 bg-gradient-to-br from-red-50 to-red-100 rounded-xl flex items-center justify-center animate-pulse">
                   <svg
                     className="w-6 h-6 text-red-600"
                     fill="none"
@@ -2318,8 +2676,8 @@ const CandidateDashboard = () => {
                 </div>
               </div>
 
-              <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-                <p className="text-red-800 font-medium mb-2">Warning!</p>
+              <div className="bg-gradient-to-br from-red-50 to-red-100 border border-red-200 rounded-lg p-4 mb-6 animate-shake">
+                <p className="text-red-800 font-medium mb-2">⚠️ Warning!</p>
                 <p className="text-sm text-red-700">
                   Deleting{" "}
                   <strong className="font-semibold">
@@ -2337,13 +2695,13 @@ const CandidateDashboard = () => {
                     setShowDeleteSectionConfirm(false);
                     setSectionToDelete(null);
                   }}
-                  className="flex-1 px-4 py-3 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 font-semibold"
+                  className="flex-1 px-4 py-3 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 font-semibold transition-all duration-300 hover:scale-105"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleConfirmDeleteSection}
-                  className="flex-1 px-4 py-3 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-lg hover:from-red-600 hover:to-red-700 font-semibold"
+                  className="flex-1 px-4 py-3 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-lg hover:from-red-600 hover:to-red-700 font-semibold transition-all duration-300 hover:scale-105 hover:shadow-lg"
                 >
                   Delete Position
                 </button>
@@ -2353,7 +2711,7 @@ const CandidateDashboard = () => {
         </div>
       )}
 
-      <div className="border-t border-slate-200 pt-8 mt-8">
+      <div className="border-t border-slate-200 pt-8 mt-8 animate-fadeIn">
         <ElectionDashboard key={dashboardRefreshKey} />
       </div>
     </div>
