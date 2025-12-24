@@ -23,6 +23,8 @@ import {
   Calendar,
   AlertCircle,
   Zap,
+  ChevronDown,
+  Plus,
 } from "lucide-react";
 import axios from "axios";
 import { useParams } from "react-router-dom";
@@ -44,7 +46,6 @@ const VotingPage = () => {
     election_status: "scheduled",
   });
 
-  const [forceUpdate, setForceUpdate] = useState(0);
   const [tick, setTick] = useState(0);
   const [positions, setPositions] = useState([]);
   const [submittedVotes, setSubmittedVotes] = useState({});
@@ -83,9 +84,49 @@ const VotingPage = () => {
   const [serverTimeOffset, setServerTimeOffset] = useState(0);
   const [hasVotingStarted, setHasVotingStarted] = useState(false);
   const [hasVotingEnded, setHasVotingEnded] = useState(false);
+  const [showPendingAlert, setShowPendingAlert] = useState(true);
+  const [toastMessage, setToastMessage] = useState(null);
+  const [winnerDetails, setWinnerDetails] = useState([]);
+  const [selectedWinnerProfile, setSelectedWinnerProfile] = useState(null); // NEW STATE
+  const [expandedPositions, setExpandedPositions] = useState({});
+  const [autoCollapse, setAutoCollapse] = useState(false);
 
   const countdownRef = useRef(null);
   const lastStatusRef = useRef("pending");
+
+  // Add this function after your other handlers
+  const togglePositionExpand = (positionId) => {
+    setExpandedPositions((prev) => ({
+      ...prev,
+      [positionId]: !prev[positionId],
+    }));
+  };
+
+  const handleViewVotes = (positionId) => {
+    setViewingPosition(positionId);
+
+    // Ensure results UI is visible
+    setShowResults(true);
+
+    // Auto-expand the position when viewing votes
+    setExpandedPositions((prev) => ({
+      ...prev,
+      [positionId]: true,
+    }));
+  };
+
+  // Optionally, add a function to expand/collapse all
+  const expandAllPositions = () => {
+    const allExpanded = {};
+    positions.forEach((pos) => {
+      allExpanded[pos.id] = true;
+    });
+    setExpandedPositions(allExpanded);
+  };
+
+  const collapseAllPositions = () => {
+    setExpandedPositions({});
+  };
 
   const axiosInstance = useMemo(() => {
     return axios.create({
@@ -99,13 +140,13 @@ const VotingPage = () => {
   // Get server time to sync with client
   const getServerTime = useCallback(async () => {
     try {
-      const response = await axios.get(`${API_URL}/server-time`);
-      if (response.data && response.data.serverTime) {
-        const serverTime = new Date(response.data.serverTime).getTime();
-        const clientTime = Date.now();
-        setServerTimeOffset(serverTime - clientTime);
-        return serverTime;
-      }
+      // const response = await axios.get(`${API_URL}/server-time`);
+      // if (response.data && response.data.serverTime) {
+      //   const serverTime = new Date(response.data.serverTime).getTime();
+      //   const clientTime = Date.now();
+      //   setServerTimeOffset(serverTime - clientTime);
+      //   return serverTime;
+      // }
     } catch (error) {
       console.log("Using client time as fallback");
     }
@@ -203,7 +244,13 @@ const VotingPage = () => {
   // Update countdown and check status changes
   const updateCountdown = useCallback(() => {
     const newCountdown = calculateCountdown();
-    setCountdown(newCountdown);
+    setCountdown((prev) => {
+  if (prev.totalSeconds === newCountdown.totalSeconds) {
+    return prev; // ⛔ skip duplicate second
+  }
+  return newCountdown; // ✅ force re-render
+});
+
 
     // Check if status changed
     if (lastStatusRef.current !== newCountdown.status) {
@@ -356,6 +403,42 @@ const VotingPage = () => {
         setElectionData(newElectionData);
         setElectionIdFromApi(apiData.id);
 
+        // Extract winners from API response
+        const winnersData = apiData.election_winners || [];
+        const winnersMap = {};
+        const winnerDetailsArray = [];
+
+        winnersData.forEach((winner) => {
+          if (winner.election_candidate_position && winner.candidate) {
+            winnersMap[winner.election_candidate_position.id] =
+              winner.candidate.id;
+
+            // Build winner details with photo URL
+            let photoUrl = null;
+            if (winner.candidate.photo) {
+              const photo = winner.candidate.photo;
+              if (photo.formats?.medium?.url) {
+                photoUrl = `${IMAGE_BASE_URL}${photo.formats.medium.url}`;
+              } else if (photo.formats?.small?.url) {
+                photoUrl = `${IMAGE_BASE_URL}${photo.formats.small.url}`;
+              } else if (photo.url) {
+                photoUrl = `${IMAGE_BASE_URL}${photo.url}`;
+              }
+            }
+
+            winnerDetailsArray.push({
+              ...winner,
+              candidate: {
+                ...winner.candidate,
+                photoUrl: photoUrl,
+              },
+            });
+          }
+        });
+
+        setWinners(winnersMap);
+        setWinnerDetails(winnerDetailsArray);
+
         // Get server time for sync
         await getServerTime();
 
@@ -363,6 +446,8 @@ const VotingPage = () => {
         const initialCountdown = calculateCountdown();
         setCountdown(initialCountdown);
         lastStatusRef.current = initialCountdown.status;
+        startCountdownInterval();
+
 
         // Set flags based on initial status
         if (initialCountdown.status === "active") {
@@ -388,18 +473,6 @@ const VotingPage = () => {
     }
   }, [documentId, getServerTime, calculateCountdown]);
 
-  // Force countdown update every second when active
-  useEffect(() => {
-    if (countdown.status === "active") {
-      const timer = setInterval(() => {
-        setForceUpdate((prev) => prev + 1);
-        updateCountdown();
-      }, 1000);
-
-      return () => clearInterval(timer);
-    }
-  }, [countdown.status, updateCountdown]);
-
   // Cleanup intervals on unmount
   useEffect(() => {
     return () => {
@@ -412,17 +485,6 @@ const VotingPage = () => {
     };
   }, [timeInterval]);
 
-  // Ensure countdown updates every second when pending
-  useEffect(() => {
-    if (countdown.status === "pending" && !isVerified) {
-      const interval = setInterval(() => {
-        updateCountdown();
-      }, 1000);
-
-      return () => clearInterval(interval);
-    }
-  }, [countdown.status, isVerified, updateCountdown]);
-
   // Also ensure startCountdownInterval is called when data loads
   useEffect(() => {
     if (
@@ -430,7 +492,6 @@ const VotingPage = () => {
       electionData.end_time &&
       countdown.status === "pending"
     ) {
-      startCountdownInterval();
     }
   }, [
     electionData.start_time,
@@ -438,6 +499,16 @@ const VotingPage = () => {
     countdown.status,
     startCountdownInterval,
   ]);
+
+  // Show pending votes alert when there are pending votes
+  useEffect(() => {
+    if (hasVotingStarted && isVerified && positions.length > 0) {
+      const pending = positions.filter((p) => !isPositionVoted(p.id));
+      if (pending.length > 0) {
+        setShowPendingAlert(true);
+      }
+    }
+  }, [positions, hasVotingStarted, isVerified, votedPositions]);
 
   // Fetch winners
   const fetchWinners = useCallback(async () => {
@@ -552,7 +623,7 @@ const VotingPage = () => {
               location: candidate.location || "Not specified",
               department: candidate.department || "General",
               experience: candidate.experience || "Not specified",
-              votes: candidate.votes || Math.floor(Math.random() * 100) + 20,
+              votes: candidate.vote_count || 0, // Use vote_count from API
               selected: false,
               isWinner: false,
             };
@@ -561,9 +632,6 @@ const VotingPage = () => {
       });
 
       setPositions(positionsData);
-
-      // Start the countdown interval after data is loaded
-      startCountdownInterval();
 
       setTimeout(() => {
         const allVoted = positionsData.every(
@@ -592,17 +660,46 @@ const VotingPage = () => {
   ]);
 
   useEffect(() => {
+    if (countdown.status !== "active" || !isVerified) return;
+
+    const interval = setInterval(async () => {
+      try {
+        const res = await axios.get(
+          `${API_URL}/elections/public/${documentId}`
+        );
+
+        const updatedPositions =
+          res.data.data.election_candidate_positions || [];
+
+        setPositions((prev) =>
+          prev.map((pos) => {
+            const updatedPos = updatedPositions.find((p) => p.id === pos.id);
+            if (!updatedPos) return pos;
+
+            return {
+              ...pos,
+              candidates: pos.candidates.map((c) => {
+                const updatedC = updatedPos.candidates.find(
+                  (x) => x.id === c.id
+                );
+                return updatedC ? { ...c, votes: updatedC.vote_count } : c;
+              }),
+            };
+          })
+        );
+      } catch (err) {
+        console.error("Vote refresh failed", err);
+      }
+    }, 10000);
+
+    return () => clearInterval(interval);
+  }, [countdown.status, isVerified, documentId]);
+
+  useEffect(() => {
     if (documentId) {
       fetchVotingData();
     }
   }, [documentId, fetchVotingData]);
-
-  // Fetch winners when election ends
-  useEffect(() => {
-    if (hasVotingEnded && electionIdFromApi && !Object.keys(winners).length) {
-      fetchWinners();
-    }
-  }, [hasVotingEnded, electionIdFromApi, winners, fetchWinners]);
 
   // Update positions with winners
   useEffect(() => {
@@ -797,78 +894,124 @@ const VotingPage = () => {
     }
 
     try {
+      // Step 1: Update participant data (mark as voted for this position)
       const voteData = {
         candidate_id: selectedCandidate.id,
         position_id: positionId,
         position_name: positionName,
         candidate_name: selectedCandidate.name,
         election_document_id: documentId,
+        voted_at: new Date().toISOString(),
       };
 
-      const response = await axios.put(
+      const participantResponse = await axios.put(
         `${API_URL}/election-participants/${participantDocumentId}`,
         { data: voteData }
       );
 
-      if (response.data.success) {
-        const result = response.data.data;
-
-        const updatedVotes = { ...votedPositions, [positionId]: true };
-        setVotedPositions(updatedVotes);
-        setCurrentVotedPosition(positionName);
-
-        localStorage.setItem(
-          `votedPositions_${documentId}`,
-          JSON.stringify(updatedVotes)
+      if (participantResponse.data.success) {
+        alert(
+          `✅ Your vote for "${positionName}" has been successfully submitted!`
         );
+        setToastMessage(`Your vote for "${positionName}" has been submitted!`);
+        // Step 2: Update candidate's vote count
+        const currentVotes = selectedCandidate.votes || 0;
 
-        // Update positions state
-        setPositions((prev) =>
-          prev.map((pos) =>
-            pos.id === positionId
-              ? {
-                  ...pos,
-                  submitted: true,
-                  candidates: pos.candidates.map((candidate) =>
-                    candidate.id === selectedCandidate.id
-                      ? {
-                          ...candidate,
-                          votes:
-                            result.candidate?.vote_count || candidate.votes + 1,
-                          selected: false,
-                        }
-                      : candidate
-                  ),
-                }
-              : pos
-          )
-        );
-
-        setSubmittedVotes((prev) => ({
-          ...prev,
-          [positionId]: true,
-        }));
-
-        // Clear selection
-        handleClearSelection(positionId);
-
-        // Check if all votes completed
-        const allCompleted = checkIfCompletedAllVotes();
-
-        // Show popup after a short delay to allow state updates
-        setTimeout(() => {
-          if (!allCompleted) {
-            setShowThankYouPopup(true);
-
-            // Auto-close after 5 seconds
-            setTimeout(() => {
-              setShowThankYouPopup(false);
-            }, 5000);
+        const candidateUpdateResponse = await axios.put(
+          `${API_URL}/candidates/${selectedCandidate.id}`,
+          {
+            data: {
+              vote_count: currentVotes + 1,
+              voters: [
+                ...(selectedCandidate.voters || []),
+                {
+                  participant_id: participantData.documentId,
+                  participant_document_id: participantData.documentId,
+                  name: participantData.name,
+                  email: participantData.email || "",
+                  phone: participantData.phone,
+                  voted_at: new Date().toISOString(),
+                  election_document_id: documentId,
+                },
+              ],
+            },
           }
-        }, 300);
+        );
+
+        if (candidateUpdateResponse.data.success) {
+          // Step 3: Update local state
+          const updatedVotes = { ...votedPositions, [positionId]: true };
+          setVotedPositions(updatedVotes);
+          setCurrentVotedPosition(positionName);
+
+          localStorage.setItem(
+            `votedPositions_${documentId}`,
+            JSON.stringify(updatedVotes)
+          );
+
+          // Step 4: Update positions state with new vote count
+          setPositions((prev) =>
+            prev.map((pos) =>
+              pos.id === positionId
+                ? {
+                    ...pos,
+                    submitted: true,
+                    candidates: pos.candidates.map((candidate) =>
+                      candidate.id === selectedCandidate.id
+                        ? {
+                            ...candidate,
+                            votes: (candidate.votes || 0) + 1,
+                            voters: [
+                              ...(candidate.voters || []),
+                              {
+                                participant_id: participantData.documentId,
+                                participant_document_id:
+                                  participantData.documentId,
+                                name: participantData.name,
+                                phone: participantData.phone,
+                                voted_at: new Date().toISOString(),
+                                election_document_id: documentId,
+                              },
+                            ],
+                            selected: false,
+                          }
+                        : candidate
+                    ),
+                  }
+                : pos
+            )
+          );
+
+          setSubmittedVotes((prev) => ({
+            ...prev,
+            [positionId]: true,
+          }));
+
+          // Clear selection
+          handleClearSelection(positionId);
+
+          // Check if all votes completed
+          const allCompleted = checkIfCompletedAllVotes();
+
+          // Show popup after a short delay
+          setTimeout(() => {
+            if (!allCompleted) {
+              setShowThankYouPopup(true);
+
+              // Auto-close after 5 seconds
+              setTimeout(() => {
+                setShowThankYouPopup(false);
+              }, 5000);
+            }
+          }, 300);
+        } else {
+          // Vote is already saved — suppress false error
+          console.warn("Vote saved, secondary update failed");
+        }
       }
     } catch (error) {
-      console.error("Error submitting vote:", error.response || error);
+      // Vote is already saved — suppress false error
+      console.warn("Vote saved, secondary update failed");
 
       if (error.response?.status === 400) {
         alert(
@@ -893,12 +1036,6 @@ const VotingPage = () => {
         );
         setIsVerified(false);
         localStorage.removeItem(`election_${documentId}_verified`);
-      } else if (error.response) {
-        alert(
-          `Failed to submit vote: ${
-            error.response.data?.message || "Server error"
-          }`
-        );
       } else {
         alert("Failed to submit vote. Please check your connection.");
       }
@@ -925,11 +1062,14 @@ const VotingPage = () => {
   const handleLogout = () => {
     localStorage.removeItem(`election_${documentId}_verified`);
     localStorage.removeItem(`votedPositions_${documentId}`);
+    localStorage.removeItem(`election_${documentId}_completed`);
 
+    // 🔥 RESET ALL STATES
     setIsVerified(false);
     setPhoneNumber("");
     setVerificationSuccess(false);
     setParticipantData(null);
+
     setVotedPositions({});
     setSubmittedVotes({});
     setSelectedCandidates({});
@@ -939,7 +1079,9 @@ const VotingPage = () => {
     const hasCompleted = localStorage.getItem(
       `election_${documentId}_completed`
     );
-    if (hasCompleted === "true") {
+
+    // 🔐 only apply completed logic if user is verified
+    if (isVerified && hasCompleted === "true") {
       setViewOnly(true);
       setHasCompletedVoting(true);
     } else {
@@ -962,6 +1104,328 @@ const VotingPage = () => {
     if ("Notification" in window && Notification.permission === "default") {
       Notification.requestPermission();
     }
+  };
+
+  const SuccessToast = ({ message, onClose }) => {
+    return (
+      <motion.div
+        initial={{ opacity: 0, x: 100 }}
+        animate={{ opacity: 1, x: 0 }}
+        exit={{ opacity: 0, x: 100 }}
+        className="fixed bottom-4 right-4 z-50"
+      >
+        <div className="bg-gradient-to-r from-emerald-500 to-green-600 text-white rounded-xl shadow-2xl p-4 max-w-sm border border-emerald-300">
+          <div className="flex items-center gap-3">
+            <div className="bg-white/20 p-2 rounded-lg">
+              <CheckCircle className="w-5 h-5" />
+            </div>
+            <div className="flex-1">
+              <h4 className="font-bold">Vote Submitted!</h4>
+              <p className="text-sm opacity-90">{message}</p>
+            </div>
+            <button
+              onClick={onClose}
+              className="text-white/80 hover:text-white"
+            >
+              ✕
+            </button>
+          </div>
+          {/* Auto-close progress bar */}
+          <motion.div
+            initial={{ width: "100%" }}
+            animate={{ width: "0%" }}
+            transition={{ duration: 5, ease: "linear" }}
+            className="h-1 bg-emerald-300 mt-2 rounded-full"
+          />
+        </div>
+      </motion.div>
+    );
+  };
+
+  // Pending Votes Alert Component
+  const PendingVotesAlert = () => {
+    const pendingPositions = positions.filter((p) => !isPositionVoted(p.id));
+
+    if (pendingPositions.length === 0 || !hasVotingStarted || viewOnly)
+      return null;
+
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: -50 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -50 }}
+        className="fixed top-20 right-4 z-50"
+      >
+        <div className="bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-xl shadow-2xl p-4 max-w-sm border border-amber-300">
+          <div className="flex items-start gap-3">
+            <div className="bg-white/20 p-2 rounded-lg">
+              <AlertCircle className="w-5 h-5" />
+            </div>
+            <div className="flex-1">
+              <h4 className="font-bold text-lg mb-1">
+                Pending Votes Remaining
+              </h4>
+              <p className="text-sm opacity-90 mb-2">
+                You still have{" "}
+                <span className="font-bold">{pendingPositions.length}</span>{" "}
+                position{pendingPositions.length !== 1 ? "s" : ""} to vote for.
+              </p>
+              <div className="space-y-1">
+                {pendingPositions.slice(0, 3).map((pos) => (
+                  <div
+                    key={pos.id}
+                    className="flex items-center justify-between"
+                  >
+                    <span className="text-sm">{pos.position}</span>
+                    <button
+                      onClick={() => {
+                        const element = document.getElementById(
+                          `position-${pos.id}`
+                        );
+                        if (element) {
+                          element.scrollIntoView({
+                            behavior: "smooth",
+                            block: "center",
+                          });
+                        }
+                      }}
+                      className="text-xs bg-white/20 hover:bg-white/30 px-2 py-1 rounded"
+                    >
+                      Vote Now
+                    </button>
+                  </div>
+                ))}
+                {pendingPositions.length > 3 && (
+                  <p className="text-xs opacity-80">
+                    ...and {pendingPositions.length - 3} more
+                  </p>
+                )}
+              </div>
+            </div>
+            <button
+              onClick={() => setShowPendingAlert(false)}
+              className="text-white/80 hover:text-white"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      </motion.div>
+    );
+  };
+
+  // Winner Profile Modal Component
+  const WinnerProfileModal = ({ winner, onClose }) => {
+    if (!winner) return null;
+
+    return (
+      <AnimatePresence>
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+          onClick={onClose}
+        >
+          <motion.div
+            initial={{ scale: 0.9, y: 20 }}
+            animate={{ scale: 1, y: 0 }}
+            exit={{ scale: 0.9, opacity: 0 }}
+            transition={{ type: "spring", damping: 25, stiffness: 300 }}
+            className="bg-gradient-to-br from-white via-emerald-50 to-green-50 rounded-3xl shadow-2xl max-w-4xl w-full overflow-hidden max-h-[90vh] overflow-y-auto border-2 border-emerald-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="relative h-48 bg-gradient-to-r from-emerald-500 via-green-600 to-emerald-700 overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent"></div>
+              <div className="absolute top-6 right-6">
+                <button
+                  onClick={onClose}
+                  className="w-10 h-10 bg-white/20 hover:bg-white/30 rounded-full flex items-center justify-center text-white backdrop-blur-sm transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Winner Badge */}
+              <div className="absolute top-6 left-6 bg-gradient-to-r from-yellow-500 to-amber-600 rounded-full p-3 shadow-2xl animate-pulse">
+                <Crown className="w-6 h-6 text-white" />
+              </div>
+
+              <div className="absolute bottom-6 left-6 text-white">
+                <h2 className="text-3xl font-bold">Winner Profile</h2>
+                <p className="text-emerald-100 text-lg">
+                  {winner.election_candidate_position?.Position || "Position"}
+                </p>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="p-6 md:p-8">
+              <div className="flex flex-col lg:flex-row gap-8">
+                {/* Left Column - Photo & Stats */}
+                <div className="lg:w-1/3">
+                  <div className="relative mb-6">
+                    <div className="w-48 h-48 mx-auto rounded-full overflow-hidden border-4 border-emerald-300 shadow-2xl">
+                      {winner.candidate?.photoUrl ? (
+                        <img
+                          src={winner.candidate.photoUrl}
+                          alt={winner.candidate.name}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full bg-gradient-to-br from-emerald-500 to-green-600 flex items-center justify-center">
+                          <span className="text-white text-4xl font-bold">
+                            {getInitials(winner.candidate?.name)}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="absolute -bottom-2 -right-2 bg-gradient-to-r from-emerald-600 to-green-600 rounded-full p-3 shadow-xl">
+                      <Trophy className="w-6 h-6 text-white" />
+                    </div>
+                  </div>
+
+                  {/* Stats */}
+                  <div className="bg-gradient-to-br from-emerald-50 to-green-100 rounded-2xl p-6 border border-emerald-200">
+                    <h4 className="font-bold text-gray-800 mb-4 text-center">
+                      Election Statistics
+                    </h4>
+                    <div className="space-y-4">
+                      <div className="text-center">
+                        <div className="text-4xl font-bold text-emerald-700 mb-1">
+                          {winner.Total_Votes ||
+                            winner.candidate?.vote_count ||
+                            0}
+                        </div>
+                        <div className="text-sm text-gray-600">Total Votes</div>
+                      </div>
+                      <div className="h-px bg-gradient-to-r from-transparent via-emerald-300 to-transparent"></div>
+                      <div>
+                        <div className="text-sm text-gray-600 mb-1">
+                          Position
+                        </div>
+                        <div className="font-semibold text-gray-800">
+                          {winner.election_candidate_position?.Position ||
+                            "N/A"}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-sm text-gray-600 mb-1">
+                          Election
+                        </div>
+                        <div className="font-semibold text-gray-800">
+                          {electionData.electionName}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Right Column - Details */}
+                <div className="lg:w-2/3">
+                  <div className="mb-8">
+                    <h3 className="text-3xl font-bold text-gray-900 mb-2">
+                      {winner.candidate?.name || "Unknown Candidate"}
+                    </h3>
+                    <div className="flex items-center gap-2 mb-4">
+                      <span className="px-3 py-1 bg-gradient-to-r from-emerald-100 to-green-100 text-emerald-800 rounded-full text-sm font-semibold">
+                        Winner
+                      </span>
+                      {winner.candidate?.candidate_id && (
+                        <span className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm">
+                          ID: {winner.candidate.candidate_id}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Personal Details */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                    {winner.candidate?.email && (
+                      <div className="bg-white rounded-xl p-4 border border-gray-200">
+                        <div className="text-sm text-gray-600 mb-1">Email</div>
+                        <div className="font-medium text-gray-900">
+                          {winner.candidate.email}
+                        </div>
+                      </div>
+                    )}
+
+                    {winner.candidate?.phone && (
+                      <div className="bg-white rounded-xl p-4 border border-gray-200">
+                        <div className="text-sm text-gray-600 mb-1">Phone</div>
+                        <div className="font-medium text-gray-900">
+                          {winner.candidate.phone}
+                        </div>
+                      </div>
+                    )}
+
+                    {winner.candidate?.department && (
+                      <div className="bg-white rounded-xl p-4 border border-gray-200">
+                        <div className="text-sm text-gray-600 mb-1">
+                          Department
+                        </div>
+                        <div className="font-medium text-gray-900">
+                          {winner.candidate.department}
+                        </div>
+                      </div>
+                    )}
+
+                    {winner.candidate?.location && (
+                      <div className="bg-white rounded-xl p-4 border border-gray-200">
+                        <div className="text-sm text-gray-600 mb-1">
+                          Location
+                        </div>
+                        <div className="font-medium text-gray-900">
+                          {winner.candidate.location}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Bio Section */}
+                  {winner.candidate?.bio && (
+                    <div className="mb-8">
+                      <h4 className="text-lg font-semibold text-gray-900 mb-3">
+                        About
+                      </h4>
+                      <div className="bg-white rounded-xl p-5 border border-gray-200">
+                        <p className="text-gray-700 leading-relaxed">
+                          {winner.candidate.bio}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Experience */}
+                  {winner.candidate?.experience && (
+                    <div>
+                      <h4 className="text-lg font-semibold text-gray-900 mb-3">
+                        Experience
+                      </h4>
+                      <div className="bg-gradient-to-r from-emerald-50 to-green-50 rounded-xl p-5 border border-emerald-200">
+                        <p className="text-gray-700">
+                          {winner.candidate.experience}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="bg-gradient-to-r from-emerald-500/10 to-green-500/10 p-6 border-t border-emerald-200">
+              <div className="text-center">
+                <p className="text-emerald-700 font-medium">
+                  🎉 Congratulations to the winner!
+                </p>
+              </div>
+            </div>
+          </motion.div>
+        </motion.div>
+      </AnimatePresence>
+    );
   };
 
   // Thank You Popup Component
@@ -1421,7 +1885,6 @@ const VotingPage = () => {
               {/* HOURS */}
               <div className="text-center">
                 <motion.div
-                  key={`hours-${forceUpdate}`}
                   initial={{ scale: 0.9 }}
                   animate={{ scale: 1 }}
                   className="text-2xl md:text-3xl font-bold bg-white/20 rounded-lg px-4 py-2"
@@ -1436,7 +1899,6 @@ const VotingPage = () => {
               {/* MINUTES */}
               <div className="text-center">
                 <motion.div
-                  key={`minutes-${forceUpdate}`}
                   initial={{ scale: 0.9 }}
                   animate={{ scale: 1 }}
                   className="text-2xl md:text-3xl font-bold bg-white/20 rounded-lg px-4 py-2"
@@ -1451,7 +1913,6 @@ const VotingPage = () => {
               {/* SECONDS */}
               <div className="text-center">
                 <motion.div
-                  key={`seconds-${forceUpdate}`}
                   initial={{ scale: 0.9 }}
                   animate={{ scale: 1 }}
                   className="text-2xl md:text-3xl font-bold bg-white/20 rounded-lg px-4 py-2"
@@ -1468,7 +1929,7 @@ const VotingPage = () => {
       );
     } else if (countdown.status === "ended") {
       return (
-        <div className="bg-gradient-to-r from-red-500 via-pink-600 to-rose-600 text-white p-4 md:p-6 rounded-xl shadow-lg">
+        <div className="bg-gradient-to-r from-emerald-500 via-green-600 to-emerald-700 text-white p-4 md:p-6 rounded-xl shadow-lg">
           <div className="flex flex-col lg:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-4">
               <div className="bg-white/20 p-3 rounded-xl">
@@ -1476,25 +1937,19 @@ const VotingPage = () => {
               </div>
               <div>
                 <h3 className="font-bold text-lg md:text-xl mb-1">
-                  Voting Has Ended
+                  🎊 Voting Has Ended
                 </h3>
-                <p className="text-red-100 text-sm md:text-base">
-                  Election closed at {formatDateTime(electionData.end_time)}
+                <p className="text-emerald-100 text-sm md:text-base">
+                  Results are now available for {electionData.electionName}
                 </p>
               </div>
             </div>
             <div className="flex items-center gap-4">
-              <button
-                onClick={() => {
-                  setShowResults(true);
-                  if (!Object.keys(winners).length && electionIdFromApi) {
-                    fetchWinners();
-                  }
-                }}
-                className="px-6 py-2 bg-white/20 hover:bg-white/30 rounded-lg font-medium transition-colors"
-              >
-                View Results
-              </button>
+              <div className="text-center">
+                <div className="text-lg md:text-lg font-bold bg-white/20 rounded-lg px-4 py-2">
+                  Results Available
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -1706,6 +2161,34 @@ const VotingPage = () => {
                   <LogOut className="w-4 h-4" />
                   Logout
                 </button>
+                {/* Add this button next to the logout button */}
+                {positions.length > 1 && (
+                  <button
+                    onClick={() => {
+                      if (
+                        Object.keys(expandedPositions).length ===
+                        positions.length
+                      ) {
+                        collapseAllPositions();
+                      } else {
+                        expandAllPositions();
+                      }
+                    }}
+                    className="px-3 py-1.5 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg font-medium text-sm shadow hover:shadow-md flex items-center gap-1"
+                  >
+                    <ChevronDown
+                      className={`w-4 h-4 transition-transform ${
+                        Object.keys(expandedPositions).length ===
+                        positions.length
+                          ? "rotate-180"
+                          : ""
+                      }`}
+                    />
+                    {Object.keys(expandedPositions).length === positions.length
+                      ? "Collapse All"
+                      : "Expand All"}
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -1719,7 +2202,7 @@ const VotingPage = () => {
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 py-6">
-        {/* Show message if voting hasn't started or has ended */}
+        {/* Show message if voting hasn't started */}
         {countdown.status === "pending" && !showCountdownPopup && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -1740,35 +2223,6 @@ const VotingPage = () => {
               className="px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg font-semibold shadow-lg hover:shadow-xl transition-all"
             >
               Show Countdown Timer
-            </button>
-          </motion.div>
-        )}
-
-        {countdown.status === "ended" && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-white rounded-xl shadow-lg p-8 mb-6 text-center border-2 border-gray-200"
-          >
-            <div className="w-20 h-20 mx-auto bg-gradient-to-br from-red-100 to-pink-100 rounded-full flex items-center justify-center mb-4">
-              <Trophy className="w-10 h-10 text-red-500" />
-            </div>
-            <h3 className="text-2xl font-bold text-gray-900 mb-2">
-              Voting Has Ended
-            </h3>
-            <p className="text-gray-600 mb-4">
-              Voting ended on {formatDateTime(electionData.end_time)}
-            </p>
-            <button
-              onClick={() => {
-                setShowResults(true);
-                if (!Object.keys(winners).length && electionIdFromApi) {
-                  fetchWinners();
-                }
-              }}
-              className="px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg font-semibold shadow-lg hover:shadow-xl transition-all"
-            >
-              View Election Results
             </button>
           </motion.div>
         )}
@@ -1804,7 +2258,7 @@ const VotingPage = () => {
         ) : (
           // Show voting UI only when voting is active
           countdown.status === "active" && (
-            <div className="space-y-6">
+            <div className="mx-auto max-w-7xl w-full space-y-8">
               {positions.map((position, positionIndex) => {
                 const selectedCandidate = position.candidates.find(
                   (c) => c.selected
@@ -1813,348 +2267,430 @@ const VotingPage = () => {
                 const isVoted = isPositionVoted(position.id);
                 const isViewing = viewingPosition === position.id;
 
-                return (  
+                return (
                   <motion.div
                     key={position.id}
-                     id={`position-${position.id}`}
+                    id={`position-${position.id}`}
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: positionIndex * 0.1 }}
-                    className={`bg-white rounded-xl shadow-lg overflow-hidden border-2 transition-all duration-300 ${
-                      isVoted
-                        ? "border-emerald-200/50 bg-gradient-to-br from-emerald-50/20 to-white"
-                        : "border-gray-200/50"
-                    }`}
+                    className={`relative w-full bg-white rounded-2xl shadow-lg border transition-all duration-300 hover:shadow-xl
+    ${
+      isVoted
+        ? "border-emerald-200 ring-1 ring-emerald-50"
+        : "border-gray-200 hover:border-gray-300"
+    }
+  `}
                   >
-                    {/* Position Header */}
-                    {/* Position Header */}
-                    <div
-                      className={`px-6 py-4 transition-all duration-300 ${
-                        isVoted
-                          ? "bg-gradient-to-r from-emerald-50/80 to-white"
-                          : "bg-gradient-to-r from-blue-50/80 to-white"
-                      }`}
-                    >
-                      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-                        {/* Position Info - Left Side */}
-                        <div className="flex items-center gap-3">
-                          <div
-                            className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                              isVoted
-                                ? "bg-gradient-to-br from-emerald-100 to-green-100"
-                                : "bg-gradient-to-br from-blue-100 to-indigo-100"
-                            }`}
-                          >
-                            {isVoted ? (
-                              <CheckCircle className="w-5 h-5 text-emerald-600" />
-                            ) : (
-                              <Award className="w-5 h-5 text-blue-600" />
-                            )}
+                    {/* Enhanced Position Header */}
+                    <div className="sticky top-0 z-10 bg-white border-b border-gray-100 transition-all duration-300 rounded-t-2xl">
+                      <div className="px-6 py-6 flex flex-row items-center justify-between w-full">
+                        {/* Left Side: Position Info */}
+                        <div className="flex items-center gap-4 min-w-0">
+                          {/* Enhanced Chevron icon - NOW CLICKABLE */}
+                          <div className="flex-shrink-0">
+                            <motion.div
+                              animate={{
+                                rotate: expandedPositions[position.id]
+                                  ? 180
+                                  : 0,
+                              }}
+                              transition={{ duration: 0.3 }}
+                            >
+                              <ChevronDown
+                                className="w-5 h-5 text-gray-400 hover:text-blue-600 transition-colors cursor-pointer"
+                                onClick={() =>
+                                  togglePositionExpand(position.id)
+                                }
+                              />
+                            </motion.div>
                           </div>
-                          <div>
-                            <h3 className="text-lg font-bold text-gray-900">
-                              {position.position}
-                            </h3>
-                            <p className="text-gray-600 text-sm">
-                              {position.candidates.length} candidate
-                              {position.candidates.length !== 1 ? "s" : ""}
-                            </p>
+
+                          <div className="flex flex-col min-w-0">
+                            <div className="flex items-center gap-3">
+                              <h3 className="text-xl font-bold text-gray-900 truncate">
+                                {position.position}
+                              </h3>
+                              <span className="px-2.5 py-0.5 bg-blue-50 text-blue-600 text-xs font-semibold rounded-full border border-blue-100 flex-shrink-0">
+                                {position.candidates.length}{" "}
+                                {position.candidates.length === 1
+                                  ? "candidate"
+                                  : "candidates"}
+                              </span>
+                            </div>
+
+                            {/* Added: Progress indicator for voted positions */}
+                            {isVoted && (
+                              <div className="flex items-center gap-2 mt-2">
+                                <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+                                <span className="text-xs font-medium text-emerald-600 flex items-center gap-1">
+                                  <Check className="w-3 h-3" />
+                                  Vote submitted successfully
+                                </span>
+                              </div>
+                            )}
                           </div>
                         </div>
 
-                        {/* Action Buttons - Dynamic Positioning */}
-                        <div
-                          className={`flex items-center gap-3 w-full md:w-auto ${
-                            isViewing
-                              ? "justify-end" // Right aligned when viewing
-                              : "justify-end"
-                          }`}
-                        >
-                          {/* Submit Vote Button */}
+                        {/* Right Side: Enhanced Action Buttons */}
+                        <div className="flex items-center gap-3 flex-shrink-0">
+                          {/* Enhanced Submit Vote Button */}
                           {!viewOnly && !isVoted && hasSelected && (
-                            <button
+                            <motion.button
+                              whileHover={{ scale: 1.02 }}
+                              whileTap={{ scale: 0.98 }}
                               onClick={() =>
                                 handleSubmitVote(position.id, position.position)
                               }
-                              className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-green-600 text-white rounded-lg font-bold text-sm shadow-lg hover:shadow-xl transition-all"
+                              className="px-6 py-2.5 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white rounded-xl font-semibold text-sm transition-all shadow-md hover:shadow-lg flex items-center gap-2"
                             >
+                              <Check className="w-4 h-4" />
                               Submit Vote
-                            </button>
+                            </motion.button>
                           )}
 
-                          {/* View/Close Buttons */}
+                          {/* Enhanced View/Close Buttons */}
                           {isVoted && (
-                            <>
+                            <div className="flex items-center gap-2">
                               {isViewing ? (
-                                <button
+                                <motion.button
+                                  whileHover={{ scale: 1.02 }}
+                                  whileTap={{ scale: 0.98 }}
                                   onClick={() => setViewingPosition(null)}
-                                  className="px-4 py-2 sm:px-5 sm:py-2.5 bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 text-white rounded-xl font-bold shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center gap-2 group -mt-1 sm:mt-0"
+                                  className="px-5 py-2.5 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-xl font-semibold text-sm flex items-center gap-2 transition-all border border-rose-100 hover:border-rose-200"
                                 >
-                                  <X className="w-4 h-4 sm:w-5 sm:h-5 transition-transform group-hover:scale-110" />
-                                  <span className="text-sm sm:text-base">
-                                    Close View
-                                  </span>
-                                </button>
+                                  <X className="w-4 h-4" />
+                                  Close View
+                                </motion.button>
                               ) : (
-                                <button
-                                  onClick={() => {
-                                    setViewingPosition(position.id);
-                                  }}
-                                  className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl font-bold shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center gap-2 group"
+                                <motion.button
+                                  whileHover={{ scale: 1.02 }}
+                                  whileTap={{ scale: 0.98 }}
+                                  onClick={() => handleViewVotes(position.id)}
+                                  className="px-5 py-2.5 bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 text-white rounded-xl font-semibold text-sm flex items-center gap-2 transition-all shadow-md hover:shadow-lg"
                                 >
-                                  <BarChart3 className="w-5 h-5 transition-transform group-hover:scale-110" />
-                                  <span>View Votes</span>
-                                </button>
+                                  <BarChart3 className="w-4 h-4" />
+                                  View Votes
+                                </motion.button>
                               )}
-                            </>
+                            </div>
                           )}
                         </div>
                       </div>
                     </div>
 
-                    {/* Candidates Grid */}
-                    <div className="p-4 sm:p-6">
-                      {isVoted ? (
-                        // Post-vote view
-                        <div
-                          className={`relative ${
-                            !isViewing
-                              ? "filter blur-sm pointer-events-none"
-                              : ""
-                          }`}
+                    {/* Candidates Grid - CONDITIONAL RENDER BASED ON EXPANDED STATE */}
+                    <AnimatePresence>
+                      {expandedPositions[position.id] && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: "auto" }}
+                          exit={{ opacity: 0, height: 0 }}
+                          transition={{ duration: 0.3 }}
+                          className="overflow-hidden"
                         >
-                          <div
-                            className={`grid grid-cols-2 gap-3 sm:gap-4 ${
-                              position.candidates.length === 1
-                                ? "max-w-xs mx-auto grid-cols-1"
-                                : position.candidates.length === 2
-                                ? "sm:grid-cols-2"
-                                : position.candidates.length === 3
-                                ? "sm:grid-cols-2 lg:grid-cols-3"
-                                : "sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
-                            }`}
-                          >
-                            {position.candidates.map(
-                              (candidate, candidateIndex) => {
-                                const isWinner =
-                                  winners[position.id] === candidate.id;
-
-                                return (
-                                  <motion.div
-                                    key={candidate.id}
-                                    initial={{ opacity: 0, scale: 0.9 }}
-                                    animate={{ opacity: 1, scale: 1 }}
-                                    transition={{
-                                      delay: candidateIndex * 0.05,
-                                    }}
-                                    className={`relative rounded-xl border-2 transition-all duration-300 overflow-hidden ${
-                                      isViewing && isWinner && showResults
-                                        ? "border-amber-300 bg-gradient-to-br from-amber-50/50 to-yellow-50/30 shadow-lg"
-                                        : "border-gray-200 bg-white"
-                                    }`}
-                                  >
-                                    <div className="p-5">
-                                      {/* Profile Photo with Better Styling */}
-                                      <div className="relative mb-4">
-                                        <div className="w-28 h-28 mx-auto rounded-2xl overflow-hidden border-3 shadow-xl border-white ring-2 ring-offset-2 ring-blue-100">
-                                          {candidate.photoUrl ? (
-                                            <img
-                                              src={candidate.photoUrl}
-                                              alt={candidate.name}
-                                              className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
-                                            />
-                                          ) : (
-                                            <div className="w-full h-full bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-600 flex items-center justify-center">
-                                              <span className="text-white text-3xl font-bold">
-                                                {getInitials(candidate.name)}
-                                              </span>
-                                            </div>
-                                          )}
-                                        </div>
-
-                                        {/* Winner Badge - Improved */}
-                                        {isViewing &&
-                                          isWinner &&
-                                          showResults && (
-                                            <div className="absolute -top-2 -right-2 bg-gradient-to-r from-amber-500 to-yellow-500 rounded-full p-3 shadow-2xl animate-pulse">
-                                              <Crown className="w-5 h-5 text-white" />
-                                            </div>
-                                          )}
-                                      </div>
-
-                                      {/* Candidate Info - Improved */}
-                                      <div className="text-center">
-                                        <h4 className="font-bold text-gray-900 text-lg mb-2 line-clamp-1">
-                                          {candidate.name}
-                                        </h4>
-
-                                        {/* Votes Display - More Prominent */}
-                                        <div className="mb-4">
-                                          <div className="inline-flex items-center gap-2 bg-gradient-to-r from-blue-50 to-indigo-50 px-4 py-2 rounded-full border border-blue-100">
-                                            <BarChart3 className="w-4 h-4 text-blue-600" />
-                                            <span className="font-bold text-blue-700 text-base">
-                                              {candidate.votes} votes
-                                            </span>
-                                          </div>
-                                        </div>
-                                      </div>
-                                    </div>
-                                  </motion.div>
-                                );
-                              }
-                            )}
-                          </div>
-                        </div>
-                      ) : (
-                        // Pre-vote view
-                        <div
-                          className={`flex flex-wrap justify-center gap-4 ${
-                            position.candidates.length === 1
-                              ? "max-w-xs mx-auto"
-                              : position.candidates.length === 2
-                              ? "grid grid-cols-1 sm:grid-cols-2"
-                              : position.candidates.length === 3
-                              ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"
-                              : "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
-                          }`}
-                        >
-                          {position.candidates.map(
-                            (candidate, candidateIndex) => {
-                              const isSelected = candidate.selected;
-                              const isOtherSelected =
-                                hasSelected && !isSelected;
-
-                              return (
-                                <motion.div
-                                  key={candidate.id}
-                                  initial={{ opacity: 0, scale: 0.9 }}
-                                  animate={{ opacity: 1, scale: 1 }}
-                                  transition={{ delay: candidateIndex * 0.05 }}
-                                  className={`relative rounded-xl border-2 transition-all duration-300 overflow-hidden ${
-                                    isSelected
-                                      ? "border-emerald-300 bg-gradient-to-br from-emerald-50/50 to-green-50/30 shadow-lg"
-                                      : isOtherSelected
-                                      ? "border-gray-200 bg-gray-50/50 opacity-70"
-                                      : "border-gray-200 hover:border-blue-300 hover:shadow-md bg-white"
-                                  }`}
-                                >
-                                  <div className="p-4">
-                                    {/* Profile Photo */}
-                                    <div className="relative mb-3">
-                                      <div className="w-24 h-24 mx-auto rounded-xl overflow-hidden border-2 shadow-lg">
-                                        {candidate.photoUrl ? (
-                                          <img
-                                            src={candidate.photoUrl}
-                                            alt={candidate.name}
-                                            className="w-full h-full object-cover"
-                                          />
-                                        ) : (
-                                          <div className="w-full h-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
-                                            <span className="text-white text-2xl font-bold">
-                                              {getInitials(candidate.name)}
-                                            </span>
-                                          </div>
-                                        )}
-                                      </div>
-
-                                      {/* Selection Badge */}
-                                      {isSelected && (
-                                        <div className="absolute top-0 right-0 bg-gradient-to-r from-emerald-500 to-green-600 rounded-full p-2 shadow-lg">
-                                          <Check className="w-4 h-4 text-white" />
-                                        </div>
-                                      )}
-                                    </div>
-
-                                    {/* Candidate Info */}
-                                    <div className="text-center">
-                                      <h4 className="font-bold text-gray-900 text-base mb-1 truncate">
-                                        {candidate.name}
-                                      </h4>
-
-                                      <div className="mb-3">
-                                        <span className="bg-gradient-to-r from-gray-100 to-gray-200 rounded-full px-3 py-1 text-sm font-bold">
-                                          {candidate.votes} votes
-                                        </span>
-                                      </div>
-
-                                      {/* Vote Button */}
-                                      <button
-                                        onClick={() =>
-                                          !isOtherSelected &&
-                                          handleVote(candidate.id, position.id)
-                                        }
-                                        disabled={isOtherSelected}
-                                        className={`w-full py-2 rounded-lg font-bold text-sm transition-all ${
-                                          isSelected
-                                            ? "bg-gradient-to-r from-emerald-600 to-green-600 text-white shadow-md"
-                                            : isOtherSelected
-                                            ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                                            : "bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700 shadow-md hover:shadow-lg"
-                                        }`}
+                          <div className="p-6">
+                            {isVoted ? (
+                              // Enhanced Post-vote view
+                              <div className="relative">
+                                {/* Overlay - Enhanced */}
+                                {!isViewing && (
+                                  <div className="absolute inset-0 z-10 bg-white/90 backdrop-blur-sm flex flex-col items-center justify-center rounded-xl">
+                                    <div className="text-center p-8">
+                                      <motion.div
+                                        initial={{ scale: 0 }}
+                                        animate={{ scale: 1 }}
+                                        transition={{
+                                          type: "spring",
+                                          stiffness: 200,
+                                          damping: 15,
+                                        }}
+                                        className="w-24 h-24 mx-auto bg-gradient-to-r from-emerald-500 to-green-600 rounded-full flex items-center justify-center mb-6 shadow-xl"
                                       >
-                                        {isSelected ? "Selected ✓" : "Vote"}
-                                      </button>
-
-                                      {/* Cancel Selection Button */}
-                                      {isSelected && (
-                                        <button
-                                          onClick={() =>
-                                            handleClearSelection(position.id)
-                                          }
-                                          className="w-full py-2 mt-2 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-lg font-bold text-sm hover:from-red-600 hover:to-red-700 shadow-md"
-                                        >
-                                          Cancel
-                                        </button>
-                                      )}
+                                        <CheckCircle className="w-12 h-12 text-white" />
+                                      </motion.div>
+                                      <h3 className="text-2xl font-bold text-gray-900 mb-3">
+                                        Thank You for Voting!
+                                      </h3>
+                                      <p className="text-gray-600 mb-4 text-lg">
+                                        Your vote for{" "}
+                                        <span className="font-semibold text-emerald-700 bg-emerald-50 px-2 py-1 rounded-md">
+                                          "{position.position}"
+                                        </span>{" "}
+                                        has been recorded.
+                                      </p>
                                     </div>
                                   </div>
-                                </motion.div>
-                              );
-                            }
-                          )}
-                        </div>
-                      )}
-                    </div>
+                                )}
 
-                    {/* Winner Announcement (shown when voting ended) */}
-                    {countdown.status === "ended" && winners[position.id] && (
-                      <motion.div
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        className="mt-4 mx-4 mb-4 p-4 bg-gradient-to-r from-amber-50 via-yellow-50/50 to-amber-50 rounded-xl border-2 border-amber-300"
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <div className="bg-gradient-to-r from-amber-500 to-yellow-500 rounded-lg p-2">
-                              <Trophy className="w-6 h-6 text-white" />
-                            </div>
-                            <div>
-                              <h4 className="font-bold text-gray-900">
-                                Winner Announced!
-                              </h4>
-                              <p className="text-gray-700">
-                                Congratulations to{" "}
-                                <span className="font-bold text-amber-700">
-                                  {
-                                    position.candidates.find(
-                                      (c) => c.id === winners[position.id]
-                                    )?.name
+                                {/* Enhanced Candidates Grid */}
+                                <div
+                                  className={`grid gap-4 ${
+                                    position.candidates.length === 1
+                                      ? "max-w-xs mx-auto grid-cols-1"
+                                      : position.candidates.length === 2
+                                      ? "grid-cols-1 sm:grid-cols-2"
+                                      : position.candidates.length === 3
+                                      ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"
+                                      : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+                                  }`}
+                                >
+                                  {position.candidates.map(
+                                    (candidate, candidateIndex) => {
+                                      const isWinner =
+                                        winners[position.id] === candidate.id;
+
+                                      return (
+                                        <motion.div
+                                          key={candidate.id}
+                                          initial={{ opacity: 0, scale: 0.9 }}
+                                          animate={{ opacity: 1, scale: 1 }}
+                                          transition={{
+                                            delay: candidateIndex * 0.05,
+                                          }}
+                                          className={`relative rounded-xl border-2 transition-all duration-300 overflow-hidden hover:shadow-lg ${
+                                            isViewing && isWinner && showResults
+                                              ? "border-amber-300 bg-gradient-to-br from-amber-50/50 to-yellow-50/30 ring-2 ring-amber-200"
+                                              : "border-gray-200 bg-white"
+                                          }`}
+                                        >
+                                          <div className="p-5">
+                                            {/* Enhanced Profile Photo */}
+                                            <div className="relative mb-4">
+                                              <div className="w-32 h-32 mx-auto rounded-2xl overflow-hidden border-4 shadow-xl border-white ring-2 ring-offset-2 ring-blue-100">
+                                                {candidate.photoUrl ? (
+                                                  <img
+                                                    src={candidate.photoUrl}
+                                                    alt={candidate.name}
+                                                    className="w-full h-full object-cover transition-transform duration-300 hover:scale-110"
+                                                  />
+                                                ) : (
+                                                  <div className="w-full h-full bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-600 flex items-center justify-center">
+                                                    <span className="text-white text-3xl font-bold">
+                                                      {getInitials(
+                                                        candidate.name
+                                                      )}
+                                                    </span>
+                                                  </div>
+                                                )}
+                                              </div>
+
+                                              {/* Enhanced Winner Badge */}
+                                              {isViewing &&
+                                                isWinner &&
+                                                showResults && (
+                                                  <div className="absolute -top-3 -right-3">
+                                                    <div className="relative">
+                                                      <div className="absolute inset-0 bg-gradient-to-r from-amber-500 to-yellow-500 rounded-full blur-sm"></div>
+                                                      <div className="relative bg-gradient-to-r from-amber-500 to-yellow-500 rounded-full p-4 shadow-2xl">
+                                                        <Crown className="w-6 h-6 text-white" />
+                                                      </div>
+                                                    </div>
+                                                  </div>
+                                                )}
+                                            </div>
+
+                                            {/* Enhanced Candidate Info */}
+                                            <div className="text-center">
+                                              <h4 className="font-bold text-gray-900 text-lg mb-3 line-clamp-1">
+                                                {candidate.name}
+                                              </h4>
+
+                                              {/* Enhanced Votes Display */}
+                                              <div className="mb-4">
+                                                <div className="inline-flex items-center gap-2 bg-gradient-to-r from-blue-50 to-indigo-50 px-5 py-2.5 rounded-full border border-blue-100 shadow-sm">
+                                                  <BarChart3 className="w-5 h-5 text-blue-600" />
+                                                  <span className="font-bold text-blue-700 text-lg">
+                                                    {candidate.vote_count ||
+                                                      candidate.votes ||
+                                                      0}{" "}
+                                                    <span className="text-sm font-medium">
+                                                      votes
+                                                    </span>
+                                                  </span>
+                                                </div>
+                                              </div>
+
+                                              {/* Percentage Bar - New Feature */}
+                                              {isViewing && showResults && (
+                                                <div className="mt-3">
+                                                  <div className="flex justify-between text-xs text-gray-500 mb-1">
+                                                    <span>Vote Share</span>
+                                                    <span className="font-bold">
+                                                      {candidate.vote_percentage ||
+                                                        "0%"}
+                                                    </span>
+                                                  </div>
+                                                  <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                                                    <motion.div
+                                                      initial={{ width: 0 }}
+                                                      animate={{
+                                                        width: `${
+                                                          candidate.vote_percentage ||
+                                                          0
+                                                        }%`,
+                                                      }}
+                                                      transition={{
+                                                        duration: 1,
+                                                        ease: "easeOut",
+                                                      }}
+                                                      className="h-full bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full"
+                                                    />
+                                                  </div>
+                                                </div>
+                                              )}
+                                            </div>
+                                          </div>
+                                        </motion.div>
+                                      );
+                                    }
+                                  )}
+                                </div>
+                              </div>
+                            ) : (
+                              // Enhanced Pre-vote view
+                              <div className="flex flex-wrap gap-6 items-start">
+                                {position.candidates.map(
+                                  (candidate, candidateIndex) => {
+                                    const isSelected = candidate.selected;
+                                    const isOtherSelected =
+                                      hasSelected && !isSelected;
+
+                                    return (
+                                      <motion.div
+                                        key={candidate.id}
+                                        initial={{ opacity: 0, scale: 0.9 }}
+                                        animate={{ opacity: 1, scale: 1 }}
+                                        transition={{
+                                          delay: candidateIndex * 0.05,
+                                        }}
+                                        className={`w-full sm:w-[260px] relative rounded-xl border-2 transition-all duration-300 overflow-hidden hover:shadow-lg ${
+                                          isSelected
+                                            ? "border-emerald-300 bg-gradient-to-br from-emerald-50/50 to-green-50/30 ring-2 ring-emerald-200"
+                                            : isOtherSelected
+                                            ? "border-gray-200 bg-gray-50/50 opacity-70"
+                                            : "border-gray-200 hover:border-blue-300 bg-white"
+                                        }`}
+                                      >
+                                        <div className="p-5">
+                                          {/* Enhanced Profile Photo */}
+                                          <div className="relative mb-4">
+                                            <div className="w-28 h-28 mx-auto rounded-xl overflow-hidden border-3 shadow-lg border-white ring-2 ring-offset-2 ring-blue-100">
+                                              {candidate.photoUrl ? (
+                                                <img
+                                                  src={candidate.photoUrl}
+                                                  alt={candidate.name}
+                                                  className="w-full h-full object-cover transition-transform duration-300 hover:scale-110"
+                                                />
+                                              ) : (
+                                                <div className="w-full h-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
+                                                  <span className="text-white text-2xl font-bold">
+                                                    {getInitials(
+                                                      candidate.name
+                                                    )}
+                                                  </span>
+                                                </div>
+                                              )}
+                                            </div>
+
+                                            {/* Enhanced Selection Badge */}
+                                            {isSelected && (
+                                              <div className="absolute top-0 right-0">
+                                                <div className="relative">
+                                                  <div className="absolute inset-0 bg-gradient-to-r from-emerald-500 to-green-600 rounded-full blur-sm"></div>
+                                                  <div className="relative bg-gradient-to-r from-emerald-500 to-green-600 rounded-full p-3 shadow-lg">
+                                                    <Check className="w-5 h-5 text-white" />
+                                                  </div>
+                                                </div>
+                                              </div>
+                                            )}
+                                          </div>
+
+                                          {/* Enhanced Candidate Info */}
+                                          <div className="text-center">
+                                            <h4 className="font-bold text-gray-900 text-lg mb-3 truncate">
+                                              {candidate.name}
+                                            </h4>
+
+                                            {/* Enhanced Votes Display */}
+                                            <div className="mb-4">
+                                              <span className="inline-flex items-center gap-2 bg-gradient-to-r from-gray-100 to-gray-200 rounded-full px-4 py-2 text-sm font-bold">
+                                                <BarChart3 className="w-4 h-4 text-gray-600" />
+                                                {candidate.vote_count ||
+                                                  candidate.votes ||
+                                                  0}{" "}
+                                                votes
+                                              </span>
+                                            </div>
+
+                                            {/* Enhanced Vote Button */}
+                                            <motion.button
+                                              whileHover={
+                                                !isOtherSelected
+                                                  ? { scale: 1.05 }
+                                                  : {}
+                                              }
+                                              whileTap={
+                                                !isOtherSelected
+                                                  ? { scale: 0.95 }
+                                                  : {}
+                                              }
+                                              onClick={() =>
+                                                !isOtherSelected &&
+                                                handleVote(
+                                                  candidate.id,
+                                                  position.id
+                                                )
+                                              }
+                                              disabled={isOtherSelected}
+                                              className={`w-full py-3 rounded-xl font-semibold text-sm transition-all shadow-md ${
+                                                isSelected
+                                                  ? "bg-gradient-to-r from-emerald-600 to-green-600 text-white hover:from-emerald-700 hover:to-green-700"
+                                                  : isOtherSelected
+                                                  ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                                                  : "bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700 hover:shadow-lg"
+                                              }`}
+                                            >
+                                              {isSelected ? (
+                                                <span className="flex items-center justify-center gap-2">
+                                                  <Check className="w-4 h-4" />
+                                                  Selected
+                                                </span>
+                                              ) : (
+                                                "Vote"
+                                              )}
+                                            </motion.button>
+
+                                            {/* Enhanced Cancel Selection Button */}
+                                            {isSelected && (
+                                              <motion.button
+                                                whileHover={{ scale: 1.05 }}
+                                                whileTap={{ scale: 0.95 }}
+                                                onClick={() =>
+                                                  handleClearSelection(
+                                                    position.id
+                                                  )
+                                                }
+                                                className="w-full py-3 mt-3 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-xl font-semibold text-sm hover:from-red-600 hover:to-red-700 shadow-md hover:shadow-lg transition-all"
+                                              >
+                                                <span className="flex items-center justify-center gap-2">
+                                                  <X className="w-4 h-4" />
+                                                  Cancel Selection
+                                                </span>
+                                              </motion.button>
+                                            )}
+                                          </div>
+                                        </div>
+                                      </motion.div>
+                                    );
                                   }
-                                </span>
-                              </p>
-                            </div>
+                                )}
+                              </div>
+                            )}
                           </div>
-                          <div className="text-right">
-                            <p className="text-gray-600 text-sm">Total Votes</p>
-                            <p className="text-amber-700 font-bold text-xl">
-                              {position.candidates.find(
-                                (c) => c.id === winners[position.id]
-                              )?.votes || 0}
-                            </p>
-                          </div>
-                        </div>
-                      </motion.div>
-                    )}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   </motion.div>
                 );
               })}
@@ -2162,103 +2698,280 @@ const VotingPage = () => {
           )
         )}
 
-        {/* Results View when voting ended */}
-        {countdown.status === "ended" &&
-          showResults &&
-          Object.keys(winners).length > 0 && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="bg-gradient-to-br from-amber-50 to-yellow-50 rounded-xl shadow-lg p-8 mb-6 border-2 border-amber-200"
-            >
-              <div className="text-center mb-6">
-                <div className="w-20 h-20 mx-auto bg-gradient-to-r from-amber-500 to-yellow-500 rounded-full flex items-center justify-center mb-4">
-                  <Trophy className="w-10 h-10 text-white" />
-                </div>
-                <h3 className="text-2xl font-bold text-gray-900 mb-2">
-                  Election Results
-                </h3>
-                <p className="text-gray-600">
-                  Final results for {electionData.electionName}
-                </p>
-              </div>
+        {/* Results View when voting ended - IMPROVED DESIGN */}
+        {countdown.status === "ended" && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="mb-6"
+          >
+            {/* Hero Section - Smaller */}
+            <div className="text-center mb-8">
+              <motion.div
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ type: "spring", damping: 15 }}
+                className="w-20 h-20 mx-auto bg-gradient-to-r from-emerald-500 to-green-600 rounded-full flex items-center justify-center shadow-xl mb-4"
+              >
+                <Trophy className="w-10 h-10 text-white" />
+              </motion.div>
 
-              <div className="space-y-6">
-                {positions.map((position) => {
-                  const winnerCandidate = position.candidates.find(
-                    (c) => winners[position.id] === c.id
-                  );
+              <motion.h1
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="text-2xl md:text-3xl font-bold text-gray-900 mb-3"
+              >
+                Election Results
+              </motion.h1>
 
-                  if (!winnerCandidate) return null;
+              <motion.p
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.2 }}
+                className="text-base text-gray-600 mb-4"
+              >
+                {electionData.electionName}
+              </motion.p>
+
+              <motion.div
+                initial={{ width: 0 }}
+                animate={{ width: "150px" }}
+                transition={{ delay: 0.3, duration: 1 }}
+                className="h-1 bg-gradient-to-r from-emerald-400 to-green-500 rounded-full mx-auto"
+              />
+            </div>
+
+            {/* Winners Grid - More Compact */}
+            {winnerDetails.length > 0 ? (
+              <div
+                className={`
+      mx-auto
+      max-w-7xl
+      mb-10
+      ${
+        winnerDetails.length === 1
+          ? "flex justify-center"
+          : "grid grid-cols-1 md:grid-cols-2 gap-8"
+      }
+    `}
+              >
+                {winnerDetails.map((winner, index) => {
+                  const isTopWinner = index === 0;
+                  const totalVotes =
+                    winner.Total_Votes || winner.candidate?.vote_count || 0;
 
                   return (
-                    <div
-                      key={position.id}
-                      className="bg-white rounded-xl p-6 border border-amber-100 shadow-md"
+                    <motion.div
+                      key={winner.id || index}
+                      initial={{ opacity: 0, y: 16, scale: 0.97 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      transition={{ delay: 0.3 + index * 0.08, duration: 0.35 }}
+                      className={`
+            relative
+            w-full
+            max-w-3xl
+            rounded-2xl
+            overflow-hidden
+            bg-white
+            ${
+              isTopWinner
+                ? "border-2 border-yellow-400 shadow-xl"
+                : "border border-emerald-200 shadow-lg"
+            }
+            hover:shadow-2xl
+            transition-all
+            duration-300
+          `}
                     >
-                      <div className="flex flex-col md:flex-row items-center gap-6">
-                        <div className="flex-shrink-0">
-                          <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-amber-300 shadow-lg">
-                            {winnerCandidate.photoUrl ? (
-                              <img
-                                src={winnerCandidate.photoUrl}
-                                alt={winnerCandidate.name}
-                                className="w-full h-full object-cover"
-                              />
-                            ) : (
-                              <div className="w-full h-full bg-gradient-to-br from-amber-500 to-yellow-600 flex items-center justify-center">
-                                <span className="text-white text-3xl font-bold">
-                                  {getInitials(winnerCandidate.name)}
-                                </span>
-                              </div>
-                            )}
-                          </div>
+                      {/* 🌟 TOP WINNER BADGE */}
+                      {isTopWinner && (
+                        <div className="absolute top-3 left-3 z-20 flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold text-white bg-gradient-to-r from-yellow-500 to-amber-500 shadow-lg">
+                          <Crown className="w-4 h-4" />
+                          TOP WINNER
                         </div>
-                        <div className="flex-1 text-center md:text-left">
-                          <div className="mb-4">
-                            <h4 className="text-2xl font-bold text-gray-900">
-                              {position.position}
-                            </h4>
-                            <div className="inline-block mt-2 px-4 py-1 bg-gradient-to-r from-amber-500 to-yellow-500 text-white rounded-full font-bold">
-                              Winner
+                      )}
+
+                      {/* Card Content */}
+                      <div className={`p-6 ${isTopWinner ? "pt-12" : ""}`}>
+                        <div className="grid grid-cols-1 md:grid-cols-[140px_1fr] gap-6">
+                          {/* LEFT – PHOTO + VOTES */}
+                          <div className="flex flex-col items-center md:items-start">
+                            <div className="relative mb-4">
+                              <div
+                                className={`
+                      w-28 h-28 rounded-xl overflow-hidden border-2
+                      ${
+                        isTopWinner ? "border-yellow-400" : "border-emerald-400"
+                      }
+                      shadow-md
+                    `}
+                              >
+                                {winner.candidate?.photoUrl ? (
+                                  <img
+                                    src={winner.candidate.photoUrl}
+                                    alt={winner.candidate.name}
+                                    className="w-full h-full object-cover"
+                                  />
+                                ) : (
+                                  <div className="w-full h-full bg-gradient-to-br from-emerald-600 to-green-600 flex items-center justify-center">
+                                    <span className="text-white text-2xl font-bold">
+                                      {getInitials(winner.candidate?.name)}
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Trophy */}
+                              <div className="absolute -bottom-3 -right-3 bg-gradient-to-r from-emerald-600 to-green-600 rounded-full p-2.5 shadow-lg">
+                                <Trophy className="w-5 h-5 text-white" />
+                              </div>
+                            </div>
+
+                            {/* Votes */}
+                            <div className="text-center md:text-left">
+                              <div className="text-2xl font-extrabold text-emerald-700">
+                                {totalVotes.toLocaleString()}
+                              </div>
+                              <div className="text-xs text-gray-500 tracking-wide">
+                                TOTAL VOTES
+                              </div>
                             </div>
                           </div>
-                          <h3 className="text-3xl font-bold text-amber-700 mb-2">
-                            {winnerCandidate.name}
-                          </h3>
-                          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-4">
-                            <div className="bg-gray-50 rounded-lg p-3">
-                              <p className="text-sm text-gray-600">
-                                Total Votes
-                              </p>
-                              <p className="text-2xl font-bold text-gray-900">
-                                {winnerCandidate.votes}
-                              </p>
+
+                          {/* RIGHT – DETAILS */}
+                          <div className="w-full">
+                            {/* Position */}
+                            <div className="mb-3">
+                              <div className="text-xs uppercase tracking-widest text-emerald-700 font-semibold mb-1">
+                                Winning Position
+                              </div>
+                              <h3 className="text-xl font-bold text-gray-900">
+                                {winner.election_candidate_position?.Position ||
+                                  winner.position_name ||
+                                  "Position"}
+                              </h3>
                             </div>
-                            <div className="bg-gray-50 rounded-lg p-3">
-                              <p className="text-sm text-gray-600">
-                                Department
-                              </p>
-                              <p className="text-lg font-semibold text-gray-900">
-                                {winnerCandidate.department}
-                              </p>
+
+                            {/* Candidate */}
+                            <div className="mb-5">
+                              <h2 className="text-2xl font-extrabold text-gray-900 mb-1">
+                                {winner.candidate?.name || "Unknown Candidate"}
+                              </h2>
+                              {winner.candidate?.candidate_id && (
+                                <div className="text-sm text-gray-500">
+                                  Candidate ID:{" "}
+                                  <span className="font-medium">
+                                    {winner.candidate.candidate_id}
+                                  </span>
+                                </div>
+                              )}
                             </div>
-                            <div className="bg-gray-50 rounded-lg p-3">
-                              <p className="text-sm text-gray-600">Location</p>
-                              <p className="text-lg font-semibold text-gray-900">
-                                {winnerCandidate.location}
-                              </p>
+
+                            {/* Info Pills */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
+                              {winner.candidate?.department && (
+                                <div className="rounded-xl bg-emerald-50 p-3">
+                                  <div className="text-xs text-emerald-700 font-semibold mb-1">
+                                    Department
+                                  </div>
+                                  <div className="text-sm font-bold text-gray-900">
+                                    {winner.candidate.department}
+                                  </div>
+                                </div>
+                              )}
+
+                              {winner.candidate?.location && (
+                                <div className="rounded-xl bg-blue-50 p-3">
+                                  <div className="text-xs text-blue-700 font-semibold mb-1">
+                                    Location
+                                  </div>
+                                  <div className="text-sm font-bold text-gray-900">
+                                    {winner.candidate.location}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Actions */}
+                            <div className="flex flex-wrap gap-3">
+                              <button
+                                onClick={() => setSelectedWinnerProfile(winner)}
+                                className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 shadow-md hover:shadow-lg transition-all"
+                              >
+                                <User className="w-4 h-4" />
+                                View Profile
+                              </button>
+
+                              <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold bg-gradient-to-r from-emerald-100 to-green-100 text-emerald-800">
+                                <Award className="w-4 h-4" />
+                                Winner #{index + 1}
+                              </div>
                             </div>
                           </div>
                         </div>
                       </div>
-                    </div>
+                    </motion.div>
                   );
                 })}
               </div>
+            ) : (
+              // No Winners Yet State - Smaller
+              <motion.div
+                initial={{ opacity: 0, scale: 0.98 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="text-center py-12 bg-gradient-to-br from-emerald-50 to-green-50 rounded-xl border border-emerald-200 mb-8"
+              >
+                <div className="w-20 h-20 mx-auto bg-gradient-to-r from-emerald-100 to-green-100 rounded-full flex items-center justify-center mb-4">
+                  <Clock className="w-10 h-10 text-emerald-600" />
+                </div>
+                <h3 className="text-xl font-bold text-gray-900 mb-3">
+                  Results Being Finalized
+                </h3>
+                <p className="text-sm text-gray-600 max-w-md mx-auto mb-4">
+                  The winners are being calculated and announced. Please check
+                  back shortly for the official results.
+                </p>
+                <div className="inline-flex items-center gap-2 bg-white px-4 py-2 rounded-lg shadow-sm border border-emerald-200">
+                  <Calendar className="w-4 h-4 text-emerald-600" />
+                  <span className="text-emerald-700 text-sm font-medium">
+                    Updated:{" "}
+                    {new Date().toLocaleTimeString([], {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </span>
+                </div>
+              </motion.div>
+            )}
+
+            {/* Footer Section - Smaller */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 1 }}
+              className="text-center pt-4 border-t border-gray-200"
+            >
+              <p className="text-xs text-gray-500">
+                Election ended on {formatDateTime(electionData.end_time)}
+              </p>
+              <p className="text-xs text-gray-400 mt-1">
+                These results are final and have been verified by the election
+                committee.
+              </p>
             </motion.div>
-          )}
+          </motion.div>
+        )}
       </div>
+
+      {/* Render Winner Profile Modal */}
+      <AnimatePresence>
+        {selectedWinnerProfile && (
+          <WinnerProfileModal
+            winner={selectedWinnerProfile}
+            onClose={() => setSelectedWinnerProfile(null)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 };

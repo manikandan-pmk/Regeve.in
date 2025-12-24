@@ -14,6 +14,8 @@ import {
 } from "lucide-react";
 import axios from "axios";
 import { useParams } from "react-router-dom";
+import * as XLSX from "xlsx";
+import { saveAs } from "file-saver";
 
 const axiosInstance = axios.create({
   baseURL: "https://api.regeve.in/api",
@@ -131,6 +133,47 @@ const ElectionDashboard = () => {
     return max > 0 ? max : 1;
   }, [allCandidates]);
 
+  // ===============================
+  // EXPORT TO EXCEL HANDLER
+  // ===============================
+  const exportToExcel = () => {
+    if (allCandidates.length === 0) {
+      alert("No candidate data to export");
+      return;
+    }
+
+    const excelData = allCandidates.map((c, index) => ({
+      "S.No": index + 1,
+      "Candidate Name": c.name,
+      Email: c.email,
+      Phone: c.phone || "-",
+      "WhatsApp Number": c.whatsapp || "-",
+      Gender: c.gender || "-",
+      Age: c.age || "-",
+      Position: c.position || "-",
+      Votes: c.votes || 0,
+      Winner: c.IsWinnedCandidate ? "YES" : "NO",
+      "Registration Date": c.registrationDate
+        ? new Date(c.registrationDate).toLocaleDateString()
+        : "-",
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(excelData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Candidates");
+
+    const excelBuffer = XLSX.write(workbook, {
+      bookType: "xlsx",
+      type: "array",
+    });
+
+    const fileData = new Blob([excelBuffer], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
+
+    saveAs(fileData, `Election_${electionDocumentId}_Candidates.xlsx`);
+  };
+
   // -----------------------------
   // FETCH DATA FUNCTIONS
   // -----------------------------
@@ -149,6 +192,10 @@ const ElectionDashboard = () => {
           id: c.id,
           documentId: c.documentId,
           name: c.name,
+          phone: c.phone_number ? String(c.phone_number) : "",
+          whatsapp: c.whatsApp_number ? String(c.whatsApp_number) : "",
+          gender: c.gender || "",
+          age: c.age || "",
           email: c.email || "",
           registrationDate: c.createdAt,
           image: c.photo?.url
@@ -157,6 +204,7 @@ const ElectionDashboard = () => {
           votes: c.vote_count || 0,
           party: c.party || null,
           position: section.Position,
+          IsWinnedCandidate: c.IsWinnedCandidate === true,
         }))
       );
 
@@ -268,9 +316,14 @@ const ElectionDashboard = () => {
               Monitor election progress and candidate analytics
             </p>
           </div>
-          <button className="w-full md:w-auto px-4 md:px-5 py-2.5 bg-white border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 transition-all duration-300 ease-out hover:scale-[1.02] transform flex items-center justify-center gap-2 font-medium text-sm shadow-sm hover:shadow-md animate-fade-in animation-delay-200">
-            <Download className="w-4 h-4 transition-transform duration-300 group-hover:scale-110" />
-            Export Report
+          <button
+            onClick={exportToExcel}
+            className="w-full md:w-auto px-4 md:px-5 py-2.5 bg-white border border-gray-200
+  text-gray-700 rounded-xl hover:bg-gray-50 transition-all duration-300
+  flex items-center justify-center gap-2 font-medium text-sm shadow-sm"
+          >
+            <Download className="w-4 h-4" />
+            Export Excel
           </button>
         </div>
 
@@ -439,7 +492,7 @@ const ElectionDashboard = () => {
                 <Search className="absolute left-3 md:left-4 top-1/2 transform -translate-y-1/2 w-4 h-4 md:w-5 md:h-5 text-gray-400 transition-transform duration-300 group-hover:scale-110" />
                 <input
                   type="text"
-                  placeholder="Search candidates by name, email, position, or party..."
+                  placeholder="Search candidates by name, email, position ..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   className="w-full pl-10 md:pl-12 pr-3 md:pr-4 py-2.5 md:py-3.5 bg-white border border-gray-300 rounded-lg md:rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all duration-300 text-gray-700 placeholder-gray-500 text-sm md:text-base shadow-sm hover:shadow-md focus:shadow-lg"
@@ -546,9 +599,6 @@ const ElectionDashboard = () => {
 
                       {/* Position & Party */}
                       <div className="mb-3 space-y-2">
-                        <span className="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-medium bg-gradient-to-r from-blue-50 to-blue-100/50 text-blue-700 border border-blue-200 hover:from-blue-100 hover:to-blue-200/50 transition-all duration-300">
-                          <UserCheck className="w-3 h-3 mr-1.5" /> Candidate
-                        </span>
                         {candidate.position && (
                           <div className="text-xs text-gray-600">
                             <span className="font-medium">Position:</span>{" "}
@@ -626,7 +676,7 @@ const ElectionDashboard = () => {
                       Candidate
                     </th>
                     <th className="p-4 lg:p-6 text-left text-sm font-semibold text-gray-700">
-                      Position & Party
+                      Position
                     </th>
                     <th className="p-4 lg:p-6 text-left text-sm font-semibold text-gray-700">
                       Registration
@@ -672,13 +722,20 @@ const ElectionDashboard = () => {
                                 alt={candidate.name}
                                 className="w-14 h-14 rounded-lg transition-transform duration-300 hover:scale-110"
                               />
-                              <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center shadow-md animate-pulse-slow">
-                                <UserCheck className="w-3.5 h-3.5 text-white" />
-                              </div>
                             </div>
                             <div>
                               <h3 className="font-semibold text-gray-900 text-base">
                                 {candidate.name}
+                                {candidate.IsWinnedCandidate && (
+                                  <span
+                                    className="inline-flex ml-4 items-center gap-1 px-2 py-0.5
+      text-sm font-semibold bg-green-100 text-green-800
+      border border-green-300 rounded-full"
+                                  >
+                                    <Trophy className="w-3 h-3" />
+                                    Winner
+                                  </span>
+                                )}
                               </h3>
                               <div className="flex items-center gap-2 mt-1.5">
                                 <svg
@@ -694,7 +751,7 @@ const ElectionDashboard = () => {
                                     d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
                                   />
                                 </svg>
-                                <span className="text-sm text-gray-600 truncate max-w-[180px]">
+                                <span className="text-sm text-gray-600 truncate max-w-[200px]">
                                   {candidate.email}
                                 </span>
                               </div>
@@ -705,13 +762,12 @@ const ElectionDashboard = () => {
                         {/* Position & Party Column */}
                         <td className="p-4 lg:p-6">
                           <div className="space-y-2">
-                            <span className="inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium bg-gradient-to-r from-blue-50 to-blue-100/50 text-blue-700 border border-blue-200 hover:from-blue-100 hover:to-blue-200/50 transition-all duration-300">
-                              <UserCheck className="w-4 h-4 mr-2" /> Candidate
-                            </span>
                             {candidate.position && (
                               <div className="text-sm text-gray-600">
-                                <span className="font-medium">Position:</span>{" "}
-                                {candidate.position}
+                                <span className="font-medium">
+                                  {" "}
+                                  {candidate.position}{" "}
+                                </span>
                               </div>
                             )}
                             {candidate.party && (

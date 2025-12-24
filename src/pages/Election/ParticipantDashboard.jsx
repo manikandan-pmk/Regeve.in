@@ -23,6 +23,8 @@ import {
 
 import axios from "axios";
 import { useNavigate, useParams } from "react-router-dom";
+import * as XLSX from "xlsx";
+import { saveAs } from "file-saver";
 
 const axiosInstance = axios.create({
   baseURL: "https://api.regeve.in/api",
@@ -64,6 +66,45 @@ const ParticipantDashboard = () => {
     participant: null,
     link: "",
   });
+
+  // ===============================
+  // EXPORT PARTICIPANTS TO EXCEL
+  // ===============================
+  const exportParticipantsToExcel = () => {
+    if (participants.length === 0) {
+      alert("No participant data to export");
+      return;
+    }
+
+    const excelData = participants.map((p, index) => ({
+      "S.No": index + 1,
+      "Participant ID": p.participant_id,
+      Name: p.name,
+      Email: p.email,
+      "Phone Number": p.phone ? String(p.phone) : "-",
+      "WhatsApp Number": p.whatsapp ? String(p.whatsapp) : "-",
+      Gender: p.gender || "-",
+      Age: p.age || "-",
+      "ID Number": p.idNumber || "-",
+      Status: p.verified ? "Verified" : "Pending",
+      Voted: p.hasVoted ? "YES" : "NO", // ✅ NEW COLUMN
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(excelData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Participants");
+
+    const excelBuffer = XLSX.write(workbook, {
+      bookType: "xlsx",
+      type: "array",
+    });
+
+    const fileData = new Blob([excelBuffer], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
+
+    saveAs(fileData, `Election_${electionDocumentId}_Participants.xlsx`);
+  };
 
   // Function to generate the share link
   const generateElectionFormLink = () => {
@@ -107,7 +148,7 @@ const ParticipantDashboard = () => {
   };
   const fetchParticipants = async () => {
     try {
-      const response= await axiosInstance.get("/election-participants", {
+      const response = await axiosInstance.get("/election-participants", {
         params: {
           electionDocumentId: electionDocumentId, // ✅ REQUIRED
         },
@@ -130,6 +171,7 @@ const ParticipantDashboard = () => {
           ? `https://api.regeve.in${item.Photo.url}`
           : `https://api.dicebear.com/7.x/initials/svg?seed=${item.name}`,
         constituency: item.constituency || "Unknown",
+        hasVoted: item.hasVoted === true,
       }));
 
       setParticipants(formatted);
@@ -537,7 +579,13 @@ const ParticipantDashboard = () => {
               </button>
 
               {/* Existing Export Data Button */}
-              <button className="px-5 py-2.5 border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 transition-all duration-200 flex items-center gap-2 text-sm font-medium bg-white shadow-[0_1px_3px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_8px_rgba(0,0,0,0.05)]">
+              <button
+                onClick={exportParticipantsToExcel}
+                className="px-5 py-2.5 border border-gray-200 text-gray-700 rounded-xl
+  hover:bg-gray-50 transition-all duration-200 flex items-center gap-2
+  text-sm font-medium bg-white shadow-[0_1px_3px_rgba(0,0,0,0.04)]
+  hover:shadow-[0_4px_8px_rgba(0,0,0,0.05)]"
+              >
                 <Download className="w-4 h-4" />
                 Export Data
               </button>
@@ -764,7 +812,7 @@ const ParticipantDashboard = () => {
                 <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
                 <input
                   type="text"
-                  placeholder="Search by name, email, ID, or constituency..."
+                  placeholder="Search by name, email, ID ..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   className="w-full pl-12 pr-4 py-3.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 focus:border-blue-400 outline-none transition-all duration-200 bg-white"
@@ -969,69 +1017,209 @@ const ParticipantDashboard = () => {
           )}
         </div>
 
-        {/* Edit Modal with Animation */}
-        {(editingId || isModalOpen) && (
+        {isModalOpen && (
           <div
-            className={`fixed inset-0 z-50 overflow-y-auto ${
-              isModalOpen ? "animate-fadeIn" : "animate-fadeOut"
-            }`}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="modal-title"
           >
-            {/* Backdrop with click handler */}
+            {/* Enhanced Backdrop */}
             <div
-              className="fixed inset-0 bg-black/50 transition-opacity"
+              className="absolute inset-0 bg-gradient-to-br from-black/40 via-black/30 to-black/20 backdrop-blur-sm transition-all duration-300"
               onClick={cancelEdit}
-            ></div>
+            />
 
-            <div className="flex min-h-full items-center justify-center p-4">
-              <div
-                className={`relative bg-white rounded-2xl max-w-4xl w-full p-6 shadow-2xl transform transition-all duration-300 ${
-                  isModalOpen ? "scale-100 opacity-100" : "scale-95 opacity-0"
-                }`}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div className="flex items-center justify-between mb-6">
-                  <div>
-                    <h3 className="text-xl font-bold text-gray-900">
-                      Edit Voter Details
-                    </h3>
-                    <p className="text-sm text-gray-500 mt-1">
-                      Participant ID: {editForm.participant_id}
-                    </p>
+            {/* Modal Container - Compact */}
+            <div
+              className="
+    relative z-50 w-full max-w-3xl
+    bg-white rounded-2xl shadow-2xl shadow-black/20
+    flex flex-col
+    max-h-[90vh]          /* 🔥 KEY FIX */
+    overflow-hidden
+    border border-gray-100
+    animate-[modalSlideIn_0.3s_ease-out]
+  "
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* ================= HEADER ================= */}
+              <div className="bg-white rounded-t-2xl border-b  border-gray-100 px-5 py-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 bg-blue-100 rounded-lg">
+                      <Edit2 className="w-5 h-5 text-blue-600" />
+                    </div>
+                    <div>
+                      <h3
+                        id="modal-title"
+                        className="text-lg font-semibold text-gray-900"
+                      >
+                        Edit Voter Information
+                      </h3>
+                      <p className="text-sm text-gray-500 mt-1">
+                        ID: {editForm.participant_id}
+                      </p>
+                    </div>
                   </div>
+
                   <button
                     onClick={cancelEdit}
-                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors duration-200"
+                    className="
+              p-2 rounded-lg hover:bg-gray-100 transition-all duration-200
+              hover:scale-105 active:scale-95
+            "
+                    aria-label="Close modal"
                   >
                     <X className="w-5 h-5 text-gray-500" />
                   </button>
                 </div>
+              </div>
 
-                {/* UPDATED FORM LAYOUT TO MATCH IMAGE */}
-                <div className="space-y-6 mb-6">
-                  {/* First Row */}
-                  <div className="grid grid-cols-2 gap-8">
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <label className="block text-sm font-medium text-gray-700">
-                          Full Name *
-                        </label>
-                        <div className="w-3/4">
-                          <input
-                            type="text"
-                            value={editForm.name || ""}
-                            onChange={(e) =>
-                              setEditForm({ ...editForm, name: e.target.value })
-                            }
-                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-blue-400 outline-none transition"
-                            placeholder="Enter full name"
-                          />
-                        </div>
+              {/* ================= BODY ================= */}
+              <div style={{ maxHeight: "calc(90vh - 140px)" }} className="px-5 py-4 space-y-4 overflow-y-auto">
+                {/* Profile Photo Section - Compact */}
+                <div className="space-y-3">
+                  <div>
+                    <h4 className="text-base font-semibold text-gray-900 mb-1">
+                      Profile Photo
+                    </h4>
+                    <p className="text-xs text-gray-500">
+                      Upload a square image (max 2MB)
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-6">
+                    {/* Current Photo Preview */}
+                    <div className="relative flex-shrink-0">
+                      <div className="relative w-28 h-28 rounded-xl overflow-hidden border-2 border-gray-200">
+                        <img
+                          src={photoPreview}
+                          alt="Voter profile"
+                          className="w-full h-full object-cover"
+                        />
                       </div>
-                      <div className="flex items-center justify-between">
-                        <label className="block text-sm font-medium text-gray-700">
-                          Email Address *
+                      {photoFile && (
+                        <div className="absolute -top-1 -right-1 px-2 py-0.5 bg-green-500 text-white text-xs rounded animate-pulse">
+                          New
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Upload Area */}
+                    <div className="flex-1">
+                      <label className="block cursor-pointer group">
+                        <div
+                          className="
+                  p-4 bg-gray-50
+                  rounded-xl border-2 border-dashed border-gray-300
+                  group-hover:border-blue-400 group-hover:bg-blue-50/30
+                  transition-all duration-300
+                  text-center
+                "
+                        >
+                          <div className="inline-flex flex-col items-center gap-2">
+                            <div
+                              className="
+                      p-2 bg-blue-100 rounded-lg
+                      group-hover:scale-110
+                      transition-transform duration-300
+                    "
+                            >
+                              <svg
+                                className="w-5 h-5 text-blue-600"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                                />
+                              </svg>
+                            </div>
+                            <div>
+                              <span
+                                className="
+                        block text-sm font-medium text-gray-700
+                        group-hover:text-blue-600 transition-colors
+                      "
+                              >
+                                Change photo
+                              </span>
+                              <p className="text-xs text-gray-500 mt-0.5">
+                                PNG, JPG up to 2MB
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files[0];
+                            if (file) {
+                              setPhotoFile(file);
+                              setPhotoPreview(URL.createObjectURL(file));
+                            }
+                          }}
+                        />
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Form Section */}
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2">
+                    <div className="p-1.5 bg-gray-100 rounded">
+                      <User className="w-4 h-4 text-gray-600" />
+                    </div>
+                    <h4 className="text-base font-semibold text-gray-900">
+                      Personal Information
+                    </h4>
+                    <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
+                      * Required
+                    </span>
+                  </div>
+
+                  {/* Form Grid - Compact spacing */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Column 1 */}
+                    <div className="space-y-4">
+                      {/* Full Name */}
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                          Full Name <span className="text-red-500">*</span>
                         </label>
-                        <div className="w-3/4">
+                        <input
+                          type="text"
+                          value={editForm.name || ""}
+                          onChange={(e) =>
+                            setEditForm({ ...editForm, name: e.target.value })
+                          }
+                          className="
+                    w-full px-3 py-2.5
+                    bg-white border border-gray-200 rounded-lg
+                    focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20
+                    outline-none transition-all duration-200
+                    placeholder:text-gray-400 text-sm
+                    hover:border-gray-300
+                  "
+                          placeholder="Enter full name"
+                        />
+                      </div>
+
+                      {/* Email */}
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                          Email Address <span className="text-red-500">*</span>
+                        </label>
+                        <div className="relative">
+                          <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
                           <input
                             type="email"
                             value={editForm.email || ""}
@@ -1041,60 +1229,59 @@ const ParticipantDashboard = () => {
                                 email: e.target.value,
                               })
                             }
-                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-blue-400 outline-none transition"
-                            placeholder="Enter email address"
+                            className="
+                      w-full pl-10 pr-3 py-2.5
+                      bg-white border border-gray-200 rounded-lg
+                      focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20
+                      outline-none transition-all duration-200
+                      placeholder:text-gray-400 text-sm
+                      hover:border-gray-300
+                    "
+                            placeholder="voter@email.com"
                           />
                         </div>
                       </div>
-                      <div className="flex items-center justify-between">
-                        <label className="block text-sm font-medium text-gray-700">
+
+                      {/* Age */}
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">
                           Age
                         </label>
-                        <div className="w-3/4">
+                        <div className="relative">
                           <input
                             type="number"
+                            min="18"
+                            max="120"
                             value={editForm.age || ""}
                             onChange={(e) =>
-                              setEditForm({
-                                ...editForm,
-                                age: parseInt(e.target.value),
-                              })
+                              setEditForm({ ...editForm, age: e.target.value })
                             }
-                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-blue-400 outline-none transition"
+                            className="
+                      w-full px-3 py-2.5
+                      bg-white border border-gray-200 rounded-lg
+                      focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20
+                      outline-none transition-all duration-200
+                      placeholder:text-gray-400 text-sm
+                      hover:border-gray-300
+                    "
                             placeholder="Enter age"
                           />
-                        </div>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <label className="block text-sm font-medium text-gray-700">
-                          Gender
-                        </label>
-                        <div className="w-3/4">
-                          <select
-                            value={editForm.gender || ""}
-                            onChange={(e) =>
-                              setEditForm({
-                                ...editForm,
-                                gender: e.target.value,
-                              })
-                            }
-                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-blue-400 outline-none transition"
-                          >
-                            <option value="">Select Gender</option>
-                            <option value="male">Male</option>
-                            <option value="female">Female</option>
-                            <option value="other">Other</option>
-                          </select>
+                          <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-xs text-gray-400">
+                            years
+                          </span>
                         </div>
                       </div>
                     </div>
 
+                    {/* Column 2 */}
                     <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <label className="block text-sm font-medium text-gray-700">
-                          Phone Number *
+                      {/* Phone */}
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                          Phone Number <span className="text-red-500">*</span>
                         </label>
-                        <div className="w-3/4">
+                        <div className="relative">
+                          <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
                           <input
                             type="tel"
                             value={editForm.phone || ""}
@@ -1104,16 +1291,30 @@ const ParticipantDashboard = () => {
                                 phone: e.target.value,
                               })
                             }
-                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-blue-400 outline-none transition"
-                            placeholder="Enter phone number"
+                            className="
+                      w-full pl-10 pr-3 py-2.5
+                      bg-white border border-gray-200 rounded-lg
+                      focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20
+                      outline-none transition-all duration-200
+                      placeholder:text-gray-400 text-sm
+                      hover:border-gray-300
+                    "
+                            placeholder="Phone number"
                           />
                         </div>
                       </div>
-                      <div className="flex items-center justify-between">
-                        <label className="block text-sm font-medium text-gray-700">
+
+                      {/* WhatsApp */}
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">
                           WhatsApp Number
                         </label>
-                        <div className="w-3/4">
+                        <div className="relative">
+                          <div className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-green-500">
+                            <svg fill="currentColor" viewBox="0 0 24 24">
+                              <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004c-1.168 0-2.335-.312-3.345-.911l-3.715 1.189 1.189-3.714c-1.251-2.189-1.258-4.842-.022-7.001 1.641-2.831 4.64-4.524 7.898-4.524 2.582 0 5.007 1.202 6.548 3.238 1.541 2.036 1.944 4.612 1.089 7.003-1.642 4.524-6.415 7.381-10.948 6.92" />
+                            </svg>
+                          </div>
                           <input
                             type="tel"
                             value={editForm.whatsapp || ""}
@@ -1123,16 +1324,56 @@ const ParticipantDashboard = () => {
                                 whatsapp: e.target.value,
                               })
                             }
-                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-blue-400 outline-none transition"
-                            placeholder="Enter WhatsApp number"
+                            className="
+                      w-full pl-10 pr-3 py-2.5
+                      bg-white border border-gray-200 rounded-lg
+                      focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20
+                      outline-none transition-all duration-200
+                      placeholder:text-gray-400 text-sm
+                      hover:border-gray-300
+                    "
+                            placeholder="WhatsApp number (optional)"
                           />
                         </div>
                       </div>
-                      <div className="flex items-center justify-between">
-                        <label className="block text-sm font-medium text-gray-700">
-                          ID Number *
-                        </label>
-                        <div className="w-3/4">
+
+                      {/* Gender and ID Number */}
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                            Gender
+                          </label>
+                          <div className="relative">
+                            <select
+                              value={editForm.gender || ""}
+                              onChange={(e) =>
+                                setEditForm({
+                                  ...editForm,
+                                  gender: e.target.value,
+                                })
+                              }
+                              className="
+                        w-full px-3 py-2.5
+                        bg-white border border-gray-200 rounded-lg
+                        focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20
+                        outline-none transition-all duration-200
+                        appearance-none cursor-pointer text-sm
+                        hover:border-gray-300
+                      "
+                            >
+                              <option value="">Select</option>
+                              <option value="male">Male</option>
+                              <option value="female">Female</option>
+                              <option value="other">Other</option>
+                            </select>
+                            <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 w-3 h-3 text-gray-400 pointer-events-none" />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                            ID Number <span className="text-red-500">*</span>
+                          </label>
                           <input
                             type="text"
                             value={editForm.idNumber || ""}
@@ -1142,82 +1383,80 @@ const ParticipantDashboard = () => {
                                 idNumber: e.target.value,
                               })
                             }
-                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-blue-400 outline-none transition"
-                            placeholder="Enter ID number"
-                          />
-                        </div>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <label className="block text-sm font-medium text-gray-700">
-                          Participant ID
-                        </label>
-                        <div className="w-3/4">
-                          <input
-                            type="text"
-                            value={editForm.participant_id || ""}
-                            onChange={(e) =>
-                              setEditForm({
-                                ...editForm,
-                                participant_id: e.target.value,
-                              })
-                            }
-                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-blue-400 outline-none transition bg-gray-50"
-                            placeholder="Auto-generated"
-                            readOnly
+                            className="
+                      w-full px-3 py-2.5
+                      bg-white border border-gray-200 rounded-lg
+                      focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20
+                      outline-none transition-all duration-200
+                      placeholder:text-gray-400 text-sm
+                      hover:border-gray-300
+                    "
+                            placeholder="ID number"
                           />
                         </div>
                       </div>
                     </div>
                   </div>
                 </div>
+              </div>
 
-                {/* Profile Photo */}
-                <div className="flex items-center gap-6 mb-6">
-                  <img
-                    src={photoPreview}
-                    alt="Preview"
-                    className="w-24 h-24 rounded-xl object-cover border"
-                  />
-                  <label className="cursor-pointer">
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={(e) => {
-                        const file = e.target.files[0];
-                        if (file) {
-                          setPhotoFile(file);
-                          setPhotoPreview(URL.createObjectURL(file));
-                        }
-                      }}
-                    />
-                    <span className="px-4 py-2 text-sm bg-gray-100 rounded-lg hover:bg-gray-200">
-                      Change Photo
-                    </span>
-                  </label>
+              {/* ================= FOOTER ================= */}
+              <div
+                className="
+        bg-white border-t border-gray-100 rounded-b-2xl
+        px-6 py-4 flex items-center justify-between
+      "
+              >
+                <div className="text-xs text-gray-500">
+                  <span className="font-medium text-gray-700">
+                    Last updated:
+                  </span>{" "}
+                  {new Date().toLocaleDateString("en-US", {
+                    month: "short",
+                    day: "numeric",
+                    year: "numeric",
+                  })}
                 </div>
 
-                <div className="border-t border-gray-200 pt-6">
-                  <div className="flex justify-end gap-3">
-                    <button
-                      onClick={cancelEdit}
-                      className="px-5 py-2.5 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors duration-200"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={saveEdit}
-                      className="px-5 py-2.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-colors duration-200 flex items-center gap-2"
-                    >
-                      <Save className="w-4 h-4" />
-                      Save Changes
-                    </button>
-                  </div>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={cancelEdit}
+                    className="
+              px-4 py-2.5
+              text-sm font-medium text-gray-700
+              bg-gray-100 hover:bg-gray-200
+              rounded-lg transition-all duration-200
+              hover:scale-105 active:scale-95
+              flex items-center gap-1.5
+            "
+                    type="button"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                    Cancel
+                  </button>
+
+                  <button
+                    onClick={saveEdit}
+                    className="
+              px-5 py-2.5
+              text-sm font-medium text-white
+              bg-blue-600 hover:bg-blue-700
+              rounded-lg transition-all duration-200
+              hover:scale-105 active:scale-95
+              flex items-center gap-1.5
+              shadow hover:shadow-md
+            "
+                    type="button"
+                  >
+                    <Save className="w-3.5 h-3.5" />
+                    Save Changes
+                  </button>
                 </div>
               </div>
             </div>
           </div>
         )}
+
         {/* Summary Footer */}
         <div className="mt-6 bg-white rounded-2xl border border-gray-100 shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-6">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
