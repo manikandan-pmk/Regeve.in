@@ -1,13 +1,11 @@
-import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   FaPlay,
   FaStop,
   FaTrophy,
   FaStar,
-  FaFire,
-  FaUser,
   FaAward,
+  FaUser,
 } from "react-icons/fa";
 import {
   GiSparkles,
@@ -15,11 +13,10 @@ import {
   GiSpinningBlades,
   GiCardRandom,
 } from "react-icons/gi";
-import { IoSparkles, IoRocket } from "react-icons/io5";
-import axios from "axios";
-import ProfilePopup from "./ProfilePopup";
+import { IoRocket } from "react-icons/io5";
 import { useNavigate } from "react-router-dom";
-import Logo from "../assets/form-logo.png";
+import axios from "axios";
+import React, { useState, useEffect } from "react";
 
 // Animation variants
 const containerVariants = {
@@ -179,75 +176,104 @@ const LuckyDraw = () => {
   const [finalValues, setFinalValues] = useState(["B", "0", "0", "0"]);
   const [blastAnimation, setBlastAnimation] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
-  const [allMembers, setAllMembers] = useState([]);
-  const [selectedMember, setSelectedMember] = useState(null);
-  const [loading, setLoading] = useState(false);
 
   const navigate = useNavigate();
+  const adminId = localStorage.getItem("adminId");
 
-  // Fetch all members data on component mount
-  useEffect(() => {
-    fetchAllMembers();
-  }, []);
+const [participants, setParticipants] = useState([]);
+  const [loading, setLoading] = useState(false);
 
-  const fetchAllMembers = async () => {
+  // Static demo members data
+  // const staticMembers = [
+  //   {
+  //     id: 1,
+  //     name: "John Doe",
+  //     memberId: "B123",
+  //     phone: "+1 234-567-8901",
+  //     email: "john@example.com",
+  //     companyId: "COMP001",
+  //     age: 28,
+  //     familyMembers: 3,
+  //     address: "123 Main St, New York",
+  //     foodPreference: "Vegetarian",
+  //     gender: "Male",
+  //     isWinnned: false,
+  //     photo: "https://randomuser.me/api/portraits/men/1.jpg"
+  //   },
+  //   {
+  //     id: 2,
+  //     name: "Jane Smith",
+  //     memberId: "B045",
+  //     phone: "+1 345-678-9012",
+  //     email: "jane@example.com",
+  //     companyId: "COMP002",
+  //     age: 32,
+  //     familyMembers: 4,
+  //     address: "456 Oak Ave, Los Angeles",
+  //     foodPreference: "Non-Vegetarian",
+  //     gender: "Female",
+  //     isWinnned: false,
+  //     photo: "https://randomuser.me/api/portraits/women/2.jpg"
+  //   },
+  //   {
+  //     id: 3,
+  //     name: "Robert Johnson",
+  //     memberId: "B267",
+  //     phone: "+1 456-789-0123",
+  //     email: "robert@example.com",
+  //     companyId: "COMP003",
+  //     age: 45,
+  //     familyMembers: 2,
+  //     address: "789 Pine Rd, Chicago",
+  //     foodPreference: "Vegan",
+  //     gender: "Male",
+  //     isWinnned: false,
+  //     photo: "https://randomuser.me/api/portraits/men/3.jpg"
+  //   }
+  // ];
+
+useEffect(() => {
+  const fetchParticipants = async () => {
     try {
       setLoading(true);
-      const response = await axios.get("https://api.regeve.in/api/form");
-      console.log("API Response:", response.data.data);
 
-      // Filter members who haven't won yet
-      const eligible = response.data.data.filter((m) => {
-        const present = m.IsPresent === true || m.IsPresent === "true";
+      const token = localStorage.getItem("jwt"); // 🔑 get token
 
-        // treat null as NOT won
-        const won = m.IsWinnned === true || m.IsWinnned === "true";
+      const res = await axios.get(
+        "https://api.regeve.in/api/lucky-draw-forms",
+        {
+          headers: {
+            Authorization: `Bearer ${token}`, // ✅ REQUIRED
+          },
+        }
+      );
 
-        return present && !won;
-      });
+      const data = res.data?.data || res.data;
 
-      console.log("Eligible members:", eligible);
-      setAllMembers(eligible);
-    } catch (error) {
-      console.error("Error fetching members:", error);
+      // ✅ Only verified users
+      const verifiedUsers = data.filter(
+        (user) => user.isVerified === true
+      );
+
+      setParticipants(verifiedUsers);
+    } catch (err) {
+      console.error("Fetch error:", err);
+
+      if (err.response?.status === 403) {
+        alert("Session expired. Please login again.");
+      }
     } finally {
       setLoading(false);
     }
   };
 
-  const updateWinnerStatus = async (memberId) => {
-    try {
-      const member = allMembers.find(
-        (m) => m.Member_ID === memberId || m.Member_ID === memberId
-      );
-      if (!member) {
-        console.error("Member not found:", memberId);
-        return false;
-      }
+  fetchParticipants();
+}, []);
 
-      console.log("Updating winner status for:", memberId);
-
-      const response = await axios.put(
-        `https://api.regeve.in/api/event-forms/${memberId}`,
-        {
-          data: {
-            IsWinnned: true, // CHANGED FROM false TO true
-          },
-        }
-      );
-
-      console.log("Update successful:", response.data);
-      return true;
-    } catch (error) {
-      console.error("Update failed:", error);
-      console.log("Error details:", error.response?.data);
-      return false;
-    }
-  };
 
   const startSpinning = () => {
-    if (allMembers.length === 0) {
-      alert("No eligible participants available!");
+    if (participants.length === 0) {
+      alert("No verified participants available!");
       return;
     }
 
@@ -256,73 +282,28 @@ const LuckyDraw = () => {
     setResult(null);
     setBlastAnimation(false);
     setShowProfile(false);
-    setSelectedMember(null);
-
-    const randomNumber = Math.floor(Math.random() * 300) + 1;
-    const numberStr = randomNumber.toString().padStart(3, "0");
-    const newFinalValues = ["B", numberStr[0], numberStr[1], numberStr[2]];
-    setFinalValues(newFinalValues);
   };
 
-  const stopSpinning = async () => {
+  const stopSpinning = () => {
     setIsSpinning(false);
     setBlastAnimation(true);
 
-    try {
-      if (allMembers.length > 0) {
-        const randomIndex = Math.floor(Math.random() * allMembers.length);
-        const winner = allMembers[randomIndex];
-        console.log("Selected Winner:", winner);
-        setSelectedMember(winner);
+    if (participants.length > 0) {
+      const randomIndex = Math.floor(Math.random() * participants.length);
 
-        // Extract member ID from either direct property or attributes
-        const memberId = winner.Member_ID || winner.attributes?.Member_ID;
-        const memberNumber = memberId ? memberId.substring(1) : "000";
-        const finalDisplayValues = [
-          "B",
-          memberNumber[0] || "0",
-          memberNumber[1] || "0",
-          memberNumber[2] || "0",
-        ];
-        setFinalValues(finalDisplayValues);
+      const winner = participants[randomIndex];
 
-        const updateSuccess = await updateWinnerStatus(memberId);
+      // LuckyDraw_ID → number boxes
+      const luckyId = winner.LuckyDraw_ID || "B000";
+      const digits = luckyId.replace(/\D/g, "").padStart(3, "0");
 
-        const successMessages = [
-          "Amazing! You've hit the jackpot!",
-          "Incredible! Fortune favors you!",
-          "Outstanding! You're a winner!",
-          "Fantastic! Luck is on your side!",
-          "Remarkable! Victory is yours!",
-        ];
+      setFinalValues(["B", digits[0], digits[1], digits[2]]);
 
-        const randomMessage =
-          successMessages[Math.floor(Math.random() * successMessages.length)];
-        setResult({
-          message: randomMessage,
-          memberId: memberId || "B000",
-          updateSuccess: updateSuccess,
-        });
-
-        if (updateSuccess) {
-          // Refresh the members list after a short delay
-          setTimeout(() => {
-            fetchAllMembers();
-          }, 2000);
-        }
-      } else {
-        setResult({
-          message: "No eligible participants found!",
-          memberId: "B000",
-          updateSuccess: false,
-        });
-      }
-    } catch (error) {
-      console.error("Error selecting winner:", error);
       setResult({
-        message: "Error selecting winner. Please try again.",
-        memberId: "B000",
-        updateSuccess: false,
+        message: "Congratulations! You are the lucky winner!",
+        memberId: luckyId,
+        winner: winner,
+        updateSuccess: true,
       });
     }
 
@@ -338,7 +319,6 @@ const LuckyDraw = () => {
     setBlastAnimation(false);
     setCurrentValues(["B", "0", "0", "0"]);
     setFinalValues(["B", "0", "0", "0"]);
-    setSelectedMember(null);
   };
 
   const handleViewProfile = () => {
@@ -352,55 +332,29 @@ const LuckyDraw = () => {
     }, 300);
   };
 
-  // Format user data for ProfilePopup
-  const formatUserData = (member) => {
-    if (!member) return null;
-
-    console.log("Formatting member:", member);
-    const memberData = member.attributes || member;
-    const baseUrl = "https://api.regeve.in";
-
-    return {
-      name: memberData.Name || "No Name",
-      phone: memberData.Phone_Number || "Not provided",
-      whatsapp: memberData.WhatsApp_Number || "Not provided",
-      email: memberData.Email || "Not provided",
-      companyId: memberData.Company_ID || "Not provided",
-      image: memberData.Photo?.url
-        ? `${baseUrl}${memberData.Photo.url}`
-        : memberData.Photo?.data?.attributes?.url
-        ? `${baseUrl}${memberData.Photo.data.attributes.url}`
-        : null,
-      age: memberData.Age || 0,
-      familyMembers: memberData.Family_Member_Count || 0,
-      address: memberData.Address || "Not provided",
-      foodPreference: memberData.Food || "Not specified",
-      gender: memberData.Gender || "Not specified",
-      memberId: memberData.Member_ID || "Not provided",
-      isWinnned: memberData.IsWinnned || false,
-    };
-  };
-
+  // Update current values during spinning
   useEffect(() => {
-    let interval;
-    if (isSpinning) {
-      interval = setInterval(() => {
-        const randomNumber = Math.floor(Math.random() * 300) + 1;
-        const numberStr = randomNumber.toString().padStart(3, "0");
-        setCurrentValues(["B", numberStr[0], numberStr[1], numberStr[2]]);
-      }, 60);
-    } else {
-      setCurrentValues(finalValues);
-    }
+  let interval;
 
-    return () => clearInterval(interval);
-  }, [isSpinning, finalValues]);
+  if (isSpinning) {
+    interval = setInterval(() => {
+      const randomNumber = Math.floor(Math.random() * 300) + 1;
+      const numberStr = randomNumber.toString().padStart(3, "0");
+      setCurrentValues(["B", numberStr[0], numberStr[1], numberStr[2]]);
+    }, 60);
+  } else {
+    setCurrentValues(finalValues);
+  }
+
+  return () => clearInterval(interval);
+}, [isSpinning, finalValues]);
+
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-800 flex items-center justify-center p-4 font-serif relative">
-      {/* Fixed Go Home Button - Top Right */}
+      {/* Profile Popup - Static Version */}
       <motion.button
-        onClick={() => navigate("/")}
+        onClick={() => navigate(`/${adminId}/luckydraw-dashboard`)}
         className={`fixed top-6 right-6 z-50 bg-gradient-to-br from-slate-900 via-purple-900 hover:from-blue-700 hover:to-cyan-800 text-white px-5 py-2.5 rounded-lg shadow-lg cursor-pointer transition-all duration-200 ease-in-out transform hover:scale-105 font-medium text-sm border border-white/30 backdrop-blur-sm ${
           showProfile ? "blur-sm opacity-70" : "opacity-100"
         }`}
@@ -412,20 +366,90 @@ const LuckyDraw = () => {
           boxShadow: "0 0 20px rgba(59, 130, 246, 0.5)",
         }}
       >
-        ← Go Home
+        ← Go Back
       </motion.button>
+      <AnimatePresence>
+        {showProfile && result?.winner && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm"
+            onClick={closeProfile}
+          >
+            <motion.div
+              initial={{ scale: 0.8, y: 50 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.8, y: 50 }}
+              className="bg-gradient-to-br from-slate-800 to-purple-900 rounded-3xl p-8 max-w-md w-full m-4 border border-purple-500/30 shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-bold text-white">
+                  Winner Profile
+                </h2>
+                <button
+                  onClick={closeProfile}
+                  className="text-white text-xl hover:text-yellow-400"
+                >
+                  ✕
+                </button>
+              </div>
 
-      {/* Profile Popup */}
-      <ProfilePopup
-        isOpen={showProfile}
-        onClose={closeProfile}
-        userData={formatUserData(selectedMember)}
-        luckyNumber={
-          selectedMember
-            ? selectedMember.Member_ID || selectedMember.attributes?.Member_ID
-            : `B${finalValues.slice(1).join("")}`
-        }
-      />
+              <div className="text-center mb-6">
+                <div className="w-32 h-32 mx-auto mb-4 rounded-full overflow-hidden border-4 border-yellow-400">
+                  <img
+                    src={
+                      result.winner.Photo?.url
+                        ? `https://api.regeve.in${result.winner.Photo.url}`
+                        : "/default-avatar.png"
+                    }
+                    alt={result.winner.Name}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <h3 className="text-xl font-bold text-white">
+                  {result.winner.Name}
+                </h3>
+                <p className="text-yellow-400 font-mono">
+                  {result.winner.LuckyDraw_ID}
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Phone:</span>
+                  <span className="text-white">
+                    {result.winner.Phone_Number}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Email:</span>
+                  <span className="text-white">{result.winner.Email}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Age:</span>
+                  <span className="text-white">{result.winner.Age}</span>
+                </div>
+
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Gender:</span>
+                  <span className="text-white">{result.winner.Gender}</span>
+                </div>
+              </div>
+
+              <div className="mt-6 p-4 bg-purple-900/50 rounded-xl">
+                <p className="text-center text-yellow-300 font-bold">
+                  🎉 CONGRATULATIONS! 🎉
+                </p>
+                <p className="text-center text-gray-300 mt-2">
+                  You are the lucky winner!
+                </p>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Animated Background Elements */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
@@ -751,7 +775,7 @@ const LuckyDraw = () => {
             }}
             whileTap={{ scale: 0.95 }}
             onClick={startSpinning}
-            disabled={isSpinning || loading || allMembers.length === 0}
+            disabled={isSpinning || loading}
             className="flex-1 bg-gradient-to-r cursor-pointer from-green-500 to-emerald-600 text-white py-4 px-6 rounded-xl font-bold text-lg shadow-2xl flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed border border-emerald-400 relative overflow-hidden"
           >
             <motion.div
@@ -781,7 +805,7 @@ const LuckyDraw = () => {
             }}
             whileTap={{ scale: 0.95 }}
             onClick={stopSpinning}
-            disabled={!isSpinning || allMembers.length === 0}
+            disabled={!isSpinning}
             className="flex-1 bg-gradient-to-r cursor-pointer from-red-500 to-pink-600 text-white py-4 px-6 rounded-xl font-bold text-lg shadow-2xl flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed border border-red-400 relative overflow-hidden"
           >
             <motion.div
@@ -875,7 +899,7 @@ const LuckyDraw = () => {
               )}
 
               {/* View Profile Button */}
-              {selectedMember && (
+              {result.winner && (
                 <motion.div
                   initial={{ scale: 0 }}
                   animate={{ scale: 1 }}
@@ -951,14 +975,14 @@ const LuckyDraw = () => {
           className="text-center text-sm text-gray-400 mt-6"
         >
           <p className="font-light">Press START to begin your lucky draw!</p>
-          {allMembers.length > 0 && (
+          {participants.length > 0 && (
             <p className="text-xs mt-1 text-green-400">
-              {allMembers.length} eligible participants
+              {participants.length} verified participants loaded
             </p>
           )}
-          {allMembers.length === 0 && !loading && (
+          {participants.length === 0 && !loading && (
             <p className="text-xs mt-1 text-red-400">
-              No eligible participants found
+              No verified participants found
             </p>
           )}
         </motion.div>

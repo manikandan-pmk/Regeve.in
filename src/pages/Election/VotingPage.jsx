@@ -93,6 +93,34 @@ const VotingPage = () => {
 
   const countdownRef = useRef(null);
   const lastStatusRef = useRef("pending");
+ 
+
+  useEffect(() => {
+    const savedParticipant = localStorage.getItem(
+      `election_${documentId}_verified`
+    );
+
+    if (savedParticipant) {
+      try {
+        const parsed = JSON.parse(savedParticipant);
+
+        setParticipantData(parsed);
+        setIsVerified(true);
+
+        // restore completed state
+        const completed = localStorage.getItem(
+          `election_${documentId}_completed`
+        );
+        if (completed === "true") {
+          setViewOnly(true);
+          setHasCompletedVoting(true);
+        }
+      } catch (e) {
+        console.error("Failed to restore participant session");
+        localStorage.removeItem(`election_${documentId}_verified`);
+      }
+    }
+  }, [documentId]);
 
   // Add this function after your other handlers
   const togglePositionExpand = (positionId) => {
@@ -240,94 +268,78 @@ const VotingPage = () => {
       timeToEnd,
     };
   }, [electionData.start_time, electionData.end_time, getCurrentTime]);
+    const fetchWinners = useCallback(async () => {
+    try {
+      if (!electionIdFromApi) return;
 
-  // Update countdown and check status changes
+      const response = await axiosInstance.get("/winners", {
+        params: {
+          filters: {
+            election: {
+              id: electionIdFromApi,
+            },
+          },
+          populate: "*",
+        },
+      });
+
+      if (
+        response.data &&
+        Array.isArray(response.data) &&
+        response.data.length > 0
+      ) {
+        const winnersMap = {};
+        response.data.forEach((winner) => {
+          if (
+            winner.position &&
+            winner.position.id &&
+            winner.candidate &&
+            winner.candidate.id
+          ) {
+            winnersMap[winner.position.id] = winner.candidate.id;
+          }
+        });
+        setWinners(winnersMap);
+        setShowResults(true);
+      }
+    } catch (error) {
+      console.error("Error fetching winners:", error);
+    }
+  }, [axiosInstance, electionIdFromApi]);
+
   const updateCountdown = useCallback(() => {
     const newCountdown = calculateCountdown();
-    setCountdown((prev) => {
-  if (prev.totalSeconds === newCountdown.totalSeconds) {
-    return prev; // ⛔ skip duplicate second
-  }
-  return newCountdown; // ✅ force re-render
-});
+    setCountdown(newCountdown);
 
-
-    // Check if status changed
     if (lastStatusRef.current !== newCountdown.status) {
-      console.log(
-        `Status changed from ${lastStatusRef.current} to ${newCountdown.status}`
-      );
-
       if (
         newCountdown.status === "active" &&
         lastStatusRef.current === "pending"
       ) {
-        // Voting just started
-        console.log("VOTING STARTED! Showing voting UI...");
         setHasVotingStarted(true);
         setShowCountdownPopup(false);
-
-        // Force re-render to show voting UI
-        setRefreshKey((prev) => prev + 1);
-
-        // Play notification sound or show alert
-        if (Notification.permission === "granted") {
-          new Notification("Voting Started!", {
-            body: `Voting for ${electionData.electionName} has started!`,
-            icon: "/voting-icon.png",
-          });
-        }
-
-        // Show alert for testing
-        alert(
-          `🎉 Voting for "${electionData.electionName}" has started! You can now vote.`
-        );
       }
 
       if (
         newCountdown.status === "ended" &&
-        lastStatusRef.current === "active"
+        lastStatusRef.current !== "ended"
       ) {
-        // Voting just ended
-        console.log("VOTING ENDED! Showing results...");
         setHasVotingEnded(true);
         setShowResults(true);
         setViewOnly(true);
 
-        // Force fetch winners
-        if (electionIdFromApi) {
-          fetchWinners();
+        // 🔥 STOP COUNTDOWN COMPLETELY
+        if (countdownRef.current) {
+          clearInterval(countdownRef.current);
+          countdownRef.current = null;
         }
 
-        // Play notification sound or show alert
-        if (Notification.permission === "granted") {
-          new Notification("Voting Ended!", {
-            body: `Voting for ${electionData.electionName} has ended. Results are available.`,
-            icon: "/voting-icon.png",
-          });
-        }
-
-        // Show alert for testing
-        alert(
-          `⏰ Voting for "${electionData.electionName}" has ended. Results are now available.`
-        );
+        if (electionIdFromApi) fetchWinners();
       }
 
       lastStatusRef.current = newCountdown.status;
     }
-
-    // Auto-hide countdown popup when voting starts
-    if (newCountdown.status === "active" && showCountdownPopup) {
-      setShowCountdownPopup(false);
-    }
-
-    return newCountdown;
-  }, [
-    calculateCountdown,
-    electionData.electionName,
-    electionIdFromApi,
-    showCountdownPopup,
-  ]);
+  }, [calculateCountdown, electionIdFromApi, fetchWinners]);
 
   // Start countdown interval
   const startCountdownInterval = useCallback(() => {
@@ -335,20 +347,35 @@ const VotingPage = () => {
       clearInterval(countdownRef.current);
     }
 
-    const interval = setInterval(() => {
-      const newCountdown = updateCountdown();
-
-      // Check if we need to stop the interval
-      if (newCountdown.status === "ended" && newCountdown.totalSeconds <= 0) {
-        clearInterval(countdownRef.current);
-        countdownRef.current = null;
-      }
+    countdownRef.current = setInterval(() => {
+      updateCountdown();
     }, 1000);
-
-    countdownRef.current = interval;
-    setTimeInterval(interval);
-    return interval;
   }, [updateCountdown]);
+
+  useEffect(() => {
+  if (
+    electionData.start_time &&
+    electionData.end_time &&
+    countdown.status !== "ended"
+  ) {
+    updateCountdown();
+    startCountdownInterval();
+  }
+
+  return () => {
+    if (countdownRef.current) {
+      clearInterval(countdownRef.current);
+      countdownRef.current = null;
+    }
+  };
+}, [
+  electionData.start_time,
+  electionData.end_time,
+  countdown.status,
+  updateCountdown,
+  startCountdownInterval,
+]);
+
 
   // Check if user has completed all votes
   const checkIfCompletedAllVotes = useCallback(() => {
@@ -448,7 +475,6 @@ const VotingPage = () => {
         lastStatusRef.current = initialCountdown.status;
         startCountdownInterval();
 
-
         // Set flags based on initial status
         if (initialCountdown.status === "active") {
           setHasVotingStarted(true);
@@ -510,45 +536,6 @@ const VotingPage = () => {
     }
   }, [positions, hasVotingStarted, isVerified, votedPositions]);
 
-  // Fetch winners
-  const fetchWinners = useCallback(async () => {
-    try {
-      if (!electionIdFromApi) return;
-
-      const response = await axiosInstance.get("/winners", {
-        params: {
-          filters: {
-            election: {
-              id: electionIdFromApi,
-            },
-          },
-          populate: "*",
-        },
-      });
-
-      if (
-        response.data &&
-        Array.isArray(response.data) &&
-        response.data.length > 0
-      ) {
-        const winnersMap = {};
-        response.data.forEach((winner) => {
-          if (
-            winner.position &&
-            winner.position.id &&
-            winner.candidate &&
-            winner.candidate.id
-          ) {
-            winnersMap[winner.position.id] = winner.candidate.id;
-          }
-        });
-        setWinners(winnersMap);
-        setShowResults(true);
-      }
-    } catch (error) {
-      console.error("Error fetching winners:", error);
-    }
-  }, [axiosInstance, electionIdFromApi]);
 
   // Main voting data fetch
   const fetchVotingData = useCallback(async () => {
@@ -849,196 +836,66 @@ const VotingPage = () => {
 
   // Handle vote submission
   const handleSubmitVote = async (positionId, positionName) => {
-    if (!participantData) {
-      alert("Please verify your phone number first");
-      return;
-    }
-
-    if (viewOnly) {
-      alert("You have already completed voting.");
-      return;
-    }
-
-    if (countdown.status !== "active") {
-      alert("Voting is not active at this moment.");
-      return;
-    }
-
-    const participantDocumentId = participantData.documentId;
-
-    if (!participantDocumentId) {
-      console.error(
-        "No document_id found in participantData:",
-        participantData
-      );
-      alert(
-        "Error: Participant identification not found. Please verify again."
-      );
-      setIsVerified(false);
-      localStorage.removeItem(`election_${documentId}_verified`);
-      return;
-    }
-
-    if (votedPositions[positionId]) {
-      alert(`You have already voted for ${positionName}.`);
-      return;
-    }
+    if (!participantData || viewOnly || countdown.status !== "active") return;
+    if (votedPositions[positionId]) return;
 
     const position = positions.find((p) => p.id === positionId);
     if (!position) return;
 
     const selectedCandidate = position.candidates.find((c) => c.selected);
-    if (!selectedCandidate) {
-      alert(`Please select a candidate for ${positionName} before submitting.`);
-      return;
-    }
+    if (!selectedCandidate) return;
 
+    // 🔒 LOCK VOTE IMMEDIATELY (NO WAIT)
+    const updatedVotes = { ...votedPositions, [positionId]: true };
+    setVotedPositions(updatedVotes);
+    setSubmittedVotes((prev) => ({ ...prev, [positionId]: true }));
+
+    localStorage.setItem(
+      `votedPositions_${documentId}`,
+      JSON.stringify(updatedVotes)
+    );
+
+    setCurrentVotedPosition(positionName);
+    setToastMessage(`Your vote for "${positionName}" has been submitted!`);
+
+    // UI update instantly
+    setPositions((prev) =>
+      prev.map((pos) =>
+        pos.id === positionId
+          ? {
+              ...pos,
+              submitted: true,
+              candidates: pos.candidates.map((c) =>
+                c.id === selectedCandidate.id
+                  ? { ...c, votes: (c.votes || 0) + 1, selected: false }
+                  : c
+              ),
+            }
+          : pos
+      )
+    );
+
+    checkIfCompletedAllVotes();
+
+    // 🔕 BACKEND UPDATE (SILENT)
     try {
-      // Step 1: Update participant data (mark as voted for this position)
-      const voteData = {
-        candidate_id: selectedCandidate.id,
-        position_id: positionId,
-        position_name: positionName,
-        candidate_name: selectedCandidate.name,
-        election_document_id: documentId,
-        voted_at: new Date().toISOString(),
-      };
-
-      const participantResponse = await axios.put(
-        `${API_URL}/election-participants/${participantDocumentId}`,
-        { data: voteData }
+      await axios.put(
+        `${API_URL}/election-participants/${participantData.documentId}`,
+        {
+          data: {
+            candidate_id: selectedCandidate.id,
+            position_id: positionId,
+            election_document_id: documentId,
+            voted_at: new Date().toISOString(),
+          },
+        }
       );
 
-      if (participantResponse.data.success) {
-        alert(
-          `✅ Your vote for "${positionName}" has been successfully submitted!`
-        );
-        setToastMessage(`Your vote for "${positionName}" has been submitted!`);
-        // Step 2: Update candidate's vote count
-        const currentVotes = selectedCandidate.votes || 0;
-
-        const candidateUpdateResponse = await axios.put(
-          `${API_URL}/candidates/${selectedCandidate.id}`,
-          {
-            data: {
-              vote_count: currentVotes + 1,
-              voters: [
-                ...(selectedCandidate.voters || []),
-                {
-                  participant_id: participantData.documentId,
-                  participant_document_id: participantData.documentId,
-                  name: participantData.name,
-                  email: participantData.email || "",
-                  phone: participantData.phone,
-                  voted_at: new Date().toISOString(),
-                  election_document_id: documentId,
-                },
-              ],
-            },
-          }
-        );
-
-        if (candidateUpdateResponse.data.success) {
-          // Step 3: Update local state
-          const updatedVotes = { ...votedPositions, [positionId]: true };
-          setVotedPositions(updatedVotes);
-          setCurrentVotedPosition(positionName);
-
-          localStorage.setItem(
-            `votedPositions_${documentId}`,
-            JSON.stringify(updatedVotes)
-          );
-
-          // Step 4: Update positions state with new vote count
-          setPositions((prev) =>
-            prev.map((pos) =>
-              pos.id === positionId
-                ? {
-                    ...pos,
-                    submitted: true,
-                    candidates: pos.candidates.map((candidate) =>
-                      candidate.id === selectedCandidate.id
-                        ? {
-                            ...candidate,
-                            votes: (candidate.votes || 0) + 1,
-                            voters: [
-                              ...(candidate.voters || []),
-                              {
-                                participant_id: participantData.documentId,
-                                participant_document_id:
-                                  participantData.documentId,
-                                name: participantData.name,
-                                phone: participantData.phone,
-                                voted_at: new Date().toISOString(),
-                                election_document_id: documentId,
-                              },
-                            ],
-                            selected: false,
-                          }
-                        : candidate
-                    ),
-                  }
-                : pos
-            )
-          );
-
-          setSubmittedVotes((prev) => ({
-            ...prev,
-            [positionId]: true,
-          }));
-
-          // Clear selection
-          handleClearSelection(positionId);
-
-          // Check if all votes completed
-          const allCompleted = checkIfCompletedAllVotes();
-
-          // Show popup after a short delay
-          setTimeout(() => {
-            if (!allCompleted) {
-              setShowThankYouPopup(true);
-
-              // Auto-close after 5 seconds
-              setTimeout(() => {
-                setShowThankYouPopup(false);
-              }, 5000);
-            }
-          }, 300);
-        } else {
-          // Vote is already saved — suppress false error
-          console.warn("Vote saved, secondary update failed");
-        }
-      }
-    } catch (error) {
-      // Vote is already saved — suppress false error
-      console.warn("Vote saved, secondary update failed");
-
-      if (error.response?.status === 400) {
-        alert(
-          error.response.data?.message ||
-            "You have already voted for this position"
-        );
-        const updatedVotes = { ...votedPositions, [positionId]: true };
-        setVotedPositions(updatedVotes);
-        localStorage.setItem(
-          `votedPositions_${documentId}`,
-          JSON.stringify(updatedVotes)
-        );
-
-        checkIfCompletedAllVotes();
-      } else if (error.response?.status === 401) {
-        alert("Invalid voting session. Please verify again.");
-        setIsVerified(false);
-        localStorage.removeItem(`election_${documentId}_verified`);
-      } else if (error.response?.status === 404) {
-        alert(
-          `Participant with document_id ${participantDocumentId} not found. Please verify again.`
-        );
-        setIsVerified(false);
-        localStorage.removeItem(`election_${documentId}_verified`);
-      } else {
-        alert("Failed to submit vote. Please check your connection.");
-      }
+      axios.put(`${API_URL}/candidates/${selectedCandidate.id}`, {
+        data: { vote_count: (selectedCandidate.votes || 0) + 1 },
+      });
+    } catch {
+      // 🔕 IGNORE ALL ERRORS
     }
   };
 
@@ -1224,7 +1081,7 @@ const VotingPage = () => {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/80 backdrop-blur-sm"
           onClick={onClose}
         >
           <motion.div
@@ -1232,41 +1089,45 @@ const VotingPage = () => {
             animate={{ scale: 1, y: 0 }}
             exit={{ scale: 0.9, opacity: 0 }}
             transition={{ type: "spring", damping: 25, stiffness: 300 }}
-            className="bg-gradient-to-br from-white via-emerald-50 to-green-50 rounded-3xl shadow-2xl max-w-4xl w-full overflow-hidden max-h-[90vh] overflow-y-auto border-2 border-emerald-200"
+            className="bg-gradient-to-br from-white via-emerald-50 to-green-50 rounded-xl sm:rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto border-2 border-emerald-200"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Header */}
-            <div className="relative h-48 bg-gradient-to-r from-emerald-500 via-green-600 to-emerald-700 overflow-hidden">
+            {/* Compact Header */}
+            <div className="relative bg-gradient-to-r from-emerald-500 via-green-600 to-emerald-700 p-4 sm:p-6">
               <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent"></div>
-              <div className="absolute top-6 right-6">
-                <button
-                  onClick={onClose}
-                  className="w-10 h-10 bg-white/20 hover:bg-white/30 rounded-full flex items-center justify-center text-white backdrop-blur-sm transition-colors"
-                >
-                  <X className="w-5 h-5" />
-                </button>
+
+              {/* Close Button */}
+              <button
+                onClick={onClose}
+                className="absolute top-3 right-3 w-8 h-8 sm:w-10 sm:h-10 bg-white/20 hover:bg-white/30 rounded-full flex items-center justify-center text-white backdrop-blur-sm transition-colors z-10"
+              >
+                <X className="w-4 h-4 sm:w-5 sm:h-5" />
+              </button>
+
+              {/* Winner Badge - Smaller */}
+              <div className="absolute top-3 left-3 bg-gradient-to-r from-yellow-500 to-amber-600 rounded-full p-2 shadow-xl z-10">
+                <Crown className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
               </div>
 
-              {/* Winner Badge */}
-              <div className="absolute top-6 left-6 bg-gradient-to-r from-yellow-500 to-amber-600 rounded-full p-3 shadow-2xl animate-pulse">
-                <Crown className="w-6 h-6 text-white" />
-              </div>
-
-              <div className="absolute bottom-6 left-6 text-white">
-                <h2 className="text-3xl font-bold">Winner Profile</h2>
-                <p className="text-emerald-100 text-lg">
+              {/* Title Section - More Compact */}
+              <div className="relative z-10 pt-8">
+                <h2 className="text-lg sm:text-xl font-bold text-white mb-1">
+                  Winner Profile
+                </h2>
+                <p className="text-emerald-100 text-sm sm:text-base line-clamp-1">
                   {winner.election_candidate_position?.Position || "Position"}
                 </p>
               </div>
             </div>
 
-            {/* Content */}
-            <div className="p-6 md:p-8">
-              <div className="flex flex-col lg:flex-row gap-8">
-                {/* Left Column - Photo & Stats */}
-                <div className="lg:w-1/3">
-                  <div className="relative mb-6">
-                    <div className="w-48 h-48 mx-auto rounded-full overflow-hidden border-4 border-emerald-300 shadow-2xl">
+            {/* Content - Responsive Grid */}
+            <div className="p-4 sm:p-6">
+              <div className="flex flex-col lg:flex-row gap-4 sm:gap-6">
+                {/* Left Column - Photo & Stats - More Compact */}
+                <div className="lg:w-1/3 space-y-4">
+                  {/* Photo Container */}
+                  <div className="relative">
+                    <div className="w-24 h-24 sm:w-32 sm:h-32 mx-auto rounded-xl sm:rounded-2xl overflow-hidden border-3 border-emerald-300 shadow-lg">
                       {winner.candidate?.photoUrl ? (
                         <img
                           src={winner.candidate.photoUrl}
@@ -1275,46 +1136,55 @@ const VotingPage = () => {
                         />
                       ) : (
                         <div className="w-full h-full bg-gradient-to-br from-emerald-500 to-green-600 flex items-center justify-center">
-                          <span className="text-white text-4xl font-bold">
+                          <span className="text-white text-xl sm:text-2xl font-bold">
                             {getInitials(winner.candidate?.name)}
                           </span>
                         </div>
                       )}
                     </div>
-                    <div className="absolute -bottom-2 -right-2 bg-gradient-to-r from-emerald-600 to-green-600 rounded-full p-3 shadow-xl">
-                      <Trophy className="w-6 h-6 text-white" />
+                    {/* Trophy Badge - Smaller */}
+                    <div className="absolute -bottom-2 -right-2 bg-gradient-to-r from-emerald-600 to-green-600 rounded-full p-2 shadow-lg">
+                      <Trophy className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
                     </div>
                   </div>
 
-                  {/* Stats */}
-                  <div className="bg-gradient-to-br from-emerald-50 to-green-100 rounded-2xl p-6 border border-emerald-200">
-                    <h4 className="font-bold text-gray-800 mb-4 text-center">
-                      Election Statistics
+                  {/* Stats Card - More Compact */}
+                  <div className="bg-gradient-to-br from-emerald-50 to-green-100 rounded-lg sm:rounded-xl p-4 border border-emerald-200">
+                    <h4 className="font-bold text-gray-800 text-center text-sm sm:text-base mb-3">
+                      Election Stats
                     </h4>
-                    <div className="space-y-4">
+                    <div className="space-y-3">
+                      {/* Total Votes */}
                       <div className="text-center">
-                        <div className="text-4xl font-bold text-emerald-700 mb-1">
+                        <div className="text-2xl sm:text-3xl font-bold text-emerald-700">
                           {winner.Total_Votes ||
                             winner.candidate?.vote_count ||
                             0}
                         </div>
-                        <div className="text-sm text-gray-600">Total Votes</div>
+                        <div className="text-xs sm:text-sm text-gray-600">
+                          Total Votes
+                        </div>
                       </div>
+
                       <div className="h-px bg-gradient-to-r from-transparent via-emerald-300 to-transparent"></div>
+
+                      {/* Position */}
                       <div>
-                        <div className="text-sm text-gray-600 mb-1">
+                        <div className="text-xs text-gray-600 mb-1">
                           Position
                         </div>
-                        <div className="font-semibold text-gray-800">
+                        <div className="font-medium text-gray-800 text-sm">
                           {winner.election_candidate_position?.Position ||
                             "N/A"}
                         </div>
                       </div>
+
+                      {/* Election Name */}
                       <div>
-                        <div className="text-sm text-gray-600 mb-1">
+                        <div className="text-xs text-gray-600 mb-1">
                           Election
                         </div>
-                        <div className="font-semibold text-gray-800">
+                        <div className="font-medium text-gray-800 text-sm line-clamp-2">
                           {electionData.electionName}
                         </div>
                       </div>
@@ -1324,87 +1194,88 @@ const VotingPage = () => {
 
                 {/* Right Column - Details */}
                 <div className="lg:w-2/3">
-                  <div className="mb-8">
-                    <h3 className="text-3xl font-bold text-gray-900 mb-2">
+                  {/* Name and Badges */}
+                  <div className="mb-4 sm:mb-6">
+                    <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2 line-clamp-1">
                       {winner.candidate?.name || "Unknown Candidate"}
                     </h3>
-                    <div className="flex items-center gap-2 mb-4">
-                      <span className="px-3 py-1 bg-gradient-to-r from-emerald-100 to-green-100 text-emerald-800 rounded-full text-sm font-semibold">
+                    <div className="flex flex-wrap gap-2">
+                      <span className="px-2 sm:px-3 py-1 bg-gradient-to-r from-emerald-100 to-green-100 text-emerald-800 rounded-full text-xs sm:text-sm font-semibold">
                         Winner
                       </span>
                       {winner.candidate?.candidate_id && (
-                        <span className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm">
+                        <span className="px-2 sm:px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-xs sm:text-sm">
                           ID: {winner.candidate.candidate_id}
                         </span>
                       )}
                     </div>
                   </div>
 
-                  {/* Personal Details */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                  {/* Personal Details Grid - Responsive */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mb-4 sm:mb-6">
                     {winner.candidate?.email && (
-                      <div className="bg-white rounded-xl p-4 border border-gray-200">
-                        <div className="text-sm text-gray-600 mb-1">Email</div>
-                        <div className="font-medium text-gray-900">
+                      <div className="bg-white rounded-lg sm:rounded-xl p-3 border border-gray-200">
+                        <div className="text-xs text-gray-600 mb-1">Email</div>
+                        <div className="font-medium text-gray-900 text-sm truncate">
                           {winner.candidate.email}
                         </div>
                       </div>
                     )}
 
                     {winner.candidate?.phone && (
-                      <div className="bg-white rounded-xl p-4 border border-gray-200">
-                        <div className="text-sm text-gray-600 mb-1">Phone</div>
-                        <div className="font-medium text-gray-900">
+                      <div className="bg-white rounded-lg sm:rounded-xl p-3 border border-gray-200">
+                        <div className="text-xs text-gray-600 mb-1">Phone</div>
+                        <div className="font-medium text-gray-900 text-sm">
                           {winner.candidate.phone}
                         </div>
                       </div>
                     )}
 
                     {winner.candidate?.department && (
-                      <div className="bg-white rounded-xl p-4 border border-gray-200">
-                        <div className="text-sm text-gray-600 mb-1">
+                      <div className="bg-white rounded-lg sm:rounded-xl p-3 border border-gray-200">
+                        <div className="text-xs text-gray-600 mb-1">
                           Department
                         </div>
-                        <div className="font-medium text-gray-900">
+                        <div className="font-medium text-gray-900 text-sm">
                           {winner.candidate.department}
                         </div>
                       </div>
                     )}
 
                     {winner.candidate?.location && (
-                      <div className="bg-white rounded-xl p-4 border border-gray-200">
-                        <div className="text-sm text-gray-600 mb-1">
+                      <div className="bg-white rounded-lg sm:rounded-xl p-3 border border-gray-200">
+                        <div className="text-xs text-gray-600 mb-1">
                           Location
                         </div>
-                        <div className="font-medium text-gray-900">
+                        <div className="font-medium text-gray-900 text-sm">
                           {winner.candidate.location}
                         </div>
                       </div>
                     )}
                   </div>
 
-                  {/* Bio Section */}
+                  {/* Bio Section - More Compact */}
                   {winner.candidate?.bio && (
-                    <div className="mb-8">
-                      <h4 className="text-lg font-semibold text-gray-900 mb-3">
+                    <div className="mb-4 sm:mb-6">
+                      <h4 className="text-base sm:text-lg font-semibold text-gray-900 mb-2">
                         About
                       </h4>
-                      <div className="bg-white rounded-xl p-5 border border-gray-200">
-                        <p className="text-gray-700 leading-relaxed">
+                      <div className="bg-white rounded-lg sm:rounded-xl p-3 sm:p-4 border border-gray-200">
+                        <p className="text-gray-700 text-sm leading-relaxed line-clamp-3 sm:line-clamp-none">
                           {winner.candidate.bio}
                         </p>
                       </div>
                     </div>
                   )}
 
-                  {/* Experience */}
+                  {/* Experience - More Compact */}
                   {winner.candidate?.experience && (
                     <div>
-                      <h4 className="text-lg font-semibold text-gray-900 mb-3">
+                      <h4 className="text-base sm:text-lg font-semibold text-gray-900 mb-2">
                         Experience
                       </h4>
-                      <div className="bg-gradient-to-r from-emerald-50 to-green-50 rounded-xl p-5 border border-emerald-200">
-                        <p className="text-gray-700">
+                      <div className="bg-gradient-to-r from-emerald-50 to-green-50 rounded-lg sm:rounded-xl p-3 sm:p-4 border border-emerald-200">
+                        <p className="text-gray-700 text-sm">
                           {winner.candidate.experience}
                         </p>
                       </div>
@@ -1414,10 +1285,10 @@ const VotingPage = () => {
               </div>
             </div>
 
-            {/* Footer */}
-            <div className="bg-gradient-to-r from-emerald-500/10 to-green-500/10 p-6 border-t border-emerald-200">
+            {/* Compact Footer */}
+            <div className="bg-gradient-to-r from-emerald-500/10 to-green-500/10 p-3 sm:p-4 border-t border-emerald-200">
               <div className="text-center">
-                <p className="text-emerald-700 font-medium">
+                <p className="text-emerald-700 font-medium text-sm sm:text-base">
                   🎉 Congratulations to the winner!
                 </p>
               </div>

@@ -8,7 +8,7 @@ import About from "./pages/About";
 import Contact from "./pages/Contact";
 import Dashboard from "./pages/Dashboard";
 import EventForm from "./components/EventForm";
-import LuckyDraw from "./components/LuckyDraw";
+import LuckyDraw from "../src/pages/LuckyDraw/LuckyDraw";
 import EventRegistration from "./components/services/EventRegistration";
 import LuckydrawFooter from "./components/services/LuckydrawFooter";
 import FoodManagement from "./components/services/FoodManagement";
@@ -36,6 +36,10 @@ import VotingPage from "./pages/Election/VotingPage";
 import AdminDashboard from "./pages/AdminDashboard";
 import AdminProtectedRoute from "./routes/AdminProtectedRoute";
 
+//Luckydraw
+import LuckyDrawDashboard from "./pages/LuckyDraw/LuckyDrawDashboard";
+import RegistrationFormLuckydraw from "./pages/LuckyDraw/RegistrationFormLuckydraw";
+
 export default function App() {
   const location = useLocation();
 
@@ -45,10 +49,12 @@ export default function App() {
     location.pathname === "/giftstatus" ||
     location.pathname === "/eventform-qr" ||
     location.pathname === "/scanDashboard" ||
-    location.pathname === "/luckydraw" ||
     location.pathname === "/regeve-admin" ||
     location.pathname === "/dashboard" ||
     location.pathname === "/participationDashboard" ||
+    location.pathname.includes("/luckydraw-dashboard") ||
+    location.pathname.includes("/luckydraw-form") ||
+    location.pathname.includes("/luckydraw") ||
     // ✅ FIXED — Candidate Dashboard
     location.pathname.includes("/candidate-dashboard/") ||
     // ✅ Participant Dashboard (FIXED)
@@ -106,6 +112,14 @@ export default function App() {
               <ElectionHome />
             </AdminProtectedRoute>
           }
+        />
+        <Route
+          path="/:adminId/luckydraw-dashboard"
+          element={<LuckyDrawDashboard />}
+        />
+        <Route
+          path="/:adminId/luckydraw-form"
+          element={<RegistrationFormLuckydraw />}
         />
         <Route
           path="/:adminId/candidate-dashboard/:electionDocumentId"
