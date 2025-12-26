@@ -635,9 +635,36 @@ const CandidateDashboard = () => {
     showStartElection,
   ]);
 
-  const handleStartElection = async () => {
-    const error = validateElectionTimeUI(startTime, endTime);
+  const validateCandidatesPerPosition = () => {
+    if (!sections || sections.length === 0) {
+      return "You must create at least one position before starting the election";
+    }
 
+    const invalidSections = sections.filter(
+      (section) => section.candidates.length < 2
+    );
+
+    if (invalidSections.length > 0) {
+      const names = invalidSections.map((s) => s.name).join(", ");
+      return `Each position must have at least 2 candidates. Please add more candidates to: ${names}`;
+    }
+
+    return null; // ✅ all good
+  };
+
+  const handleStartElection = async () => {
+    const candidateError = validateCandidatesPerPosition();
+    if (candidateError) {
+      setShowStartElection(false); // ✅ close modal
+
+      setTimeout(() => {
+        showAlert("error", candidateError);
+      }, 100);
+
+      return;
+    }
+
+    const error = validateElectionTimeUI(startTime, endTime);
     if (error) {
       showAlert("error", error);
       return;
@@ -677,10 +704,14 @@ const CandidateDashboard = () => {
       setShowStartElection(false);
       await refetchElectionMeta();
     } catch (err) {
-      showAlert(
-        "error",
-        err.response?.data?.message || "Failed to start election"
-      );
+      setShowStartElection(false); // ✅ CLOSE MODAL FIRST
+
+      setTimeout(() => {
+        showAlert(
+          "error",
+          err.response?.data?.message || "Failed to start election"
+        );
+      }, 100); // slight delay so modal unmounts cleanly
     } finally {
       setStartingElection(false);
     }
@@ -689,7 +720,12 @@ const CandidateDashboard = () => {
   // Create new section (Election Position)
   const handleAddSection = async () => {
     if (!newSectionName.trim()) {
-      showAlert("error", "Please enter a position name");
+      setShowAddSection(false);
+
+      setTimeout(() => {
+        showAlert("error", "Please enter a position name");
+      }, 100);
+
       return;
     }
 
@@ -699,7 +735,12 @@ const CandidateDashboard = () => {
           section.name.toLowerCase() === newSectionName.trim().toLowerCase()
       )
     ) {
-      showAlert("error", "A position with this name already exists");
+      setShowAddSection(false);
+
+      setTimeout(() => {
+        showAlert("error", "A position with this name already exists");
+      }, 100);
+
       return;
     }
 
@@ -1136,31 +1177,34 @@ const CandidateDashboard = () => {
               </div>
 
               {electionStatus === "scheduled" && (
-                <button
-                  onClick={() => setShowStartElection(true)}
-                  className={`flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-semibold shadow-lg min-w-[160px] hover:scale-105 transition-all duration-300 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white hover:from-emerald-600 hover:to-emerald-700 hover:shadow-xl`}
-                >
-                  <svg
-                    className="w-5 h-5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
+                <div className="flex flex-col xs:flex-row gap-3 w-full sm:w-auto">
+                  {/* Start Election Button - Only show if election is scheduled but not cancelled */}
+                  <button
+                    onClick={() => setShowStartElection(true)}
+                    className="flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-semibold shadow-lg min-w-[160px] hover:scale-105 transition-all duration-300 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white hover:from-emerald-600 hover:to-emerald-700 hover:shadow-xl"
                   >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"
-                    />
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                    />
-                  </svg>
-                  Start Election
-                </button>
+                    <svg
+                      className="w-5 h-5"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"
+                      />
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                      />
+                    </svg>
+                    {electionMeta.start_time ? "Reschedule" : "Start Election"}
+                  </button>
+                </div>
               )}
               {electionStatus === "active" && (
                 <button
@@ -1444,10 +1488,7 @@ const CandidateDashboard = () => {
 
                   <button
                     onClick={handleStartElection}
-                    disabled={
-                      startingElection ||
-                      !!validateElectionTimeUI(startTime, endTime)
-                    }
+                    disabled={startingElection}
                     className={`rounded-lg px-5 py-2.5 font-semibold text-white transition-all duration-300 hover:scale-105
                       ${
                         startingElection ||
@@ -1883,7 +1924,8 @@ const CandidateDashboard = () => {
                         <div className="flex items-center gap-2 sm:gap-3">
                           {section.candidates.length > 0 &&
                             !hasWinner &&
-                            electionStatus === "ended" && (
+                            electionStatus === "ended" &&
+                            !electionMeta.auto_declare_enabled && (
                               <motion.button
                                 whileHover={{ scale: 1.05 }}
                                 whileTap={{ scale: 0.95 }}
@@ -2210,119 +2252,83 @@ const CandidateDashboard = () => {
       </div>
 
       {/* Add Candidate Modal */}
-<AnimatePresence>
-  {showForm && (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 z-50"
-    >
-      <motion.div
-        initial={{ scale: 0.95, opacity: 0, y: 10 }}
-        animate={{ scale: 1, opacity: 1, y: 0 }}
-        exit={{ scale: 0.95, opacity: 0, y: 10 }}
-        ref={formModalRef}
-        className="bg-white rounded-xl sm:rounded-2xl shadow-2xl w-full max-w-4xl mx-2 border border-gray-200"
-      >
-        {/* Header */}
-        <div className="border-b border-gray-200">
-          <div className="px-4 sm:px-6 py-4">
-            <div className="flex justify-between items-center">
-              <div>
-                <h2 className="text-xl sm:text-2xl font-bold text-gray-900">
-                  Add New Candidate
-                </h2>
-                <p className="text-gray-600 text-sm mt-1 truncate">
-                  {electionMeta.electionName}
-                </p>
-              </div>
-              <button
-                onClick={() => setShowForm(false)}
-                className="w-8 h-8 sm:w-9 sm:h-9 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg transition-colors duration-200 flex items-center justify-center"
-              >
-                ×
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Content - Compact Layout */}
-        <div className="p-4 sm:p-6">
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Section Selection */}
-            <div>
-              <label className="block text-sm font-semibold text-gray-800 mb-1">
-                Election Position *
-                {formErrors.sectionId && (
-                  <span className="text-red-600 text-xs ml-2">
-                    ({formErrors.sectionId})
-                  </span>
-                )}
-              </label>
-              <select
-                name="sectionId"
-                value={formData.sectionId || ""}
-                onChange={handleInputChange}
-                required
-                className={`w-full px-3 py-2.5 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white transition-all duration-200 hover:border-blue-400 ${
-                  formErrors.sectionId
-                    ? "border-red-500 focus:border-red-500 focus:ring-red-200"
-                    : "border-gray-300"
-                }`}
-              >
-                <option value="">Choose an election position</option>
-                {sections.map((section) => (
-                  <option key={section.id} value={section.id}>
-                    {section.position}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-              {/* Photo Upload - Left Column */}
-              <div className="lg:col-span-1">
-                <div className="bg-gradient-to-br from-blue-50 to-gray-50 rounded-xl p-4 border border-blue-100 h-full">
-                  <h3 className="font-semibold text-gray-800 mb-3 text-sm flex items-center gap-2">
-                    <svg
-                      className="w-4 h-4 text-blue-600"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
+      <AnimatePresence>
+        {showForm && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 z-50"
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0, y: 10 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 10 }}
+              ref={formModalRef}
+              className="bg-white rounded-xl sm:rounded-2xl shadow-2xl w-full max-w-4xl mx-2 border border-gray-200"
+            >
+              {/* Header */}
+              <div className="border-b border-gray-200">
+                <div className="px-4 sm:px-6 py-4">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <h2 className="text-xl sm:text-2xl font-bold text-gray-900">
+                        Add New Candidate
+                      </h2>
+                      <p className="text-gray-600 text-sm mt-1 truncate">
+                        {electionMeta.electionName}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setShowForm(false)}
+                      className="w-8 h-8 sm:w-9 sm:h-9 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg transition-colors duration-200 flex items-center justify-center"
                     >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-                      />
-                    </svg>
-                    Profile Photo
-                  </h3>
-                  
-                  <div className="flex flex-col items-center">
-                    {/* Photo Preview - Smaller */}
-                    <div className="relative w-24 h-24 mb-3">
-                      {photo ? (
-                        <>
-                          <img
-                            src={URL.createObjectURL(photo)}
-                            alt="Preview"
-                            className="w-full h-full rounded-lg object-cover border-2 border-white shadow"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => setPhoto(null)}
-                            className="absolute -top-1 -right-1 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors text-xs"
-                          >
-                            ×
-                          </button>
-                        </>
-                      ) : (
-                        <div className="w-full h-full rounded-lg border-2 border-dashed border-gray-300 bg-gray-100 flex flex-col items-center justify-center text-gray-400">
+                      ×
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Content - Compact Layout */}
+              <div className="p-4 sm:p-6">
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  {/* Section Selection */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-800 mb-1">
+                      Election Position *
+                      {formErrors.sectionId && (
+                        <span className="text-red-600 text-xs ml-2">
+                          ({formErrors.sectionId})
+                        </span>
+                      )}
+                    </label>
+                    <select
+                      name="sectionId"
+                      value={formData.sectionId || ""}
+                      onChange={handleInputChange}
+                      required
+                      className={`w-full px-3 py-2.5 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white transition-all duration-200 hover:border-blue-400 ${
+                        formErrors.sectionId
+                          ? "border-red-500 focus:border-red-500 focus:ring-red-200"
+                          : "border-gray-300"
+                      }`}
+                    >
+                      <option value="">Choose an election position</option>
+                      {sections.map((section) => (
+                        <option key={section.id} value={section.id}>
+                          {section.position}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                    {/* Photo Upload - Left Column */}
+                    <div className="lg:col-span-1">
+                      <div className="bg-gradient-to-br from-blue-50 to-gray-50 rounded-xl p-4 border border-blue-100 h-full">
+                        <h3 className="font-semibold text-gray-800 mb-3 text-sm flex items-center gap-2">
                           <svg
-                            className="w-8 h-8 mb-1"
+                            className="w-4 h-4 text-blue-600"
                             fill="none"
                             stroke="currentColor"
                             viewBox="0 0 24 24"
@@ -2330,261 +2336,303 @@ const CandidateDashboard = () => {
                             <path
                               strokeLinecap="round"
                               strokeLinejoin="round"
-                              strokeWidth={1.5}
+                              strokeWidth={2}
                               d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
                             />
                           </svg>
+                          Profile Photo
+                        </h3>
+
+                        <div className="flex flex-col items-center">
+                          {/* Photo Preview - Smaller */}
+                          <div className="relative w-24 h-24 mb-3">
+                            {photo ? (
+                              <>
+                                <img
+                                  src={URL.createObjectURL(photo)}
+                                  alt="Preview"
+                                  className="w-full h-full rounded-lg object-cover border-2 border-white shadow"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => setPhoto(null)}
+                                  className="absolute -top-1 -right-1 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors text-xs"
+                                >
+                                  ×
+                                </button>
+                              </>
+                            ) : (
+                              <div className="w-full h-full rounded-lg border-2 border-dashed border-gray-300 bg-gray-100 flex flex-col items-center justify-center text-gray-400">
+                                <svg
+                                  className="w-8 h-8 mb-1"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={1.5}
+                                    d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                                  />
+                                </svg>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* File Input */}
+                          <label className="w-full cursor-pointer">
+                            <input
+                              type="file"
+                              name="photo"
+                              onChange={handleInputChange}
+                              accept="image/*"
+                              className="hidden"
+                            />
+                            <div className="w-full px-3 py-2 text-sm bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:from-blue-600 hover:to-blue-700 font-medium transition-all duration-200 flex items-center justify-center gap-1">
+                              <svg
+                                className="w-4 h-4"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
+                                />
+                              </svg>
+                              {photo ? "Change" : "Upload"}
+                            </div>
+                          </label>
                         </div>
+                      </div>
+                    </div>
+
+                    {/* Personal Information - Middle Column */}
+                    <div className="lg:col-span-1">
+                      <div className="bg-gradient-to-br from-blue-50 to-gray-50 rounded-xl p-4 border border-blue-100 h-full">
+                        <h3 className="font-semibold text-gray-800 mb-3 text-sm flex items-center gap-2">
+                          <svg
+                            className="w-4 h-4 text-blue-600"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                            />
+                          </svg>
+                          Personal Info
+                        </h3>
+
+                        <div className="space-y-3">
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                              Full Name *
+                              {formErrors.name && (
+                                <span className="text-red-600 text-xs ml-1">
+                                  ({formErrors.name})
+                                </span>
+                              )}
+                            </label>
+                            <input
+                              type="text"
+                              name="name"
+                              value={formData.name}
+                              onChange={handleInputChange}
+                              required
+                              className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white transition-all duration-200 hover:border-blue-400 ${
+                                formErrors.name
+                                  ? "border-red-500 focus:border-red-500 focus:ring-red-200"
+                                  : "border-gray-300"
+                              }`}
+                              placeholder="Candidate name"
+                            />
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <label className="block text-xs font-medium text-gray-700 mb-1">
+                                Age
+                              </label>
+                              <input
+                                type="number"
+                                name="age"
+                                value={formData.age}
+                                onChange={handleInputChange}
+                                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white transition-all duration-200 hover:border-blue-400"
+                                placeholder="Age"
+                                min="1"
+                                max="100"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-xs font-medium text-gray-700 mb-1">
+                                Gender
+                              </label>
+                              <select
+                                name="gender"
+                                value={formData.gender}
+                                onChange={handleInputChange}
+                                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white transition-all duration-200 hover:border-blue-400"
+                              >
+                                <option value="">Select</option>
+                                <option value="male">Male</option>
+                                <option value="female">Female</option>
+                                <option value="others">Other</option>
+                              </select>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Contact Information - Right Column */}
+                    <div className="lg:col-span-1">
+                      <div className="bg-gradient-to-br from-blue-50 to-gray-50 rounded-xl p-4 border border-blue-100 h-full">
+                        <h3 className="font-semibold text-gray-800 mb-3 text-sm flex items-center gap-2">
+                          <svg
+                            className="w-4 h-4 text-blue-600"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"
+                            />
+                          </svg>
+                          Contact Info
+                        </h3>
+
+                        <div className="space-y-3">
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                              Email *
+                              {formErrors.email && (
+                                <span className="text-red-600 text-xs ml-1">
+                                  ({formErrors.email})
+                                </span>
+                              )}
+                            </label>
+                            <input
+                              type="email"
+                              name="email"
+                              value={formData.email}
+                              onChange={handleInputChange}
+                              required
+                              className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white transition-all duration-200 hover:border-blue-400 ${
+                                formErrors.email
+                                  ? "border-red-500 focus:border-red-500 focus:ring-red-200"
+                                  : "border-gray-300"
+                              } ${
+                                fieldFocus === "email"
+                                  ? "ring-2 ring-blue-200"
+                                  : ""
+                              }`}
+                              placeholder="email@example.com"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                              Phone *
+                              {formErrors.phone_number && (
+                                <span className="text-red-600 text-xs ml-1">
+                                  ({formErrors.phone_number})
+                                </span>
+                              )}
+                            </label>
+                            <input
+                              type="tel"
+                              name="phone_number"
+                              value={formData.phone_number}
+                              onChange={handleInputChange}
+                              required
+                              className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white transition-all duration-200 hover:border-blue-400 ${
+                                formErrors.phone_number
+                                  ? "border-red-500 focus:border-red-500 focus:ring-red-200"
+                                  : "border-gray-300"
+                              } ${
+                                fieldFocus === "phone_number"
+                                  ? "ring-2 ring-blue-200"
+                                  : ""
+                              }`}
+                              placeholder="Phone number"
+                              maxLength={10}
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                              WhatsApp
+                              {formErrors.whatsApp_number && (
+                                <span className="text-red-600 text-xs ml-1">
+                                  ({formErrors.whatsApp_number})
+                                </span>
+                              )}
+                            </label>
+                            <input
+                              type="tel"
+                              name="whatsApp_number"
+                              value={formData.whatsApp_number}
+                              onChange={handleInputChange}
+                              className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white transition-all duration-200 hover:border-blue-400 ${
+                                formErrors.whatsApp_number
+                                  ? "border-red-500 focus:border-red-500 focus:ring-red-200"
+                                  : "border-gray-300"
+                              }`}
+                              placeholder="WhatsApp number"
+                              maxLength={10}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Action Buttons - Bottom */}
+                  <div className="flex gap-3 pt-4 border-t border-gray-200">
+                    <motion.button
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      type="button"
+                      onClick={() => setShowForm(false)}
+                      className="flex-1 px-4 py-2.5 text-sm border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-semibold transition-all duration-200"
+                    >
+                      Cancel
+                    </motion.button>
+                    <motion.button
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      type="submit"
+                      disabled={loading}
+                      className="flex-1 px-4 py-2.5 text-sm bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:from-blue-600 hover:to-blue-700 font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+                    >
+                      {loading ? (
+                        <span className="flex items-center justify-center gap-2">
+                          <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                          Adding...
+                        </span>
+                      ) : (
+                        "Add Candidate"
                       )}
-                    </div>
-                    
-                    {/* File Input */}
-                    <label className="w-full cursor-pointer">
-                      <input
-                        type="file"
-                        name="photo"
-                        onChange={handleInputChange}
-                        accept="image/*"
-                        className="hidden"
-                      />
-                      <div className="w-full px-3 py-2 text-sm bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:from-blue-600 hover:to-blue-700 font-medium transition-all duration-200 flex items-center justify-center gap-1">
-                        <svg
-                          className="w-4 h-4"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
-                          />
-                        </svg>
-                        {photo ? "Change" : "Upload"}
-                      </div>
-                    </label>
+                    </motion.button>
                   </div>
-                </div>
+                </form>
               </div>
-
-              {/* Personal Information - Middle Column */}
-              <div className="lg:col-span-1">
-                <div className="bg-gradient-to-br from-blue-50 to-gray-50 rounded-xl p-4 border border-blue-100 h-full">
-                  <h3 className="font-semibold text-gray-800 mb-3 text-sm flex items-center gap-2">
-                    <svg
-                      className="w-4 h-4 text-blue-600"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-                      />
-                    </svg>
-                    Personal Info
-                  </h3>
-
-                  <div className="space-y-3">
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                        Full Name *
-                        {formErrors.name && (
-                          <span className="text-red-600 text-xs ml-1">
-                            ({formErrors.name})
-                          </span>
-                        )}
-                      </label>
-                      <input
-                        type="text"
-                        name="name"
-                        value={formData.name}
-                        onChange={handleInputChange}
-                        required
-                        className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white transition-all duration-200 hover:border-blue-400 ${
-                          formErrors.name
-                            ? "border-red-500 focus:border-red-500 focus:ring-red-200"
-                            : "border-gray-300"
-                        }`}
-                        placeholder="Candidate name"
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">
-                          Age
-                        </label>
-                        <input
-                          type="number"
-                          name="age"
-                          value={formData.age}
-                          onChange={handleInputChange}
-                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white transition-all duration-200 hover:border-blue-400"
-                          placeholder="Age"
-                          min="1"
-                          max="100"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">
-                          Gender
-                        </label>
-                        <select
-                          name="gender"
-                          value={formData.gender}
-                          onChange={handleInputChange}
-                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white transition-all duration-200 hover:border-blue-400"
-                        >
-                          <option value="">Select</option>
-                          <option value="male">Male</option>
-                          <option value="female">Female</option>
-                          <option value="others">Other</option>
-                        </select>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Contact Information - Right Column */}
-              <div className="lg:col-span-1">
-                <div className="bg-gradient-to-br from-blue-50 to-gray-50 rounded-xl p-4 border border-blue-100 h-full">
-                  <h3 className="font-semibold text-gray-800 mb-3 text-sm flex items-center gap-2">
-                    <svg
-                      className="w-4 h-4 text-blue-600"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"
-                      />
-                    </svg>
-                    Contact Info
-                  </h3>
-
-                  <div className="space-y-3">
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                        Email *
-                        {formErrors.email && (
-                          <span className="text-red-600 text-xs ml-1">
-                            ({formErrors.email})
-                          </span>
-                        )}
-                      </label>
-                      <input
-                        type="email"
-                        name="email"
-                        value={formData.email}
-                        onChange={handleInputChange}
-                        required
-                        className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white transition-all duration-200 hover:border-blue-400 ${
-                          formErrors.email
-                            ? "border-red-500 focus:border-red-500 focus:ring-red-200"
-                            : "border-gray-300"
-                        } ${fieldFocus === "email" ? "ring-2 ring-blue-200" : ""}`}
-                        placeholder="email@example.com"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                        Phone *
-                        {formErrors.phone_number && (
-                          <span className="text-red-600 text-xs ml-1">
-                            ({formErrors.phone_number})
-                          </span>
-                        )}
-                      </label>
-                      <input
-                        type="tel"
-                        name="phone_number"
-                        value={formData.phone_number}
-                        onChange={handleInputChange}
-                        required
-                        className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white transition-all duration-200 hover:border-blue-400 ${
-                          formErrors.phone_number
-                            ? "border-red-500 focus:border-red-500 focus:ring-red-200"
-                            : "border-gray-300"
-                        } ${
-                          fieldFocus === "phone_number"
-                            ? "ring-2 ring-blue-200"
-                            : ""
-                        }`}
-                        placeholder="Phone number"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                        WhatsApp
-                        {formErrors.whatsApp_number && (
-                          <span className="text-red-600 text-xs ml-1">
-                            ({formErrors.whatsApp_number})
-                          </span>
-                        )}
-                      </label>
-                      <input
-                        type="tel"
-                        name="whatsApp_number"
-                        value={formData.whatsApp_number}
-                        onChange={handleInputChange}
-                        className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white transition-all duration-200 hover:border-blue-400 ${
-                          formErrors.whatsApp_number
-                            ? "border-red-500 focus:border-red-500 focus:ring-red-200"
-                            : "border-gray-300"
-                        }`}
-                        placeholder="WhatsApp number"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Action Buttons - Bottom */}
-            <div className="flex gap-3 pt-4 border-t border-gray-200">
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                type="button"
-                onClick={() => setShowForm(false)}
-                className="flex-1 px-4 py-2.5 text-sm border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-semibold transition-all duration-200"
-              >
-                Cancel
-              </motion.button>
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                type="submit"
-                disabled={loading}
-                className="flex-1 px-4 py-2.5 text-sm bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:from-blue-600 hover:to-blue-700 font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
-              >
-                {loading ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-                    Adding...
-                  </span>
-                ) : (
-                  "Add Candidate"
-                )}
-              </motion.button>
-            </div>
-          </form>
-        </div>
-      </motion.div>
-    </motion.div>
-  )}
-</AnimatePresence>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Candidate Details Modal */}
       <AnimatePresence mode="wait">
@@ -2684,7 +2732,6 @@ const CandidateDashboard = () => {
                               </span>
                             </div>
                           )}
-                          
                         </div>
 
                         {/* Quick Stats - 3 in a grid */}

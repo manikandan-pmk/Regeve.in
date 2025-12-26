@@ -64,6 +64,11 @@ const ElectionHome = () => {
     fetchElections();
   }, []);
 
+  const handleBack = () => {
+    // Go back if possible, otherwise fallback to admin home
+      navigate(`/${adminId}/admindashboard`);
+  };
+
   const handleCreateElection = async () => {
     if (!electionName.trim()) return;
 
@@ -180,7 +185,28 @@ const ElectionHome = () => {
       <section className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-16 pb-24 md:pt-24 md:pb-32">
         <div className="text-center mx-auto">
           {/* Header Section */}
-          <header className="mb-16 mt-20">
+          <header className="mb-16 relative">
+            <button
+              onClick={handleBack}
+              className="absolute left-0 -top-12 flex items-center gap-2
+      text-slate-600 hover:text-blue-600 font-semibold
+      transition-colors duration-200"
+            >
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M15 19l-7-7 7-7"
+                />
+              </svg>
+              Back to Dashboard
+            </button>
             <h1 className="text-4xl md:text-6xl font-extrabold text-slate-900 mb-8 tracking-tight">
               Digital Election Platform
             </h1>
@@ -367,8 +393,7 @@ const ElectionHome = () => {
                   {/* Header Section */}
                   <div className="flex items-start justify-between mb-5">
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center space-x-2 mb-2">
-                      </div>
+                      <div className="flex items-center space-x-2 mb-2"></div>
                       <h3
                         className="text-xl font-bold text-slate-900 leading-tight line-clamp-2
                        group-hover:text-blue-700 transition-colors duration-300

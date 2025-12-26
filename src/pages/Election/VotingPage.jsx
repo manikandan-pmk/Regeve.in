@@ -52,7 +52,6 @@ const VotingPage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [fetchError, setFetchError] = useState(null);
   const [refreshKey, setRefreshKey] = useState(0);
-  const [winners, setWinners] = useState({});
   const [showResults, setShowResults] = useState(false);
   const [electionIdFromApi, setElectionIdFromApi] = useState(null);
   const [selectedCandidates, setSelectedCandidates] = useState({});
@@ -87,13 +86,16 @@ const VotingPage = () => {
   const [showPendingAlert, setShowPendingAlert] = useState(true);
   const [toastMessage, setToastMessage] = useState(null);
   const [winnerDetails, setWinnerDetails] = useState([]);
+  const [winners, setWinners] = useState({});
   const [selectedWinnerProfile, setSelectedWinnerProfile] = useState(null); // NEW STATE
   const [expandedPositions, setExpandedPositions] = useState({});
   const [autoCollapse, setAutoCollapse] = useState(false);
-
+  const [revealedPositions, setRevealedPositions] = useState(() => {
+    const saved = localStorage.getItem(`revealedPositions_${documentId}`);
+    return saved ? JSON.parse(saved) : {};
+  });
   const countdownRef = useRef(null);
   const lastStatusRef = useRef("pending");
- 
 
   useEffect(() => {
     const savedParticipant = localStorage.getItem(
@@ -119,6 +121,13 @@ const VotingPage = () => {
         console.error("Failed to restore participant session");
         localStorage.removeItem(`election_${documentId}_verified`);
       }
+    }
+    // Restore revealed positions
+    const savedRevealed = localStorage.getItem(
+      `revealedPositions_${documentId}`
+    );
+    if (savedRevealed) {
+      setRevealedPositions(JSON.parse(savedRevealed));
     }
   }, [documentId]);
 
@@ -268,44 +277,6 @@ const VotingPage = () => {
       timeToEnd,
     };
   }, [electionData.start_time, electionData.end_time, getCurrentTime]);
-    const fetchWinners = useCallback(async () => {
-    try {
-      if (!electionIdFromApi) return;
-
-      const response = await axiosInstance.get("/winners", {
-        params: {
-          filters: {
-            election: {
-              id: electionIdFromApi,
-            },
-          },
-          populate: "*",
-        },
-      });
-
-      if (
-        response.data &&
-        Array.isArray(response.data) &&
-        response.data.length > 0
-      ) {
-        const winnersMap = {};
-        response.data.forEach((winner) => {
-          if (
-            winner.position &&
-            winner.position.id &&
-            winner.candidate &&
-            winner.candidate.id
-          ) {
-            winnersMap[winner.position.id] = winner.candidate.id;
-          }
-        });
-        setWinners(winnersMap);
-        setShowResults(true);
-      }
-    } catch (error) {
-      console.error("Error fetching winners:", error);
-    }
-  }, [axiosInstance, electionIdFromApi]);
 
   const updateCountdown = useCallback(() => {
     const newCountdown = calculateCountdown();
@@ -328,18 +299,15 @@ const VotingPage = () => {
         setShowResults(true);
         setViewOnly(true);
 
-        // 🔥 STOP COUNTDOWN COMPLETELY
         if (countdownRef.current) {
           clearInterval(countdownRef.current);
           countdownRef.current = null;
         }
-
-        if (electionIdFromApi) fetchWinners();
       }
 
       lastStatusRef.current = newCountdown.status;
     }
-  }, [calculateCountdown, electionIdFromApi, fetchWinners]);
+  }, [calculateCountdown]);
 
   // Start countdown interval
   const startCountdownInterval = useCallback(() => {
@@ -353,29 +321,28 @@ const VotingPage = () => {
   }, [updateCountdown]);
 
   useEffect(() => {
-  if (
-    electionData.start_time &&
-    electionData.end_time &&
-    countdown.status !== "ended"
-  ) {
-    updateCountdown();
-    startCountdownInterval();
-  }
-
-  return () => {
-    if (countdownRef.current) {
-      clearInterval(countdownRef.current);
-      countdownRef.current = null;
+    if (
+      electionData.start_time &&
+      electionData.end_time &&
+      countdown.status !== "ended"
+    ) {
+      updateCountdown();
+      startCountdownInterval();
     }
-  };
-}, [
-  electionData.start_time,
-  electionData.end_time,
-  countdown.status,
-  updateCountdown,
-  startCountdownInterval,
-]);
 
+    return () => {
+      if (countdownRef.current) {
+        clearInterval(countdownRef.current);
+        countdownRef.current = null;
+      }
+    };
+  }, [
+    electionData.start_time,
+    electionData.end_time,
+    countdown.status,
+    updateCountdown,
+    startCountdownInterval,
+  ]);
 
   // Check if user has completed all votes
   const checkIfCompletedAllVotes = useCallback(() => {
@@ -386,6 +353,15 @@ const VotingPage = () => {
     );
 
     if (allPositionsVoted) {
+      const allRevealed = {};
+      positions.forEach((position) => {
+        allRevealed[position.id] = true;
+      });
+      setRevealedPositions(allRevealed);
+      localStorage.setItem(
+        `revealedPositions_${documentId}`,
+        JSON.stringify(allRevealed)
+      );
       setHasCompletedVoting(true);
       setViewOnly(true);
       localStorage.setItem(`election_${documentId}_completed`, "true");
@@ -536,7 +512,6 @@ const VotingPage = () => {
     }
   }, [positions, hasVotingStarted, isVerified, votedPositions]);
 
-
   // Main voting data fetch
   const fetchVotingData = useCallback(async () => {
     if (!documentId) {
@@ -571,9 +546,20 @@ const VotingPage = () => {
 
         return {
           id: position.id,
-          name: position.Position || position.position || "Unknown Position",
+          name:
+            typeof position.Position === "string"
+              ? position.Position
+              : typeof position.position === "string"
+              ? position.position
+              : "Unknown Position",
+
           position:
-            position.Position || position.position || "Unknown Position",
+            typeof position.Position === "string"
+              ? position.Position
+              : typeof position.position === "string"
+              ? position.position
+              : "Unknown Position",
+
           submitted: false,
           candidates: candidates.map((candidate) => {
             let photoUrl = null;
@@ -613,6 +599,7 @@ const VotingPage = () => {
               votes: candidate.vote_count || 0, // Use vote_count from API
               selected: false,
               isWinner: false,
+              showvotes: false,
             };
           }),
         };
@@ -687,21 +674,6 @@ const VotingPage = () => {
       fetchVotingData();
     }
   }, [documentId, fetchVotingData]);
-
-  // Update positions with winners
-  useEffect(() => {
-    if (Object.keys(winners).length > 0) {
-      setPositions((prev) =>
-        prev.map((position) => ({
-          ...position,
-          candidates: position.candidates.map((candidate) => ({
-            ...candidate,
-            isWinner: winners[position.id] === candidate.id,
-          })),
-        }))
-      );
-    }
-  }, [winners]);
 
   // Handle vote selection
   const handleVote = (candidateId, positionId) => {
@@ -858,6 +830,16 @@ const VotingPage = () => {
     setCurrentVotedPosition(positionName);
     setToastMessage(`Your vote for "${positionName}" has been submitted!`);
 
+    setRevealedPositions((prev) => ({
+      ...prev,
+      [positionId]: true,
+    }));
+
+    localStorage.setItem(
+      `revealedPositions_${documentId}`,
+      JSON.stringify({ ...revealedPositions, [positionId]: true })
+    );
+
     // UI update instantly
     setPositions((prev) =>
       prev.map((pos) =>
@@ -867,14 +849,18 @@ const VotingPage = () => {
               submitted: true,
               candidates: pos.candidates.map((c) =>
                 c.id === selectedCandidate.id
-                  ? { ...c, votes: (c.votes || 0) + 1, selected: false }
-                  : c
+                  ? {
+                      ...c,
+                      votes: (c.votes || 0) + 1,
+                      selected: false,
+                      showVotes: true,
+                    }
+                  : { ...c, showVotes: true }
               ),
             }
           : pos
       )
     );
-
     checkIfCompletedAllVotes();
 
     // 🔕 BACKEND UPDATE (SILENT)
@@ -920,6 +906,7 @@ const VotingPage = () => {
     localStorage.removeItem(`election_${documentId}_verified`);
     localStorage.removeItem(`votedPositions_${documentId}`);
     localStorage.removeItem(`election_${documentId}_completed`);
+    localStorage.removeItem(`revealedPositions_${documentId}`);
 
     // 🔥 RESET ALL STATES
     setIsVerified(false);
@@ -1072,232 +1059,340 @@ const VotingPage = () => {
   };
 
   // Winner Profile Modal Component
-  const WinnerProfileModal = ({ winner, onClose }) => {
-    if (!winner) return null;
+  // Winner Profile Modal Component - IMPROVED
+  // const WinnerProfileModal = ({ winner, onClose }) => {
+  //   if (!winner || !winner.candidate) return null;
 
-    return (
-      <AnimatePresence>
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/80 backdrop-blur-sm"
-          onClick={onClose}
-        >
-          <motion.div
-            initial={{ scale: 0.9, y: 20 }}
-            animate={{ scale: 1, y: 0 }}
-            exit={{ scale: 0.9, opacity: 0 }}
-            transition={{ type: "spring", damping: 25, stiffness: 300 }}
-            className="bg-gradient-to-br from-white via-emerald-50 to-green-50 rounded-xl sm:rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto border-2 border-emerald-200"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Compact Header */}
-            <div className="relative bg-gradient-to-r from-emerald-500 via-green-600 to-emerald-700 p-4 sm:p-6">
-              <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent"></div>
+  //   return (
+  //     <AnimatePresence>
+  //       <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4">
+  //         {/* Backdrop with smoother animation */}
+  //         <motion.div
+  //           initial={{ opacity: 0 }}
+  //           animate={{ opacity: 1 }}
+  //           exit={{ opacity: 0 }}
+  //           transition={{ duration: 0.2 }}
+  //           className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+  //           onClick={onClose}
+  //         />
 
-              {/* Close Button */}
-              <button
-                onClick={onClose}
-                className="absolute top-3 right-3 w-8 h-8 sm:w-10 sm:h-10 bg-white/20 hover:bg-white/30 rounded-full flex items-center justify-center text-white backdrop-blur-sm transition-colors z-10"
-              >
-                <X className="w-4 h-4 sm:w-5 sm:h-5" />
-              </button>
+  //         {/* Modal Content - Smoother animation */}
+  //         <motion.div
+  //           key={winner.id || "winner-modal"}
+  //           initial={{
+  //             opacity: 0,
+  //             scale: 0.95,
+  //             y: 20,
+  //           }}
+  //           animate={{
+  //             opacity: 1,
+  //             scale: 1,
+  //             y: 0,
+  //           }}
+  //           exit={{
+  //             opacity: 0,
+  //             scale: 0.95,
+  //             y: 20,
+  //           }}
+  //           transition={{
+  //             type: "spring",
+  //             damping: 25,
+  //             stiffness: 300,
+  //             duration: 0.3,
+  //           }}
+  //           className="relative bg-gradient-to-br from-white via-emerald-50 to-green-50 rounded-xl sm:rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto border-2 border-emerald-200 z-10"
+  //           onClick={(e) => e.stopPropagation()}
+  //         >
+  //           {/* Enhanced Header */}
+  //           <div className="relative bg-gradient-to-r from-emerald-500 via-green-600 to-emerald-700 p-4 sm:p-6">
+  //             {/* Gradient Overlay */}
+  //             <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent rounded-t-xl sm:rounded-t-2xl"></div>
 
-              {/* Winner Badge - Smaller */}
-              <div className="absolute top-3 left-3 bg-gradient-to-r from-yellow-500 to-amber-600 rounded-full p-2 shadow-xl z-10">
-                <Crown className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
-              </div>
+  //             {/* Close Button - Improved */}
+  //             <button
+  //               onClick={onClose}
+  //               className="absolute top-3 right-3 w-8 h-8 sm:w-10 sm:h-10 bg-white/20 hover:bg-white/30 rounded-full flex items-center justify-center text-white backdrop-blur-sm transition-all duration-200 z-20 hover:scale-110 active:scale-95"
+  //             >
+  //               <X className="w-4 h-4 sm:w-5 sm:h-5" />
+  //             </button>
 
-              {/* Title Section - More Compact */}
-              <div className="relative z-10 pt-8">
-                <h2 className="text-lg sm:text-xl font-bold text-white mb-1">
-                  Winner Profile
-                </h2>
-                <p className="text-emerald-100 text-sm sm:text-base line-clamp-1">
-                  {winner.election_candidate_position?.Position || "Position"}
-                </p>
-              </div>
-            </div>
+  //             {/* Winner Badge */}
+  //             <motion.div
+  //               initial={{ scale: 0, rotate: -180 }}
+  //               animate={{ scale: 1, rotate: 0 }}
+  //               transition={{ delay: 0.1, type: "spring" }}
+  //               className="absolute top-3 left-3 bg-gradient-to-r from-yellow-500 to-amber-600 rounded-full p-2 shadow-xl z-20"
+  //             >
+  //               <Crown className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
+  //             </motion.div>
 
-            {/* Content - Responsive Grid */}
-            <div className="p-4 sm:p-6">
-              <div className="flex flex-col lg:flex-row gap-4 sm:gap-6">
-                {/* Left Column - Photo & Stats - More Compact */}
-                <div className="lg:w-1/3 space-y-4">
-                  {/* Photo Container */}
-                  <div className="relative">
-                    <div className="w-24 h-24 sm:w-32 sm:h-32 mx-auto rounded-xl sm:rounded-2xl overflow-hidden border-3 border-emerald-300 shadow-lg">
-                      {winner.candidate?.photoUrl ? (
-                        <img
-                          src={winner.candidate.photoUrl}
-                          alt={winner.candidate.name}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-full bg-gradient-to-br from-emerald-500 to-green-600 flex items-center justify-center">
-                          <span className="text-white text-xl sm:text-2xl font-bold">
-                            {getInitials(winner.candidate?.name)}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                    {/* Trophy Badge - Smaller */}
-                    <div className="absolute -bottom-2 -right-2 bg-gradient-to-r from-emerald-600 to-green-600 rounded-full p-2 shadow-lg">
-                      <Trophy className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
-                    </div>
-                  </div>
+  //             {/* Title Section */}
+  //             <div className="relative z-10 pt-8">
+  //               <motion.h2
+  //                 initial={{ opacity: 0, y: 10 }}
+  //                 animate={{ opacity: 1, y: 0 }}
+  //                 transition={{ delay: 0.1 }}
+  //                 className="text-lg sm:text-xl font-bold text-white mb-1"
+  //               >
+  //                 Winner Profile
+  //               </motion.h2>
+  //               <motion.p
+  //                 initial={{ opacity: 0 }}
+  //                 animate={{ opacity: 1 }}
+  //                 transition={{ delay: 0.2 }}
+  //                 className="text-emerald-100 text-sm sm:text-base line-clamp-1"
+  //               >
+  //                 {winner.election_candidate_position?.Position || "Position"}
+  //               </motion.p>
+  //             </div>
+  //           </div>
 
-                  {/* Stats Card - More Compact */}
-                  <div className="bg-gradient-to-br from-emerald-50 to-green-100 rounded-lg sm:rounded-xl p-4 border border-emerald-200">
-                    <h4 className="font-bold text-gray-800 text-center text-sm sm:text-base mb-3">
-                      Election Stats
-                    </h4>
-                    <div className="space-y-3">
-                      {/* Total Votes */}
-                      <div className="text-center">
-                        <div className="text-2xl sm:text-3xl font-bold text-emerald-700">
-                          {winner.Total_Votes ||
-                            winner.candidate?.vote_count ||
-                            0}
-                        </div>
-                        <div className="text-xs sm:text-sm text-gray-600">
-                          Total Votes
-                        </div>
-                      </div>
+  //           {/* Content Grid */}
+  //           <div className="p-4 sm:p-6">
+  //             <div className="flex flex-col lg:flex-row gap-4 sm:gap-6">
+  //               {/* Left Column - Photo & Stats */}
+  //               <div className="lg:w-1/3 space-y-4">
+  //                 {/* Photo Container with Animation */}
+  //                 <motion.div
+  //                   initial={{ opacity: 0, scale: 0.9 }}
+  //                   animate={{ opacity: 1, scale: 1 }}
+  //                   transition={{ delay: 0.3 }}
+  //                   className="relative"
+  //                 >
+  //                   <div className="w-32 h-32 sm:w-40 sm:h-40 mx-auto rounded-xl overflow-hidden border-3 border-emerald-300 shadow-lg bg-white">
+  //                     {winner.candidate?.photoUrl ? (
+  //                       <img
+  //                         src={winner.candidate.photoUrl}
+  //                         alt={winner.candidate.name}
+  //                         className="w-full h-full object-cover"
+  //                         loading="lazy"
+  //                       />
+  //                     ) : (
+  //                       <div className="w-full h-full bg-gradient-to-br from-emerald-500 to-green-600 flex items-center justify-center">
+  //                         <span className="text-white text-xl sm:text-2xl font-bold">
+  //                           {getInitials(winner.candidate?.name)}
+  //                         </span>
+  //                       </div>
+  //                     )}
+  //                   </div>
 
-                      <div className="h-px bg-gradient-to-r from-transparent via-emerald-300 to-transparent"></div>
+  //                   {/* Trophy Badge with Animation */}
+  //                   <motion.div
+  //                     initial={{ scale: 0, rotate: -180 }}
+  //                     animate={{ scale: 1, rotate: 0 }}
+  //                     transition={{ delay: 0.4, type: "spring" }}
+  //                     className="absolute -bottom-2 -right-2 bg-gradient-to-r from-emerald-600 to-green-600 rounded-full p-2 shadow-lg"
+  //                   >
+  //                     <Trophy className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
+  //                   </motion.div>
+  //                 </motion.div>
 
-                      {/* Position */}
-                      <div>
-                        <div className="text-xs text-gray-600 mb-1">
-                          Position
-                        </div>
-                        <div className="font-medium text-gray-800 text-sm">
-                          {winner.election_candidate_position?.Position ||
-                            "N/A"}
-                        </div>
-                      </div>
+  //                 {/* Stats Card */}
+  //                 <motion.div
+  //                   initial={{ opacity: 0, y: 20 }}
+  //                   animate={{ opacity: 1, y: 0 }}
+  //                   transition={{ delay: 0.4 }}
+  //                   className="bg-gradient-to-br from-emerald-50 to-green-100 rounded-lg sm:rounded-xl p-4 border border-emerald-200"
+  //                 >
+  //                   <h4 className="font-bold text-gray-800 text-center text-sm sm:text-base mb-3">
+  //                     Election Stats
+  //                   </h4>
+  //                   <div className="space-y-3">
+  //                     {/* Total Votes */}
+  //                     <div className="text-center">
+  //                       <div className="text-2xl sm:text-3xl font-bold text-emerald-700">
+  //                         {typeof winner.Total_Votes === "number"
+  //                           ? winner.Total_Votes
+  //                           : 0}
+  //                       </div>
+  //                       <div className="text-xs sm:text-sm text-gray-600">
+  //                         Total Votes
+  //                       </div>
+  //                     </div>
 
-                      {/* Election Name */}
-                      <div>
-                        <div className="text-xs text-gray-600 mb-1">
-                          Election
-                        </div>
-                        <div className="font-medium text-gray-800 text-sm line-clamp-2">
-                          {electionData.electionName}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+  //                     <div className="h-px bg-gradient-to-r from-transparent via-emerald-300 to-transparent"></div>
 
-                {/* Right Column - Details */}
-                <div className="lg:w-2/3">
-                  {/* Name and Badges */}
-                  <div className="mb-4 sm:mb-6">
-                    <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2 line-clamp-1">
-                      {winner.candidate?.name || "Unknown Candidate"}
-                    </h3>
-                    <div className="flex flex-wrap gap-2">
-                      <span className="px-2 sm:px-3 py-1 bg-gradient-to-r from-emerald-100 to-green-100 text-emerald-800 rounded-full text-xs sm:text-sm font-semibold">
-                        Winner
-                      </span>
-                      {winner.candidate?.candidate_id && (
-                        <span className="px-2 sm:px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-xs sm:text-sm">
-                          ID: {winner.candidate.candidate_id}
-                        </span>
-                      )}
-                    </div>
-                  </div>
+  //                     {/* Position */}
+  //                     <div>
+  //                       <div className="text-xs text-gray-600 mb-1">
+  //                         Position
+  //                       </div>
+  //                       <div className="font-medium text-gray-800 text-sm">
+  //                         {winner.election_candidate_position?.Position ||
+  //                           "N/A"}
+  //                       </div>
+  //                     </div>
 
-                  {/* Personal Details Grid - Responsive */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mb-4 sm:mb-6">
-                    {winner.candidate?.email && (
-                      <div className="bg-white rounded-lg sm:rounded-xl p-3 border border-gray-200">
-                        <div className="text-xs text-gray-600 mb-1">Email</div>
-                        <div className="font-medium text-gray-900 text-sm truncate">
-                          {winner.candidate.email}
-                        </div>
-                      </div>
-                    )}
+  //                     {/* Election Name */}
+  //                     <div>
+  //                       <div className="text-xs text-gray-600 mb-1">
+  //                         Election
+  //                       </div>
+  //                       <div className="font-medium text-gray-800 text-sm line-clamp-2">
+  //                         {electionData.electionName}
+  //                       </div>
+  //                     </div>
+  //                   </div>
+  //                 </motion.div>
+  //               </div>
 
-                    {winner.candidate?.phone && (
-                      <div className="bg-white rounded-lg sm:rounded-xl p-3 border border-gray-200">
-                        <div className="text-xs text-gray-600 mb-1">Phone</div>
-                        <div className="font-medium text-gray-900 text-sm">
-                          {winner.candidate.phone}
-                        </div>
-                      </div>
-                    )}
+  //               {/* Right Column - Details with Stagger Animation */}
+  //               <div className="lg:w-2/3">
+  //                 {/* Name and Badges */}
+  //                 <motion.div
+  //                   initial={{ opacity: 0, y: 10 }}
+  //                   animate={{ opacity: 1, y: 0 }}
+  //                   transition={{ delay: 0.3 }}
+  //                   className="mb-4 sm:mb-6"
+  //                 >
+  //                   <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2 line-clamp-1">
+  //                     {winner.candidate?.name || "Unknown Candidate"}
+  //                   </h3>
+  //                   <div className="flex flex-wrap gap-2">
+  //                     <motion.span
+  //                       initial={{ opacity: 0, scale: 0.8 }}
+  //                       animate={{ opacity: 1, scale: 1 }}
+  //                       transition={{ delay: 0.4 }}
+  //                       className="px-2 sm:px-3 py-1 bg-gradient-to-r from-emerald-100 to-green-100 text-emerald-800 rounded-full text-xs sm:text-sm font-semibold"
+  //                     >
+  //                       Winner
+  //                     </motion.span>
+  //                     {winner.candidate?.candidate_id && (
+  //                       <motion.span
+  //                         initial={{ opacity: 0, scale: 0.8 }}
+  //                         animate={{ opacity: 1, scale: 1 }}
+  //                         transition={{ delay: 0.45 }}
+  //                         className="px-2 sm:px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-xs sm:text-sm"
+  //                       >
+  //                         ID: {winner.candidate.candidate_id}
+  //                       </motion.span>
+  //                     )}
+  //                   </div>
+  //                 </motion.div>
 
-                    {winner.candidate?.department && (
-                      <div className="bg-white rounded-lg sm:rounded-xl p-3 border border-gray-200">
-                        <div className="text-xs text-gray-600 mb-1">
-                          Department
-                        </div>
-                        <div className="font-medium text-gray-900 text-sm">
-                          {winner.candidate.department}
-                        </div>
-                      </div>
-                    )}
+  //                 {/* Personal Details Grid */}
+  //                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mb-4 sm:mb-6">
+  //                   {winner.candidate?.email && (
+  //                     <motion.div
+  //                       initial={{ opacity: 0, y: 10 }}
+  //                       animate={{ opacity: 1, y: 0 }}
+  //                       transition={{ delay: 0.5 }}
+  //                       className="bg-white rounded-lg sm:rounded-xl p-3 border border-gray-200"
+  //                     >
+  //                       <div className="text-xs text-gray-600 mb-1">Email</div>
+  //                       <div className="font-medium text-gray-900 text-sm truncate">
+  //                         {winner.candidate.email}
+  //                       </div>
+  //                     </motion.div>
+  //                   )}
 
-                    {winner.candidate?.location && (
-                      <div className="bg-white rounded-lg sm:rounded-xl p-3 border border-gray-200">
-                        <div className="text-xs text-gray-600 mb-1">
-                          Location
-                        </div>
-                        <div className="font-medium text-gray-900 text-sm">
-                          {winner.candidate.location}
-                        </div>
-                      </div>
-                    )}
-                  </div>
+  //                   {winner.candidate?.phone && (
+  //                     <motion.div
+  //                       initial={{ opacity: 0, y: 10 }}
+  //                       animate={{ opacity: 1, y: 0 }}
+  //                       transition={{ delay: 0.55 }}
+  //                       className="bg-white rounded-lg sm:rounded-xl p-3 border border-gray-200"
+  //                     >
+  //                       <div className="text-xs text-gray-600 mb-1">Phone</div>
+  //                       <div className="font-medium text-gray-900 text-sm">
+  //                         {winner.candidate.phone}
+  //                       </div>
+  //                     </motion.div>
+  //                   )}
 
-                  {/* Bio Section - More Compact */}
-                  {winner.candidate?.bio && (
-                    <div className="mb-4 sm:mb-6">
-                      <h4 className="text-base sm:text-lg font-semibold text-gray-900 mb-2">
-                        About
-                      </h4>
-                      <div className="bg-white rounded-lg sm:rounded-xl p-3 sm:p-4 border border-gray-200">
-                        <p className="text-gray-700 text-sm leading-relaxed line-clamp-3 sm:line-clamp-none">
-                          {winner.candidate.bio}
-                        </p>
-                      </div>
-                    </div>
-                  )}
+  //                   {winner.candidate?.department && (
+  //                     <motion.div
+  //                       initial={{ opacity: 0, y: 10 }}
+  //                       animate={{ opacity: 1, y: 0 }}
+  //                       transition={{ delay: 0.6 }}
+  //                       className="bg-white rounded-lg sm:rounded-xl p-3 border border-gray-200"
+  //                     >
+  //                       <div className="text-xs text-gray-600 mb-1">
+  //                         Department
+  //                       </div>
+  //                       <div className="font-medium text-gray-900 text-sm">
+  //                         {winner.candidate.department}
+  //                       </div>
+  //                     </motion.div>
+  //                   )}
 
-                  {/* Experience - More Compact */}
-                  {winner.candidate?.experience && (
-                    <div>
-                      <h4 className="text-base sm:text-lg font-semibold text-gray-900 mb-2">
-                        Experience
-                      </h4>
-                      <div className="bg-gradient-to-r from-emerald-50 to-green-50 rounded-lg sm:rounded-xl p-3 sm:p-4 border border-emerald-200">
-                        <p className="text-gray-700 text-sm">
-                          {winner.candidate.experience}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
+  //                   {winner.candidate?.location && (
+  //                     <motion.div
+  //                       initial={{ opacity: 0, y: 10 }}
+  //                       animate={{ opacity: 1, y: 0 }}
+  //                       transition={{ delay: 0.65 }}
+  //                       className="bg-white rounded-lg sm:rounded-xl p-3 border border-gray-200"
+  //                     >
+  //                       <div className="text-xs text-gray-600 mb-1">
+  //                         Location
+  //                       </div>
+  //                       <div className="font-medium text-gray-900 text-sm">
+  //                         {winner.candidate.location}
+  //                       </div>
+  //                     </motion.div>
+  //                   )}
+  //                 </div>
 
-            {/* Compact Footer */}
-            <div className="bg-gradient-to-r from-emerald-500/10 to-green-500/10 p-3 sm:p-4 border-t border-emerald-200">
-              <div className="text-center">
-                <p className="text-emerald-700 font-medium text-sm sm:text-base">
-                  🎉 Congratulations to the winner!
-                </p>
-              </div>
-            </div>
-          </motion.div>
-        </motion.div>
-      </AnimatePresence>
-    );
-  };
+  //                 {/* Bio Section */}
+  //                 {winner.candidate?.bio && (
+  //                   <motion.div
+  //                     initial={{ opacity: 0, y: 10 }}
+  //                     animate={{ opacity: 1, y: 0 }}
+  //                     transition={{ delay: 0.7 }}
+  //                     className="mb-4 sm:mb-6"
+  //                   >
+  //                     <h4 className="text-base sm:text-lg font-semibold text-gray-900 mb-2">
+  //                       About
+  //                     </h4>
+  //                     <div className="bg-white rounded-lg sm:rounded-xl p-3 sm:p-4 border border-gray-200">
+  //                       <p className="text-gray-700 text-sm leading-relaxed line-clamp-3 sm:line-clamp-none">
+  //                         {typeof winner.candidate.bio === "string"
+  //                           ? winner.candidate.bio
+  //                           : "No details available"}
+  //                       </p>
+  //                     </div>
+  //                   </motion.div>
+  //                 )}
+
+  //                 {/* Experience */}
+  //                 {winner.candidate?.experience && (
+  //                   <motion.div
+  //                     initial={{ opacity: 0, y: 10 }}
+  //                     animate={{ opacity: 1, y: 0 }}
+  //                     transition={{ delay: 0.75 }}
+  //                   >
+  //                     <h4 className="text-base sm:text-lg font-semibold text-gray-900 mb-2">
+  //                       Experience
+  //                     </h4>
+  //                     <div className="bg-gradient-to-r from-emerald-50 to-green-50 rounded-lg sm:rounded-xl p-3 sm:p-4 border border-emerald-200">
+  //                       <p className="text-gray-700 text-sm">
+  //                         {winner.candidate.experience}
+  //                       </p>
+  //                     </div>
+  //                   </motion.div>
+  //                 )}
+  //               </div>
+  //             </div>
+  //           </div>
+
+  //           {/* Footer */}
+  //           <motion.div
+  //             initial={{ opacity: 0 }}
+  //             animate={{ opacity: 1 }}
+  //             transition={{ delay: 0.8 }}
+  //             className="bg-gradient-to-r from-emerald-500/10 to-green-500/10 p-3 sm:p-4 border-t border-emerald-200"
+  //           >
+  //             <div className="text-center">
+  //               <p className="text-emerald-700 font-medium text-sm sm:text-base">
+  //                 🎉 Congratulations to the winner!
+  //               </p>
+  //             </div>
+  //           </motion.div>
+  //         </motion.div>
+  //       </div>
+  //     </AnimatePresence>
+  //   );
+  // };
 
   // Thank You Popup Component
   const ThankYouPopup = () => {
@@ -1878,7 +1973,7 @@ const VotingPage = () => {
           <h3 className="text-2xl font-bold text-gray-900 text-center mb-3">
             Unable to Load Election
           </h3>
-          <p className="text-gray-600 text-center mb-2">{fetchError}</p>
+          <p className="text-gray-600 text-center mb-2">{String(fetchError)}</p>
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
@@ -2372,9 +2467,25 @@ const VotingPage = () => {
                                                 <div className="inline-flex items-center gap-2 bg-gradient-to-r from-blue-50 to-indigo-50 px-5 py-2.5 rounded-full border border-blue-100 shadow-sm">
                                                   <BarChart3 className="w-5 h-5 text-blue-600" />
                                                   <span className="font-bold text-blue-700 text-lg">
-                                                    {candidate.vote_count ||
-                                                      candidate.votes ||
-                                                      0}{" "}
+                                                    {countdown.status ===
+                                                      "ended" ||
+                                                    revealedPositions[
+                                                      position.id
+                                                    ] ||
+                                                    isPositionVoted(
+                                                      position.id
+                                                    ) ||
+                                                    viewOnly
+                                                      ? `${
+                                                          typeof candidate.vote_count ===
+                                                          "number"
+                                                            ? candidate.vote_count
+                                                            : typeof candidate.votes ===
+                                                              "number"
+                                                            ? candidate.votes
+                                                            : 0
+                                                        } `
+                                                      : "? "}
                                                     <span className="text-sm font-medium">
                                                       votes
                                                     </span>
@@ -2388,8 +2499,10 @@ const VotingPage = () => {
                                                   <div className="flex justify-between text-xs text-gray-500 mb-1">
                                                     <span>Vote Share</span>
                                                     <span className="font-bold">
-                                                      {candidate.vote_percentage ||
-                                                        "0%"}
+                                                      {typeof candidate.vote_percentage ===
+                                                      "number"
+                                                        ? `${candidate.vote_percentage}%`
+                                                        : "0%"}
                                                     </span>
                                                   </div>
                                                   <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
@@ -2397,8 +2510,10 @@ const VotingPage = () => {
                                                       initial={{ width: 0 }}
                                                       animate={{
                                                         width: `${
-                                                          candidate.vote_percentage ||
-                                                          0
+                                                          typeof candidate.vote_percentage ===
+                                                          "number"
+                                                            ? candidate.vote_percentage
+                                                            : 0
                                                         }%`,
                                                       }}
                                                       transition={{
@@ -2485,13 +2600,18 @@ const VotingPage = () => {
 
                                             {/* Enhanced Votes Display */}
                                             <div className="mb-4">
-                                              <span className="inline-flex items-center gap-2 bg-gradient-to-r from-gray-100 to-gray-200 rounded-full px-4 py-2 text-sm font-bold">
-                                                <BarChart3 className="w-4 h-4 text-gray-600" />
-                                                {candidate.vote_count ||
-                                                  candidate.votes ||
-                                                  0}{" "}
-                                                votes
-                                              </span>
+                                              {/* <span className="inline-flex items-center gap-2 bg-gradient-to-r from-gray-100 to-gray-200 rounded-full px-4 py-2 text-sm font-bold"> */}
+                                              {/* <BarChart3 className="w-4 h-4 text-gray-600" /> */}
+                                              {revealedPositions[position.id] ||
+                                              isPositionVoted(position.id) ||
+                                              viewOnly
+                                                ? `${
+                                                    candidate.vote_count ||
+                                                    candidate.votes ||
+                                                    0
+                                                  } votes`
+                                                : ""}
+                                              {/* </span> */}
                                             </div>
 
                                             {/* Enhanced Vote Button */}
@@ -2613,6 +2733,7 @@ const VotingPage = () => {
             </div>
 
             {/* Winners Grid - More Compact */}
+            {/* Winners Grid - More Compact */}
             {winnerDetails.length > 0 ? (
               <div
                 className={`
@@ -2621,15 +2742,31 @@ const VotingPage = () => {
       mb-10
       ${
         winnerDetails.length === 1
-          ? "flex justify-center"
-          : "grid grid-cols-1 md:grid-cols-2 gap-8"
+          ? "flex justify-center max-w-2xl"
+          : winnerDetails.length === 2
+          ? "grid grid-cols-1 lg:grid-cols-2 gap-8"
+          : "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
       }
     `}
               >
                 {winnerDetails.map((winner, index) => {
                   const isTopWinner = index === 0;
                   const totalVotes =
-                    winner.Total_Votes || winner.candidate?.vote_count || 0;
+                    typeof winner.Total_Votes === "number"
+                      ? winner.Total_Votes
+                      : typeof winner.candidate?.vote_count === "number"
+                      ? winner.candidate.vote_count
+                      : 0;
+
+                  // Add validation to prevent empty objects
+                  if (!winner || Object.keys(winner).length === 0) {
+                    return null; // Skip empty objects
+                  }
+
+                  // Validate that we have a candidate
+                  if (!winner.candidate) {
+                    return null; // Skip items without candidate data
+                  }
 
                   return (
                     <motion.div
@@ -2646,7 +2783,7 @@ const VotingPage = () => {
             bg-white
             ${
               isTopWinner
-                ? "border-2 border-yellow-400 shadow-xl"
+                ? "border-2 border-emerald-400 shadow-xl"
                 : "border border-emerald-200 shadow-lg"
             }
             hover:shadow-2xl
@@ -2654,14 +2791,6 @@ const VotingPage = () => {
             duration-300
           `}
                     >
-                      {/* 🌟 TOP WINNER BADGE */}
-                      {isTopWinner && (
-                        <div className="absolute top-3 left-3 z-20 flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold text-white bg-gradient-to-r from-yellow-500 to-amber-500 shadow-lg">
-                          <Crown className="w-4 h-4" />
-                          TOP WINNER
-                        </div>
-                      )}
-
                       {/* Card Content */}
                       <div className={`p-6 ${isTopWinner ? "pt-12" : ""}`}>
                         <div className="grid grid-cols-1 md:grid-cols-[140px_1fr] gap-6">
@@ -2672,7 +2801,7 @@ const VotingPage = () => {
                                 className={`
                       w-28 h-28 rounded-xl overflow-hidden border-2
                       ${
-                        isTopWinner ? "border-yellow-400" : "border-emerald-400"
+                        isTopWinner ? "border-green-400" : "border-emerald-400"
                       }
                       shadow-md
                     `}
@@ -2680,13 +2809,15 @@ const VotingPage = () => {
                                 {winner.candidate?.photoUrl ? (
                                   <img
                                     src={winner.candidate.photoUrl}
-                                    alt={winner.candidate.name}
+                                    alt={winner.candidate.name || "Winner"}
                                     className="w-full h-full object-cover"
                                   />
                                 ) : (
                                   <div className="w-full h-full bg-gradient-to-br from-emerald-600 to-green-600 flex items-center justify-center">
                                     <span className="text-white text-2xl font-bold">
-                                      {getInitials(winner.candidate?.name)}
+                                      {getInitials(
+                                        winner.candidate?.name || "W"
+                                      )}
                                     </span>
                                   </div>
                                 )}
@@ -2717,16 +2848,19 @@ const VotingPage = () => {
                                 Winning Position
                               </div>
                               <h3 className="text-xl font-bold text-gray-900">
-                                {winner.election_candidate_position?.Position ||
-                                  winner.position_name ||
-                                  "Position"}
+                                {typeof winner.election_candidate_position
+                                  ?.Position === "string"
+                                  ? winner.election_candidate_position.Position
+                                  : typeof winner.position_name === "string"
+                                  ? winner.position_name
+                                  : "Position"}
                               </h3>
                             </div>
 
                             {/* Candidate */}
                             <div className="mb-5">
                               <h2 className="text-2xl font-extrabold text-gray-900 mb-1">
-                                {winner.candidate?.name || "Unknown Candidate"}
+                                {winner.candidate.name || "Unknown Candidate"}
                               </h2>
                               {winner.candidate?.candidate_id && (
                                 <div className="text-sm text-gray-500">
@@ -2765,17 +2899,17 @@ const VotingPage = () => {
 
                             {/* Actions */}
                             <div className="flex flex-wrap gap-3">
-                              <button
+                              {/* <button
                                 onClick={() => setSelectedWinnerProfile(winner)}
                                 className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 shadow-md hover:shadow-lg transition-all"
                               >
                                 <User className="w-4 h-4" />
                                 View Profile
-                              </button>
+                              </button> */}
 
                               <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold bg-gradient-to-r from-emerald-100 to-green-100 text-emerald-800">
                                 <Award className="w-4 h-4" />
-                                Winner #{index + 1}
+                                Winner 
                               </div>
                             </div>
                           </div>

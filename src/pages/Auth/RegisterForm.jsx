@@ -757,6 +757,7 @@ export default function RegisterForm() {
                           : ""
                       }`}
                       placeholder="Enter phone number"
+                      maxLength={10}
                     />
                     {touched.phoneNumber && errors.phoneNumber && (
                       <div className={errorClass}>{errors.phoneNumber}</div>

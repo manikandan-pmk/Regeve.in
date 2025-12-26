@@ -36,42 +36,60 @@ export default function ElectionParticipantForm({ token = null }) {
     }
   }
 
-  function validateForm() {
-    const newErrors = {};
+function validateForm() {
+  const newErrors = {};
 
-    if (!form.name.trim()) newErrors.name = "Name is required";
+  // Name
+  if (!form.name.trim()) newErrors.name = "Name is required";
 
-    if (!form.email.trim()) {
-      newErrors.email = "Email is required";
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
-      newErrors.email = "Invalid email format";
-    }
-
-    if (!form.phone_number.trim()) {
-      newErrors.phone_number = "Phone number is required";
-    } else if (!/^\d{10}$/.test(form.phone_number.replace(/\D/g, ""))) {
-      newErrors.phone_number = "Phone number must be 10 digits";
-    }
-
-    if (
-      form.whatsapp_number &&
-      !/^\d{10}$/.test(form.whatsapp_number.replace(/\D/g, ""))
-    ) {
-      newErrors.whatsapp_number = "WhatsApp number must be 10 digits";
-    }
-
-    if (form.age) {
-      const ageNum = parseInt(form.age);
-      if (isNaN(ageNum) || ageNum < 18) {
-        newErrors.age = "Age must be 18 or above";
-      }
-    }
-
-    if (!form.gender) newErrors.gender = "Gender is required";
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+  // Email
+  if (!form.email.trim()) {
+    newErrors.email = "Email is required";
+  } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
+    newErrors.email = "Invalid email format";
   }
+
+  // Phone
+  if (!form.phone_number.trim()) {
+    newErrors.phone_number = "Phone number is required";
+  } else if (!/^\d{10}$/.test(form.phone_number)) {
+    newErrors.phone_number = "Phone number must be 10 digits";
+  }
+
+  // WhatsApp
+  if (!form.whatsapp_number.trim()) {
+    newErrors.whatsapp_number = "WhatsApp number is required";
+  } else if (!/^\d{10}$/.test(form.whatsapp_number)) {
+    newErrors.whatsapp_number = "WhatsApp number must be 10 digits";
+  }
+
+ 
+
+  // Age
+  // Age (ALL AGES ALLOWED)
+if (!form.age) {
+  newErrors.age = "Age is required";
+}
+
+
+  // Gender
+  if (!form.gender) newErrors.gender = "Gender is required";
+
+  // ID Card
+  if (!form.id_card.trim()) {
+    newErrors.id_card = "ID number is required";
+  }
+
+  // 📸 Photo (MANDATORY)
+  if (!photos || photos.length === 0) {
+    newErrors.photo = "Profile photo is required";
+  }
+
+  setErrors(newErrors);
+  return Object.keys(newErrors).length === 0;
+}
+
+
 
   function handleFiles(e) {
     const files = Array.from(e.target.files);
@@ -122,98 +140,165 @@ export default function ElectionParticipantForm({ token = null }) {
     return uploadResp.data[0].id; // ✅ Return uploaded image ID
   }
 
-  async function handleSubmit(e) {
-    e.preventDefault();
+async function handleSubmit(e) {
+  e.preventDefault();
 
-    if (!validateForm()) {
-      setMessage({
-        type: "error",
-        text: "Please fix the errors in the form.",
-      });
-      return;
-    }
+  // 1️⃣ Validate fields
+  if (!validateForm()) {
+    setMessage({
+      type: "error",
+      text: "All fields are required. Please fix the errors.",
+    });
+    return;
+  }
 
-    setLoading(true);
-    setMessage(null);
+  setLoading(true);
+  setMessage(null);
 
-    try {
-      // ✅ 1. Upload Image Using Upload API
-      const uploadedPhotoId = await uploadPhoto(photos, token);
+  try {
+    // 2️⃣ Duplicate check BEFORE upload
+   const duplicate = await checkDuplicateUser(
+  form.email,
+  form.phone_number,
+  form.whatsapp_number,
+  form.id_card
+);
 
-      // ✅ 2. Prepare Exact Backend Payload
-      const payload = {
-        data: {
-          name: form.name,
-          email: form.email,
-          phone_number: Number(form.phone_number),
-          whatsapp_number: Number(form.whatsapp_number),
-          age: Number(form.age),
-          id_card: form.id_card,
-          gender: form.gender, // "male" | "female" | "others"
-          Photo: uploadedPhotoId ? [uploadedPhotoId] : [],
-          // ✅ NUMERIC ADMIN ID
-          adminId: Number(adminId),
-          electionDocumentId,
-        },
-      };
+if (duplicate) {
+  const newErrors = {};
 
-      console.log("✅ FINAL PAYLOAD =>", payload);
+  if (duplicate.email)
+    newErrors.email = "This email is already registered";
 
-      // ✅ 3. Save Election Participant
-      await axios.post(API_URL, payload, {
-        headers: {
-          "Content-Type": "application/json",
-          ...(token && { Authorization: `Bearer ${token}` }),
-        },
-      });
+  if (duplicate.phone)
+    newErrors.phone_number = "This phone number is already registered";
 
-      // ✅ 4. Reset After Success
-      setMessage({
-        type: "success",
-        text: "Candidate application submitted successfully!",
-      });
+  if (duplicate.whatsapp)
+    newErrors.whatsapp_number = "This WhatsApp number is already registered";
 
-      setForm({
-        name: "",
-        email: "",
-        phone_number: "",
-        whatsapp_number: "",
-        age: "",
-        gender: "",
-        id_card: "",
-      });
+  if (duplicate.id_card)
+    newErrors.id_card = "This ID number is already registered";
 
-      setPhotos([]);
-      setPhotoPreview(null);
-      setErrors({});
-    } catch (err) {
-      console.error("Upload/Submit Error:", err);
+  setErrors(newErrors);
+  setMessage({
+    type: "error",
+    text: "Duplicate details found. Please correct highlighted fields.",
+  });
+  setLoading(false);
+  return;
+}
 
-      const errorMessage =
+    // 3️⃣ Upload photo
+    const uploadedPhotoId = await uploadPhoto(photos, token);
+
+    // 4️⃣ Final payload
+    const payload = {
+      data: {
+        name: form.name,
+        email: form.email,
+        phone_number: Number(form.phone_number),
+        whatsapp_number: Number(form.whatsapp_number),
+        age: Number(form.age),
+        id_card: form.id_card,
+        gender: form.gender,
+        Photo: uploadedPhotoId ? [uploadedPhotoId] : [],
+        adminId: Number(adminId),
+        electionDocumentId,
+      },
+    };
+
+    await axios.post(API_URL, payload, {
+      headers: {
+        "Content-Type": "application/json",
+        ...(token && { Authorization: `Bearer ${token}` }),
+      },
+    });
+
+    setMessage({
+      type: "success",
+      text: "Candidate application submitted successfully!",
+    });
+
+    // Reset
+    setForm({
+      name: "",
+      email: "",
+      phone_number: "",
+      whatsapp_number: "",
+      age: "",
+      gender: "",
+      id_card: "",
+    });
+    setPhotos([]);
+    setPhotoPreview(null);
+    setErrors({});
+  } catch (err) {
+    setMessage({
+      type: "error",
+      text:
         err.response?.data?.error?.message ||
-        err.response?.data?.message ||
-        "Failed to submit application. Please try again.";
-
-      setMessage({
-        type: "error",
-        text: errorMessage,
-      });
-    } finally {
-      setLoading(false);
-    }
+        "Failed to submit application.",
+    });
+  } finally {
+    setLoading(false);
   }
+}
 
-  async function checkExistingUser(email, phone) {
-    try {
-      const response = await axios.get(
-        `${API_URL}?filters[email][$eq]=${email}&filters[phone_number][$eq]=${phone}`
-      );
-      return response.data.data.length > 0;
-    } catch (error) {
-      console.error("Check user error:", error);
-      return false;
+async function checkDuplicateUser(email, phone, whatsapp, idCard) {
+  try {
+    const duplicate = {
+      email: false,
+      phone: false,
+      whatsapp: false,
+      id_card: false,
+    };
+
+    // 1️⃣ Email check
+    const emailRes = await axios.get(
+      `${API_URL}?filters[email][$eq]=${encodeURIComponent(email)}&pagination[pageSize]=1`
+    );
+    if (emailRes.data.data.length > 0) duplicate.email = true;
+
+    // 2️⃣ Phone check
+    const phoneRes = await axios.get(
+      `${API_URL}?filters[phone_number][$eq]=${phone}&pagination[pageSize]=1`
+    );
+    if (phoneRes.data.data.length > 0) duplicate.phone = true;
+
+    // 3️⃣ WhatsApp check
+    const whatsappRes = await axios.get(
+      `${API_URL}?filters[whatsapp_number][$eq]=${whatsapp}&pagination[pageSize]=1`
+    );
+    if (whatsappRes.data.data.length > 0) duplicate.whatsapp = true;
+
+    // 4️⃣ ID Card check
+    const idRes = await axios.get(
+      `${API_URL}?filters[id_card][$eq]=${encodeURIComponent(idCard)}&pagination[pageSize]=1`
+    );
+    if (idRes.data.data.length > 0) duplicate.id_card = true;
+
+    // If NO duplicates
+    if (
+      !duplicate.email &&
+      !duplicate.phone &&
+      !duplicate.whatsapp &&
+      !duplicate.id_card
+    ) {
+      return null;
     }
+
+    return duplicate;
+  } catch (error) {
+    console.error("Duplicate check failed:", error);
+    return null;
   }
+}
+
+
+
+
+
+
 
   return (
     <div className="min-h-screen mt-10 flex items-center justify-center bg-gradient-to-br from-gray-50 to-blue-50 py-12 px-4">
@@ -483,7 +568,8 @@ export default function ElectionParticipantForm({ token = null }) {
                       Email Address <span className="text-red-500">*</span>
                     </label>
                     <div className="relative">
-                      <input
+                      <input 
+                      required 
                         className={`w-full px-4 py-3.5 pl-12 border rounded-xl focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition-all duration-200 bg-gray-50 border-gray-200 text-gray-800 placeholder-gray-500 ${
                           errors.email ? "border-red-400 bg-red-50" : ""
                         }`}
@@ -491,7 +577,7 @@ export default function ElectionParticipantForm({ token = null }) {
                         name="email"
                         value={form.email}
                         onChange={handleChange}
-                        required
+                        
                         placeholder="Enter your email address"
                       />
                       <div className="absolute left-4 top-1/2 transform -translate-y-1/2">
@@ -536,7 +622,7 @@ export default function ElectionParticipantForm({ token = null }) {
                       Phone Number <span className="text-red-500">*</span>
                     </label>
                     <div className="relative">
-                      <input
+                      <input  
                         className={`w-full px-4 py-3.5 pl-12 border rounded-xl focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition-all duration-200 bg-gray-50 border-gray-200 text-gray-800 placeholder-gray-500 ${
                           errors.phone_number ? "border-red-400 bg-red-50" : ""
                         }`}
@@ -587,7 +673,7 @@ export default function ElectionParticipantForm({ token = null }) {
                       WhatsApp Number
                     </label>
                     <div className="relative">
-                      <input
+                      <input required 
                         className={`w-full px-4 py-3.5 pl-12 border rounded-xl focus:ring-2 focus:ring-green-400 focus:border-green-400 transition-all duration-200 bg-gray-50 border-gray-200 text-gray-800 placeholder-gray-500 ${
                           errors.whatsapp_number
                             ? "border-red-400 bg-red-50"
@@ -635,7 +721,7 @@ export default function ElectionParticipantForm({ token = null }) {
                       ID Number
                     </label>
                     <div className="relative">
-                      <input
+                      <input required 
                         className={`w-full px-4 py-3.5 pl-12 border rounded-xl focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition-all duration-200 bg-gray-50 border-gray-200 text-gray-800 placeholder-gray-500 ${
                           errors.id_card ? "border-red-400 bg-red-50" : ""
                         }`}
@@ -684,7 +770,7 @@ export default function ElectionParticipantForm({ token = null }) {
                       Age
                     </label>
                     <div className="relative">
-                      <input
+                      <input required 
                         className={`w-full px-4 py-3.5 pl-12 border rounded-xl focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition-all duration-200 bg-gray-50 border-gray-200 text-gray-800 placeholder-gray-500 ${
                           errors.age ? "border-red-400 bg-red-50" : ""
                         }`}
@@ -693,7 +779,7 @@ export default function ElectionParticipantForm({ token = null }) {
                         value={form.age}
                         onChange={handleChange}
                         placeholder="25"
-                        min="18"
+                        min="10"
                         max="100"
                       />
                       <div className="absolute left-4 top-1/2 transform -translate-y-1/2">

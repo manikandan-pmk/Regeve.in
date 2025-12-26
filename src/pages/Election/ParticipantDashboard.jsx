@@ -149,9 +149,7 @@ const ParticipantDashboard = () => {
   const fetchParticipants = async () => {
     try {
       const response = await axiosInstance.get("/election-participants", {
-        params: {
-          electionDocumentId: electionDocumentId, // ✅ REQUIRED
-        },
+        params: { electionDocumentId },
       });
 
       const apiData = response.data.data;
@@ -174,7 +172,9 @@ const ParticipantDashboard = () => {
         hasVoted: item.hasVoted === true,
       }));
 
-      setParticipants(formatted);
+      setParticipants((prev) =>
+        JSON.stringify(prev) !== JSON.stringify(formatted) ? formatted : prev
+      );
     } catch (error) {
       console.error("Error fetching participants:", error);
     }
@@ -201,9 +201,18 @@ const ParticipantDashboard = () => {
 
   // Call fetchElectionName in useEffect
   useEffect(() => {
+    // Initial fetch
     fetchParticipants();
     fetchElectionName();
-  }, []);
+
+    // 🔁 Auto refresh every 5 seconds
+    const interval = setInterval(() => {
+      fetchParticipants();
+    }, 5000); // 5 seconds
+
+    // Cleanup on unmount
+    return () => clearInterval(interval);
+  }, [electionDocumentId]);
 
   // Show alert function
   const showAlertMessage = (message, type = "success") => {
@@ -347,6 +356,7 @@ const ParticipantDashboard = () => {
   const totalCount = participants.length;
   const verifiedCount = participants.filter((p) => p.verified).length;
   const pendingCount = totalCount - verifiedCount;
+  const votedCount = participants.filter((p) => p.hasVoted).length;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50/50 to-white pt-8 pb-8">
@@ -594,7 +604,7 @@ const ParticipantDashboard = () => {
         </div>
 
         {/* Statistics Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           {/* Total Voters Card - Wave Animation Style */}
           <div className="group relative bg-gradient-to-br from-white to-blue-50 p-6 rounded-2xl border border-blue-100 shadow-[0_8px_30px_rgba(0,0,0,0.04)] hover:shadow-[0_20px_40px_rgba(59,130,246,0.15)] transition-all duration-700 hover:scale-[1.02] overflow-hidden">
             {/* Wave Background Animation */}
@@ -800,6 +810,55 @@ const ParticipantDashboard = () => {
               </div>
             </div>
           </div>
+          {/* Total Voted Card */}
+          <div className="group relative bg-gradient-to-br from-white to-purple-50 p-6 rounded-2xl border border-purple-100 shadow-[0_8px_30px_rgba(0,0,0,0.04)] hover:shadow-[0_20px_40px_rgba(168,85,247,0.15)] transition-all duration-700 hover:scale-[1.02] overflow-hidden">
+            {/* Decorative Glow */}
+            <div className="absolute -right-8 -top-8 opacity-10">
+              <CheckCircle className="w-40 h-40 text-purple-400" />
+            </div>
+
+            <div className="relative z-10">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <p className="text-gray-500 text-sm font-semibold uppercase tracking-wider">
+                    Total Voted
+                  </p>
+                  <p className="text-5xl font-black text-gray-900 mt-2 bg-gradient-to-r from-purple-600 to-fuchsia-400 bg-clip-text text-transparent animate-gradient">
+                    {votedCount}
+                  </p>
+                </div>
+
+                <div className="p-4 bg-gradient-to-br from-purple-100 to-fuchsia-100 rounded-xl">
+                  🗳️
+                </div>
+              </div>
+
+              {/* Percentage Bar */}
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-purple-600 font-bold text-lg">
+                    {totalCount > 0
+                      ? ((votedCount / totalCount) * 100).toFixed(1)
+                      : 0}
+                    %
+                  </span>
+                  <span className="text-gray-500 text-sm">Voting Rate</span>
+                </div>
+
+                <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-purple-400 to-fuchsia-500 rounded-full transition-all duration-700"
+                    style={{
+                      width:
+                        totalCount > 0
+                          ? `${(votedCount / totalCount) * 100}%`
+                          : "0%",
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Combined Search and Actions Card */}
@@ -851,6 +910,9 @@ const ParticipantDashboard = () => {
                   </th>
                   <th className="py-5 px-7 text-left text-sm font-semibold text-gray-700 uppercase tracking-wider">
                     Status
+                  </th>
+                  <th className="py-5 px-7 text-left text-sm font-semibold text-gray-700 uppercase tracking-wider">
+                    Voted
                   </th>
                   <th className="py-5 px-7 text-left text-sm font-semibold text-gray-700 uppercase tracking-wider">
                     Actions
@@ -915,25 +977,6 @@ const ParticipantDashboard = () => {
                     {/* Verification Status */}
                     <td className="py-6 px-7">
                       <div className="flex flex-col space-y-4">
-                        <div className="flex items-center space-x-3">
-                          <div
-                            className={`w-3 h-3 rounded-full ${
-                              participant.verified
-                                ? "bg-green-500"
-                                : "bg-yellow-500"
-                            }`}
-                          ></div>
-                          <span
-                            className={`text-base font-medium ${
-                              participant.verified
-                                ? "text-green-700"
-                                : "text-yellow-700"
-                            }`}
-                          >
-                            {participant.verified ? "Verified" : "Pending"}
-                          </span>
-                        </div>
-
                         {/* Toggle Switch */}
                         <div className="flex items-center space-x-4">
                           <button
@@ -973,13 +1016,22 @@ const ParticipantDashboard = () => {
                             {participant.verified ? "Active" : "Inactive"}
                           </span>
                         </div>
-
-                        <p className="text-sm text-gray-600">
-                          {participant.verified
-                            ? "Voter is verified and active"
-                            : "Awaiting verification"}
-                        </p>
                       </div>
+                    </td>
+
+                    {/* Voted Status */}
+                    <td className="py-6 px-7">
+                      {participant.hasVoted ? (
+                        <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-semibold bg-green-100 text-green-700 border border-green-200">
+                          <CheckCircle className="w-4 h-4" />
+                          Yes
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-semibold bg-red-100 text-red-600 border border-gray-200">
+                          <XCircle className="w-4 h-4" />
+                          No
+                        </span>
+                      )}
                     </td>
 
                     {/* Actions */}
@@ -1077,7 +1129,10 @@ const ParticipantDashboard = () => {
               </div>
 
               {/* ================= BODY ================= */}
-              <div style={{ maxHeight: "calc(90vh - 140px)" }} className="px-5 py-4 space-y-4 overflow-y-auto">
+              <div
+                style={{ maxHeight: "calc(90vh - 140px)" }}
+                className="px-5 py-4 space-y-4 overflow-y-auto"
+              >
                 {/* Profile Photo Section - Compact */}
                 <div className="space-y-3">
                   <div>
@@ -1470,13 +1525,6 @@ const ParticipantDashboard = () => {
               registered voters
             </div>
             <div className="flex items-center gap-6 text-sm">
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-green-500"></div>
-                <span className="text-gray-600">Verified:</span>
-                <span className="font-semibold text-gray-900">
-                  {verifiedCount}
-                </span>
-              </div>
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 rounded-full bg-amber-500"></div>
                 <span className="text-gray-600">Pending:</span>
