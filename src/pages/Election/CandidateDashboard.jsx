@@ -58,6 +58,8 @@ const CandidateDashboard = () => {
   const [endDate, setEndDate] = useState("");
   const [endHour, setEndHour] = useState("17");
   const [endMinute, setEndMinute] = useState("00");
+  const [restartReason, setRestartReason] = useState("");
+  const [showRestartReason, setShowRestartReason] = useState(false);
 
   const reloadRef = useRef({
     started: false,
@@ -108,42 +110,40 @@ const CandidateDashboard = () => {
   };
 
   // Initialize date/time when modal opens
+  // Initialize date/time when modal opens
   useEffect(() => {
     if (showStartElection) {
       const now = new Date();
       const currentDate = now.toISOString().split("T")[0];
-      const currentHour = now.getHours().toString().padStart(2, "0");
-      const currentMinute = now.getMinutes().toString().padStart(2, "0");
 
-      const tenMinutesLater = new Date(now.getTime() + 10 * 60 * 1000);
-      const startHourStr = tenMinutesLater
-        .getHours()
-        .toString()
-        .padStart(2, "0");
-      const startMinuteStr = tenMinutesLater
-        .getMinutes()
-        .toString()
-        .padStart(2, "0");
+      // Set start time to current time (rounded to nearest 15 minutes)
+      const startTime = new Date(now);
+      const minutes = Math.ceil(startTime.getMinutes() / 15) * 15;
+      startTime.setMinutes(minutes);
+      startTime.setSeconds(0);
+
+      const startHour = startTime.getHours().toString().padStart(2, "0");
+      const startMinute = startTime.getMinutes().toString().padStart(2, "0");
 
       setStartDate(currentDate);
-      setStartHour(startHourStr);
-      setStartMinute(startMinuteStr);
-      updateStartTime(currentDate, startHourStr, startMinuteStr);
+      setStartHour(startHour);
+      setStartMinute(startMinute);
+      updateStartTime(currentDate, startHour, startMinute);
 
-      const endDateTime = new Date(
-        tenMinutesLater.getTime() + 8 * 60 * 60 * 1000
-      );
-      const endDateStr = endDateTime.toISOString().split("T")[0];
-      const endHourStr = endDateTime.getHours().toString().padStart(2, "0");
-      const endMinuteStr = endDateTime.getMinutes().toString().padStart(2, "0");
+      // Set end time to 2 hours from start time
+      const endTime = new Date(startTime.getTime() + 2 * 60 * 60 * 1000); // 2 hours later
 
-      setEndDate(endDateStr);
-      setEndHour(endHourStr);
-      setEndMinute(endMinuteStr);
-      updateEndTime(endDateStr, endHourStr, endMinuteStr);
+      // Check if end time is on a different date
+      const endDate = endTime.toISOString().split("T")[0];
+      const endHour = endTime.getHours().toString().padStart(2, "0");
+      const endMinute = endTime.getMinutes().toString().padStart(2, "0");
+
+      setEndDate(endDate);
+      setEndHour(endHour);
+      setEndMinute(endMinute);
+      updateEndTime(endDate, endHour, endMinute);
     }
   }, [showStartElection]);
-
   // Show alert message with auto-dismiss
   const showAlert = (type, text, duration = 5000, field = null) => {
     setMessage({ type, text, field });
@@ -651,6 +651,37 @@ const CandidateDashboard = () => {
 
     return null; // ✅ all good
   };
+  const handleRestartReasonSubmit = async () => {
+    if (restartReason.trim().length < 5) {
+      showAlert("error", "Restart reason must be at least 5 characters");
+      return;
+    }
+
+    try {
+      setStartingElection(true);
+
+      // 🔥 CALL BACKEND IMMEDIATELY
+      await axiosInstance.put(`/elections/${electionDocumentId}/restart`, {
+        restart_reason: restartReason.trim(),
+      });
+
+      // refresh meta after backend update
+      await refetchElectionMeta();
+      await fetchSections();
+
+      showAlert("success", "Restart reason saved successfully");
+
+      // ✅ CLOSE reason modal
+      setShowRestartReason(false);
+    } catch (err) {
+      showAlert(
+        "error",
+        err.response?.data?.message || "Failed to restart election"
+      );
+    } finally {
+      setStartingElection(false);
+    }
+  };
 
   const handleStartElection = async () => {
     const candidateError = validateCandidatesPerPosition();
@@ -676,15 +707,18 @@ const CandidateDashboard = () => {
       const startUTC = new Date(startTime).toISOString();
       const endUTC = new Date(endTime).toISOString();
 
-      const endpoint =
-        electionStatus === "ended"
-          ? `/elections/${electionDocumentId}/restart`
-          : `/elections/${electionDocumentId}/start`;
+      const endpoint = `/elections/${electionDocumentId}/start`;
 
-      await axiosInstance.put(endpoint, {
+      const payload = {
         start_time: startUTC,
         end_time: endUTC,
-      });
+      };
+
+      if (electionStatus === "ended") {
+        payload.restart_reason = restartReason; // 🔥 MISSING
+      }
+
+      await axiosInstance.put(endpoint, payload);
 
       await refetchElectionMeta();
 
@@ -994,7 +1028,7 @@ const CandidateDashboard = () => {
         <div className="mb-6 flex justify-between items-center">
           <button
             onClick={() => adminNavigate(navigate, "/electionhome")}
-            className="inline-flex items-center gap-2 text-slate-600 hover:text-blue-600 transition-colors duration-200 group animate-fadeIn"
+            className="inline-flex cursor-pointer items-center gap-2 text-slate-600 hover:text-blue-600 transition-colors duration-200 group animate-fadeIn"
           >
             <svg
               className="w-4 h-4 transform group-hover:-translate-x-1 transition-transform duration-200"
@@ -1018,7 +1052,7 @@ const CandidateDashboard = () => {
                 `/${adminId}/participant-dashboard/${electionDocumentId}`
               )
             }
-            className="flex items-center justify-center gap-2 bg-gradient-to-r from-amber-500 to-amber-600 text-white px-6 py-3 rounded-xl hover:from-amber-600 hover:to-amber-700 transition-all duration-200 font-semibold shadow-lg hover:shadow-xl min-w-[160px] animate-pulse hover:animate-none"
+            className="flex cursor-pointer items-center justify-center gap-2 bg-gradient-to-r from-amber-500 to-amber-600 text-white px-6 py-3 rounded-xl hover:from-amber-600 hover:to-amber-700 transition-all duration-200 font-semibold shadow-lg hover:shadow-xl min-w-[160px] animate-pulse hover:animate-none"
           >
             <svg
               className="w-5 h-5"
@@ -1120,7 +1154,6 @@ const CandidateDashboard = () => {
             {/* Action Buttons */}
             <div className="flex flex-col xs:flex-row gap-3 w-full sm:w-auto">
               {/* Auto Declare Toggle */}
-              {/* Auto Declare Toggle */}
               <div
                 className={`flex items-center gap-3 px-4 py-3 rounded-xl border shadow-sm transition-all
     ${
@@ -1165,13 +1198,14 @@ const CandidateDashboard = () => {
                     }
                   }}
                   className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors
-      ${electionMeta.auto_declare_enabled ? "bg-green-500" : "bg-gray-300"}
-    `}
+    ${electionMeta.auto_declare_enabled ? "bg-green-500" : "bg-gray-300"}
+    ${electionStatus === "scheduled" ? "cursor-pointer" : "cursor-not-allowed"}
+  `}
                 >
                   <span
                     className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform
-        ${electionMeta.auto_declare_enabled ? "translate-x-5" : "translate-x-1"}
-      `}
+      ${electionMeta.auto_declare_enabled ? "translate-x-5" : "translate-x-1"}
+    `}
                   />
                 </button>
               </div>
@@ -1180,8 +1214,11 @@ const CandidateDashboard = () => {
                 <div className="flex flex-col xs:flex-row gap-3 w-full sm:w-auto">
                   {/* Start Election Button - Only show if election is scheduled but not cancelled */}
                   <button
-                    onClick={() => setShowStartElection(true)}
-                    className="flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-semibold shadow-lg min-w-[160px] hover:scale-105 transition-all duration-300 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white hover:from-emerald-600 hover:to-emerald-700 hover:shadow-xl"
+                    onClick={() => {
+                      setRestartReason("");
+                      setShowStartElection(true); // FIRST popup
+                    }}
+                    className="flex cursor-pointer items-center justify-center gap-2 px-6 py-3 rounded-xl font-semibold shadow-lg min-w-[160px] hover:scale-105 transition-all duration-300 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white hover:from-emerald-600 hover:to-emerald-700 hover:shadow-xl"
                   >
                     <svg
                       className="w-5 h-5"
@@ -1219,7 +1256,7 @@ const CandidateDashboard = () => {
                     showAlert("success", "Election ended successfully");
                     await refetchElectionMeta();
                   }}
-                  className="flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-semibold bg-gradient-to-r from-red-500 to-red-600 text-white hover:from-red-600 hover:to-red-700 shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300"
+                  className="flex cursor-pointer items-center justify-center gap-2 px-6 py-3 rounded-xl font-semibold bg-gradient-to-r from-red-500 to-red-600 text-white hover:from-red-600 hover:to-red-700 shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300"
                 >
                   <svg
                     className="w-5 h-5"
@@ -1240,9 +1277,10 @@ const CandidateDashboard = () => {
               {electionStatus === "ended" && (
                 <button
                   onClick={() => {
-                    setShowStartElection(true);
+                    setRestartReason("");
+                    setShowRestartReason(true); // ✅ FIRST popup
                   }}
-                  className="flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-semibold bg-gradient-to-r from-blue-500 to-indigo-600 text-white hover:from-blue-600 hover:to-indigo-700 shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300 min-w-[160px]"
+                  className="flex cursor-pointer items-center justify-center gap-2 px-6 py-3 rounded-xl font-semibold bg-gradient-to-r from-blue-500 to-indigo-600 text-white hover:from-blue-600 hover:to-indigo-700 shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300 min-w-[160px]"
                 >
                   <svg
                     className="w-5 h-5"
@@ -1263,7 +1301,7 @@ const CandidateDashboard = () => {
               {electionStatus === "scheduled" && (
                 <button
                   onClick={() => setShowAddSection(true)}
-                  className="flex items-center justify-center gap-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white px-4 sm:px-6 py-3 rounded-xl
+                  className="flex cursor-pointer items-center justify-center gap-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white px-4 sm:px-6 py-3 rounded-xl
       hover:from-blue-600 hover:to-blue-700 transition-all duration-300
       font-semibold shadow-lg hover:shadow-xl hover:scale-105 min-w-[160px]"
                 >
@@ -1286,6 +1324,89 @@ const CandidateDashboard = () => {
             </div>
           </div>
         </motion.div>
+
+        <AnimatePresence>
+          {showRestartReason && (
+            <motion.div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                transition={{ duration: 0.2 }}
+                className="bg-white rounded-xl w-full max-w-md p-6 shadow-2xl"
+              >
+                {/* Header with proper alignment */}
+                <div className="flex flex-col items-center mb-4">
+                  <h2 className="text-xl font-bold text-gray-800 text-center mb-1">
+                    Restart Election
+                  </h2>
+                  <p className="text-sm text-gray-500 text-center">
+                    Please provide a reason for restarting this election
+                  </p>
+                </div>
+
+                {/* Textarea section */}
+                <div className="space-y-2">
+                  <label
+                    htmlFor="restart-reason"
+                    className="block text-sm font-medium text-gray-700"
+                  >
+                    Reason <span className="text-red-500">*</span>
+                  </label>
+                  <textarea
+                    id="restart-reason"
+                    value={restartReason}
+                    onChange={(e) => setRestartReason(e.target.value)}
+                    placeholder="Enter a detailed reason for restarting the election (minimum 5 characters)..."
+                    className="w-full border border-gray-300 rounded-lg p-3 min-h-[120px] 
+                     focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent
+                     placeholder:text-gray-400 resize-y"
+                    rows={4}
+                  />
+                  <div className="flex justify-between items-center">
+                    <p
+                      className={`text-xs ${
+                        restartReason.trim().length < 5
+                          ? "text-red-500"
+                          : "text-green-500"
+                      }`}
+                    >
+                      {restartReason.trim().length}/5 characters minimum
+                    </p>
+                    <p className="text-xs text-gray-500">Required</p>
+                  </div>
+                </div>
+
+                {/* Button group with proper spacing */}
+                <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-gray-100">
+                  <button
+                    onClick={() => setShowRestartReason(false)}
+                    className="px-4 cursor-pointer py-2.5 border border-gray-300 rounded-lg font-medium
+                     text-gray-700 hover:bg-gray-50 transition-colors duration-150
+                     focus:outline-none focus:ring-2 focus:ring-gray-200"
+                  >
+                    Cancel
+                  </button>
+
+                  <button
+                    disabled={
+                      restartReason.trim().length < 5 || startingElection
+                    }
+                    onClick={handleRestartReasonSubmit}
+                    className={`px-4 cursor-pointer py-2.5 rounded-lg font-medium transition-all duration-150
+    ${
+      restartReason.trim().length < 5 || startingElection
+        ? "bg-gray-200 text-gray-500 cursor-not-allowed"
+        : "bg-blue-600 text-white hover:bg-blue-700 active:bg-blue-800"
+    }`}
+                  >
+                    {startingElection ? "Processing..." : "Continue"}
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Start Election Modal */}
         <AnimatePresence>
@@ -1313,7 +1434,7 @@ const CandidateDashboard = () => {
                   </div>
                   <button
                     onClick={() => setShowStartElection(false)}
-                    className="w-8 h-8 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg transition-colors duration-200 flex items-center justify-center hover:rotate-90 transition-transform"
+                    className="w-8 cursor-pointer h-8 bg-red-600/70 rounded-xl hover:bg-red-600 text-white transition-colors duration-200 flex items-center justify-center hover:rotate-90 transition-transform"
                   >
                     ✕
                   </button>
@@ -1336,7 +1457,7 @@ const CandidateDashboard = () => {
                             startMinute
                           );
                         }}
-                        className="w-full rounded-lg border border-slate-300 px-4 py-3 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500 transition-all duration-300 hover:border-emerald-400"
+                        className="w-full cursor-pointer rounded-lg border border-slate-300 px-4 py-3 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500 transition-all duration-300 hover:border-emerald-400"
                         min={getCurrentDate()}
                       />
                     </div>
@@ -1356,7 +1477,7 @@ const CandidateDashboard = () => {
                               startMinute
                             );
                           }}
-                          className="w-full rounded-lg border border-slate-300 px-4 py-3 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500 transition-all duration-300 hover:border-emerald-400"
+                          className="w-full cursor-pointer rounded-lg border border-slate-300 px-4 py-3 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500 transition-all duration-300 hover:border-emerald-400"
                         >
                           {Array.from({ length: 24 }, (_, i) =>
                             i.toString().padStart(2, "0")
@@ -1381,7 +1502,7 @@ const CandidateDashboard = () => {
                               e.target.value
                             );
                           }}
-                          className="w-full rounded-lg border border-slate-300 px-4 py-3 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500 transition-all duration-300 hover:border-emerald-400"
+                          className="w-full cursor-pointer rounded-lg border border-slate-300 px-4 py-3 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500 transition-all duration-300 hover:border-emerald-400"
                         >
                           {Array.from({ length: 60 }, (_, i) =>
                             i.toString().padStart(2, "0")
@@ -1407,7 +1528,7 @@ const CandidateDashboard = () => {
                           setEndDate(e.target.value);
                           updateEndTime(e.target.value, endHour, endMinute);
                         }}
-                        className="w-full rounded-lg border border-slate-300 px-4 py-3 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500 transition-all duration-300 hover:border-emerald-400"
+                        className="w-full cursor-pointer rounded-lg border border-slate-300 px-4 py-3 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500 transition-all duration-300 hover:border-emerald-400"
                         min={startDate || getCurrentDate()}
                       />
                     </div>
@@ -1423,7 +1544,7 @@ const CandidateDashboard = () => {
                             setEndHour(e.target.value);
                             updateEndTime(endDate, e.target.value, endMinute);
                           }}
-                          className="w-full rounded-lg border border-slate-300 px-4 py-3 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500 transition-all duration-300 hover:border-emerald-400"
+                          className="w-full cursor-pointer rounded-lg border border-slate-300 px-4 py-3 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500 transition-all duration-300 hover:border-emerald-400"
                         >
                           {Array.from({ length: 24 }, (_, i) =>
                             i.toString().padStart(2, "0")
@@ -1444,7 +1565,7 @@ const CandidateDashboard = () => {
                             setEndMinute(e.target.value);
                             updateEndTime(endDate, endHour, e.target.value);
                           }}
-                          className="w-full rounded-lg border border-slate-300 px-4 py-3 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500 transition-all duration-300 hover:border-emerald-400"
+                          className="w-full cursor-pointer rounded-lg border border-slate-300 px-4 py-3 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500 transition-all duration-300 hover:border-emerald-400"
                         >
                           {Array.from({ length: 60 }, (_, i) =>
                             i.toString().padStart(2, "0")
@@ -1460,7 +1581,7 @@ const CandidateDashboard = () => {
 
                   {validateElectionTimeUI(startTime, endTime) && (
                     <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 font-medium">
-                      <div className="flex items-center gap-2">
+                      <div className="flex cursor-pointer items-center gap-2">
                         <svg
                           className="w-5 h-5"
                           fill="currentColor"
@@ -1489,7 +1610,7 @@ const CandidateDashboard = () => {
                   <button
                     onClick={handleStartElection}
                     disabled={startingElection}
-                    className={`rounded-lg px-5 py-2.5 font-semibold text-white transition-all duration-300 hover:scale-105
+                    className={`rounded-lg cursor-pointer px-5 py-2.5 font-semibold text-white transition-all duration-300 hover:scale-105
                       ${
                         startingElection ||
                         validateElectionTimeUI(startTime, endTime)
@@ -1568,13 +1689,13 @@ const CandidateDashboard = () => {
                       setShowAddSection(false);
                       setNewSectionName("");
                     }}
-                    className="flex-1 px-4 py-2.5 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 font-medium transition-all duration-300 hover:scale-105"
+                    className="flex-1 cursor-pointer px-4 py-2.5 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 font-medium transition-all duration-300 hover:scale-105"
                   >
                     Cancel
                   </button>
                   <button
                     onClick={handleAddSection}
-                    className="flex-1 px-4 py-2.5 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:from-blue-600 hover:to-blue-700 font-medium transition-all duration-300 hover:scale-105 hover:shadow-lg"
+                    className="flex-1 cursor-pointer px-4 py-2.5 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:from-blue-600 hover:to-blue-700 font-medium transition-all duration-300 hover:scale-105 hover:shadow-lg"
                   >
                     Create Position
                   </button>
@@ -1985,7 +2106,7 @@ const CandidateDashboard = () => {
                               }}
                               className="flex items-center gap-2 px-3 sm:px-4 py-2 text-xs sm:text-sm font-semibold rounded-lg
       bg-gradient-to-r from-blue-500 to-blue-600 text-white
-      hover:from-blue-600 hover:to-blue-700 shadow-md hover:shadow-lg"
+      hover:from-blue-600 hover:to-blue-700 shadow-md cursor-pointer hover:shadow-lg"
                             >
                               <svg
                                 className="w-3 h-3 sm:w-4 sm:h-4"
@@ -2007,38 +2128,39 @@ const CandidateDashboard = () => {
                             </motion.button>
                           )}
 
-                          {sections.length > 1 && (
-                            <button
-                              onClick={(e) =>
-                                handleDeleteSectionClick(section.id, e)
-                              }
-                              disabled={hasWinner}
-                              className={`p-2 rounded-lg transition-colors hover:scale-110 ${
-                                hasWinner
-                                  ? "text-slate-300 cursor-not-allowed"
-                                  : "text-red-600 hover:bg-red-50"
-                              }`}
-                              title={
-                                hasWinner
-                                  ? "Cannot delete position with winner"
-                                  : "Delete position"
-                              }
-                            >
-                              <svg
-                                className="w-4 h-4"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
+                          {electionStatus === "scheduled" &&
+                            sections.length > 1 && (
+                              <button
+                                onClick={(e) =>
+                                  handleDeleteSectionClick(section.id, e)
+                                }
+                                disabled={hasWinner}
+                                className={`p-2 rounded-lg cursor-pointer transition-colors hover:scale-110 ${
+                                  hasWinner
+                                    ? "text-slate-300 cursor-not-allowed"
+                                    : "text-red-600 hover:bg-red-50"
+                                }`}
+                                title={
+                                  hasWinner
+                                    ? "Cannot delete position with winner"
+                                    : "Delete position"
+                                }
                               >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                                />
-                              </svg>
-                            </button>
-                          )}
+                                <svg
+                                  className="w-4 h-4"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                                  />
+                                </svg>
+                              </button>
+                            )}
                         </div>
                       </div>
                     </div>
@@ -2085,7 +2207,7 @@ const CandidateDashboard = () => {
                                   setShowForm(true);
                                 }}
                                 disabled={hasWinner}
-                                className={`px-5 py-2.5 font-medium rounded-lg transition-all ${
+                                className={`px-5 py-2.5 cursor-pointer font-medium rounded-lg transition-all ${
                                   hasWinner
                                     ? "bg-slate-200 text-slate-500 cursor-not-allowed"
                                     : "bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:from-blue-600 hover:to-blue-700"
@@ -2209,7 +2331,7 @@ const CandidateDashboard = () => {
                                           onClick={() =>
                                             handleViewDetails(candidate)
                                           }
-                                          className={`flex-1 px-3 py-2 rounded-lg transition-colors font-medium text-xs ${
+                                          className={`flex-1 px-3 cursor-pointer py-2 rounded-lg transition-colors font-medium text-xs ${
                                             hasWinner &&
                                             candidate.id === winner?.id
                                               ? "bg-emerald-600 text-white hover:bg-emerald-700"
@@ -2218,21 +2340,24 @@ const CandidateDashboard = () => {
                                         >
                                           View
                                         </motion.button>
-                                        <motion.button
-                                          whileHover={{ scale: 1.05 }}
-                                          whileTap={{ scale: 0.95 }}
-                                          onClick={() =>
-                                            handleDeleteClick(candidate)
-                                          }
-                                          disabled={hasWinner}
-                                          className={`flex-1 px-3 py-2 rounded-lg transition-colors font-medium text-xs ${
-                                            hasWinner
-                                              ? "bg-slate-200 text-slate-500 cursor-not-allowed"
-                                              : "bg-red-500 text-white hover:bg-red-600"
-                                          }`}
-                                        >
-                                          Delete
-                                        </motion.button>
+
+                                        {electionStatus === "scheduled" &&
+                                          !hasWinner && (
+                                            <motion.button
+                                              whileHover={{ scale: 1.05 }}
+                                              whileTap={{ scale: 0.95 }}
+                                              onClick={() =>
+                                                handleDeleteClick(candidate)
+                                              }
+                                              className={`flex-1 cursor-pointer px-3 py-2 rounded-lg transition-colors font-medium text-xs ${
+                                                hasWinner
+                                                  ? "bg-slate-200 text-slate-500 cursor-not-allowed"
+                                                  : "bg-red-500 text-white hover:bg-red-600"
+                                              }`}
+                                            >
+                                              Delete
+                                            </motion.button>
+                                          )}
                                       </div>
                                     </div>
                                   </motion.div>
@@ -2606,7 +2731,7 @@ const CandidateDashboard = () => {
                       whileTap={{ scale: 0.98 }}
                       type="button"
                       onClick={() => setShowForm(false)}
-                      className="flex-1 px-4 py-2.5 text-sm border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-semibold transition-all duration-200"
+                      className="flex-1 cursor-pointer px-4 py-2.5 text-sm border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-semibold transition-all duration-200"
                     >
                       Cancel
                     </motion.button>
@@ -2615,7 +2740,7 @@ const CandidateDashboard = () => {
                       whileTap={{ scale: 0.98 }}
                       type="submit"
                       disabled={loading}
-                      className="flex-1 px-4 py-2.5 text-sm bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:from-blue-600 hover:to-blue-700 font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+                      className="flex-1 cursor-pointer px-4 py-2.5 text-sm bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:from-blue-600 hover:to-blue-700 font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
                     >
                       {loading ? (
                         <span className="flex items-center justify-center gap-2">
@@ -2690,7 +2815,7 @@ const CandidateDashboard = () => {
                   </div>
                   <button
                     onClick={() => setShowDetails(false)}
-                    className="w-8 h-8 sm:w-9 sm:h-9 bg-white/20 hover:bg-white/30 rounded-lg flex items-center justify-center text-white transition-colors"
+                    className="w-8 cursor-pointer h-8 sm:w-9 sm:h-9 bg-white/20 hover:bg-red-900 rounded-lg flex items-center justify-center text-white transition-colors"
                     aria-label="Close"
                   >
                     <svg
@@ -2989,12 +3114,6 @@ const CandidateDashboard = () => {
                         : "Election Completed"}
                     </span>
                   </div>
-                  <button
-                    onClick={() => setShowDetails(false)}
-                    className="text-sm text-gray-700 hover:text-gray-900 font-medium"
-                  >
-                    Close
-                  </button>
                 </div>
               </div>
             </motion.div>
@@ -3062,7 +3181,7 @@ const CandidateDashboard = () => {
                       setShowDeleteConfirm(false);
                       setCandidateToDelete(null);
                     }}
-                    className="flex-1 px-4 py-3 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 font-semibold transition-all duration-300"
+                    className="flex-1 cursor-pointer px-4 py-3 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 font-semibold transition-all duration-300"
                   >
                     Cancel
                   </motion.button>
@@ -3070,7 +3189,7 @@ const CandidateDashboard = () => {
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                     onClick={handleConfirmDelete}
-                    className="flex-1 px-4 py-3 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-lg hover:from-red-600 hover:to-red-700 font-semibold transition-all duration-300 hover:shadow-lg"
+                    className="flex-1 cursor-pointer px-4 py-3 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-lg hover:from-red-600 hover:to-red-700 font-semibold transition-all duration-300 hover:shadow-lg"
                   >
                     Delete Candidate
                   </motion.button>

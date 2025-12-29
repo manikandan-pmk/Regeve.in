@@ -2062,7 +2062,7 @@ const VotingPage = () => {
               whileTap={{ scale: 0.98 }}
               onClick={verifyPhoneNumber}
               disabled={verifying}
-              className="w-full px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg font-semibold hover:from-blue-700 hover:to-indigo-700 transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full cursor-pointer px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg font-semibold hover:from-blue-700 hover:to-indigo-700 transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {verifying ? (
                 <div className="flex items-center justify-center">
@@ -2122,13 +2122,13 @@ const VotingPage = () => {
 
                 <button
                   onClick={handleLogout}
-                  className="px-3 py-1.5 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-lg font-medium text-sm shadow hover:shadow-md flex items-center gap-1"
+                  className="px-3 cursor-pointer py-1.5 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-lg font-medium text-sm shadow hover:shadow-md flex items-center gap-1"
                 >
                   <LogOut className="w-4 h-4" />
                   Logout
                 </button>
                 {/* Add this button next to the logout button */}
-                {positions.length > 1 && (
+                {/* {positions.length > 1 && (
                   <button
                     onClick={() => {
                       if (
@@ -2154,7 +2154,7 @@ const VotingPage = () => {
                       ? "Collapse All"
                       : "Expand All"}
                   </button>
-                )}
+                )} */}
               </div>
             </div>
           </div>
@@ -2308,7 +2308,7 @@ const VotingPage = () => {
                               onClick={() =>
                                 handleSubmitVote(position.id, position.position)
                               }
-                              className="px-6 py-2.5 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white rounded-xl font-semibold text-sm transition-all shadow-md hover:shadow-lg flex items-center gap-2"
+                              className="px-6 cursor-pointer py-2.5 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white rounded-xl font-semibold text-sm transition-all shadow-md hover:shadow-lg flex items-center gap-2"
                             >
                               <Check className="w-4 h-4" />
                               Submit Vote
@@ -2323,7 +2323,7 @@ const VotingPage = () => {
                                   whileHover={{ scale: 1.02 }}
                                   whileTap={{ scale: 0.98 }}
                                   onClick={() => setViewingPosition(null)}
-                                  className="px-5 py-2.5 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-xl font-semibold text-sm flex items-center gap-2 transition-all border border-rose-100 hover:border-rose-200"
+                                  className="px-5 cursor-pointer py-2.5 bg-red-50 text-blacke hover:text-white  hover:bg-red-600 rounded-xl font-semibold text-sm flex items-center gap-2 transition-all border border-red-300 hover:border-rose-200"
                                 >
                                   <X className="w-4 h-4" />
                                   Close View
@@ -2333,7 +2333,7 @@ const VotingPage = () => {
                                   whileHover={{ scale: 1.02 }}
                                   whileTap={{ scale: 0.98 }}
                                   onClick={() => handleViewVotes(position.id)}
-                                  className="px-5 py-2.5 bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 text-white rounded-xl font-semibold text-sm flex items-center gap-2 transition-all shadow-md hover:shadow-lg"
+                                  className="px-5 cursor-pointer py-2.5 bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 text-white rounded-xl font-semibold text-sm flex items-center gap-2 transition-all shadow-md hover:shadow-lg"
                                 >
                                   <BarChart3 className="w-4 h-4" />
                                   View Votes
@@ -2636,7 +2636,7 @@ const VotingPage = () => {
                                               disabled={isOtherSelected}
                                               className={`w-full py-3 rounded-xl font-semibold text-sm transition-all shadow-md ${
                                                 isSelected
-                                                  ? "bg-gradient-to-r from-emerald-600 to-green-600 text-white hover:from-emerald-700 hover:to-green-700"
+                                                  ? "bg-gradient-to-r cursor-pointer from-emerald-600 to-green-600 text-white hover:from-emerald-700 hover:to-green-700"
                                                   : isOtherSelected
                                                   ? "bg-gray-300 text-gray-500 cursor-not-allowed"
                                                   : "bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700 hover:shadow-lg"
@@ -2662,7 +2662,7 @@ const VotingPage = () => {
                                                     position.id
                                                   )
                                                 }
-                                                className="w-full py-3 mt-3 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-xl font-semibold text-sm hover:from-red-600 hover:to-red-700 shadow-md hover:shadow-lg transition-all"
+                                                className="w-full cursor-pointer py-3 mt-3 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-xl font-semibold text-sm hover:from-red-600 hover:to-red-700 shadow-md hover:shadow-lg transition-all"
                                               >
                                                 <span className="flex items-center justify-center gap-2">
                                                   <X className="w-4 h-4" />
@@ -2784,7 +2784,7 @@ const VotingPage = () => {
             ${
               isTopWinner
                 ? "border-2 border-emerald-400 shadow-xl"
-                : "border border-emerald-200 shadow-lg"
+                : "border-2 border-emerald-400 shadow-xl"
             }
             hover:shadow-2xl
             transition-all
@@ -2801,7 +2801,7 @@ const VotingPage = () => {
                                 className={`
                       w-28 h-28 rounded-xl overflow-hidden border-2
                       ${
-                        isTopWinner ? "border-green-400" : "border-emerald-400"
+                        isTopWinner ? "border-green-400" : "border-green-400"
                       }
                       shadow-md
                     `}

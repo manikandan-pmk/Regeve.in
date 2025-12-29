@@ -1,39 +1,47 @@
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  User,
   LogIn,
   Menu,
   X,
   LogOut,
   CheckCircle,
   XCircle,
+  ChevronDown,
+  ChevronUp,
+  User,
+  Settings,
+  UserCircle,
 } from "lucide-react";
 import Login from "../pages/Auth/Login";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import Logo from "../assets/Logo.png";
 import axios from "axios";
 
 const Navbar = () => {
   const [openDropdown, setOpenDropdown] = useState(null);
-
+  const [mobileDropdown, setMobileDropdown] = useState(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [authModal, setAuthModal] = useState({
     isOpen: false,
-    type: "login", // 'login' or 'register'
+    type: "login",
   });
+  const [userDropdown, setUserDropdown] = useState(false);
   const [toast, setToast] = useState({
     show: false,
     message: "",
-    type: "success", // 'success' or 'error'
+    type: "success",
   });
+
+  const location = useLocation();
+  const navigate = useNavigate();
 
   const openLogin = () => setAuthModal({ isOpen: true, type: "login" });
   const closeAuth = () => setAuthModal({ isOpen: false, type: "login" });
+  const toggleUserDropdown = () => setUserDropdown(!userDropdown);
 
   const showToast = (message, type = "success") => {
     setToast({ show: true, message, type });
-    // Auto hide after 3 seconds
     setTimeout(() => {
       setToast({ show: false, message: "", type: "success" });
     }, 3000);
@@ -41,45 +49,42 @@ const Navbar = () => {
 
   const toggleMenu = () => {
     setIsMenuOpen(!isMenuOpen);
+    setMobileDropdown(null);
   };
 
-  const navigate = useNavigate();
+  const toggleMobileDropdown = (dropdownName) => {
+    setMobileDropdown(mobileDropdown === dropdownName ? null : dropdownName);
+  };
 
   const storedUser = localStorage.getItem("userProfile");
   const parsedUser = storedUser ? JSON.parse(storedUser) : null;
 
   const userName = parsedUser?.name || "";
-  const adminId = parsedUser?.adminId || null; // 👈 FIX
-
+  const userEmail = parsedUser?.email || "";
+  const adminId = parsedUser?.adminId || null;
   const isLoggedIn = !!localStorage.getItem("jwt");
 
   const handleLogout = async () => {
     try {
       const token = localStorage.getItem("jwt");
-
       await axios.post(
         "https://api.regeve.in/admin/logout",
-        {}, // backend usually doesn’t need email
+        {},
         {
           headers: {
             Authorization: `Bearer ${token}`,
           },
         }
       );
-
       showToast("Logged out successfully!", "success");
     } catch (error) {
       console.error("Logout error:", error);
       showToast("Logout failed on server, but logging out locally.", "error");
     } finally {
-      // ALWAYS log out user locally
       localStorage.removeItem("jwt");
       localStorage.removeItem("userProfile");
-
-      // Update UI instantly
+      setUserDropdown(false);
       navigate("/");
-
-      // Reload to reset protected components if needed
       setTimeout(() => {
         window.location.reload();
       }, 500);
@@ -90,10 +95,9 @@ const Navbar = () => {
     { name: "Home", path: "/" },
     { name: "About Us", path: "/about" },
     { name: "Contact", path: "/contact" },
-    { name: "Our Gallery", path: "/eventgallery" },
-
+    { name: "Gallery", path: "/eventgallery" },
     {
-      name: "Our Services",
+      name: "Services",
       dropdown: true,
       items: [
         { name: "Event Registration", path: "/service/registration" },
@@ -103,12 +107,11 @@ const Navbar = () => {
         { name: "Election Management", path: "/electionManagementplatform" },
       ],
     },
-
-    ...(isLoggedIn
-      ? [{ name: "Dashboard", path: `/${adminId}/admindashboard` }]
-      : []),
   ];
 
+  const isActive = (path) => location.pathname === path;
+
+  // Animation variants
   const menuVariants = {
     closed: {
       opacity: 0,
@@ -128,179 +131,279 @@ const Navbar = () => {
     },
   };
 
-  const itemVariants = {
+  const dropdownVariants = {
     closed: {
       opacity: 0,
-      y: -20,
+      y: -10,
+      scale: 0.95,
+      transition: {
+        duration: 0.2,
+      },
     },
     open: {
       opacity: 1,
       y: 0,
+      scale: 1,
+      transition: {
+        duration: 0.25,
+        ease: "easeOut",
+      },
     },
   };
 
-  const toastVariants = {
-    hidden: {
-      opacity: 0,
-      y: -100,
-      scale: 0.8,
-    },
-    visible: {
-      opacity: 1,
-      y: 0,
-      scale: 1,
+  const itemVariants = {
+    hover: {
+      y: -2,
       transition: {
         type: "spring",
-        stiffness: 300,
+        stiffness: 400,
         damping: 25,
       },
     },
-    exit: {
-      opacity: 0,
-      y: -100,
-      scale: 0.8,
-      transition: {
-        duration: 0.2,
-      },
+    tap: {
+      scale: 0.95,
     },
   };
 
   return (
     <>
-      <nav className="fixed top-0 left-0 right-0 bg-white/90 backdrop-blur-md border-b border-gray-200 z-40 shadow-sm">
+      <nav className="fixed top-0 left-0 right-0 bg-white border-b border-gray-200 z-50 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             {/* Logo */}
             <motion.div
-              className="flex items-center space-x-2 cursor-pointer"
+              className="flex items-center space-x-3 cursor-pointer flex-shrink-0"
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.5 }}
               onClick={() => navigate("/")}
+              whileHover={{ scale: 1.02 }}
             >
-              <div className="relative">
-                <div className="flex items-center space-x-2">
-                  <img src={Logo} alt="Regeve Logo" className="w-20 h-15" />
-                  <span className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">
-                    REGEVE
-                  </span>
-                </div>
+              <img src={Logo} alt="Regeve Logo" className="w-20 h-15" />
+              <div className="flex flex-col">
+                <span className="text-2xl font-bold text-gray-800 tracking-tight">
+                  REGEVE
+                </span>
               </div>
             </motion.div>
 
-            {/* Desktop Navigation */}
-            <div className="hidden md:flex items-center space-x-8">
-              {navItems.map((item, index) =>
-                item.dropdown ? (
-                  <div
-                    key={item.name}
+            {/* Desktop Navigation - Centered */}
+            <div className="hidden lg:flex items-center justify-center flex-1 px-8">
+              <div className="flex items-center space-x-3">
+                {navItems.map((item, index) =>
+                  item.dropdown ? (
+                    <div
+                      key={item.name}
+                      className="relative "
+                      onMouseEnter={() => setOpenDropdown(item.name)}
+                      onMouseLeave={() => setOpenDropdown(null)}
+                    >
+                      <motion.button
+                        onClick={() =>
+                          setOpenDropdown(
+                            openDropdown === item.name ? null : item.name
+                          )
+                        }
+                        className={`flex items-center space-x-1 cursor-pointer px-4 py-2.5 rounded-md font-medium transition-all duration-200 ${
+                          openDropdown === item.name
+                            ? "text-blue-700 bg-blue-50"
+                            : "text-gray-700 hover:text-blue-700 hover:bg-blue-50"
+                        }`}
+                        variants={itemVariants}
+                        whileHover="hover"
+                        whileTap="tap"
+                      >
+                        <span className="text-md">{item.name}</span>
+                        <ChevronDown
+                          className={`w-3 h-3 transition-transform duration-200 ${
+                            openDropdown === item.name
+                              ? "rotate-180 text-blue-600"
+                              : "text-gray-400"
+                          }`}
+                        />
+                      </motion.button>
+
+                      {/* Desktop Dropdown */}
+                      <AnimatePresence>
+                        {openDropdown === item.name && (
+                          <motion.div
+                            className="absolute left-1/2 transform -translate-x-1/2 mt-2 w-48 bg-white border border-gray-200 shadow-xl rounded-md overflow-hidden"
+                            variants={dropdownVariants}
+                            initial="closed"
+                            animate="open"
+                            exit="closed"
+                          >
+                            {item.items.map((sub, i) => (
+                              <motion.button
+                                key={sub.name}
+                                onClick={() => {
+                                  navigate(sub.path);
+                                  setOpenDropdown(null);
+                                }}
+                                className="w-full text-left px-4 cursor-pointer py-3 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-all duration-150 border-b border-gray-100 last:border-b-0"
+                                whileHover={{ x: 5 }}
+                                transition={{ duration: 0.2 }}
+                              >
+                                {sub.name}
+                              </motion.button>
+                            ))}
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  ) : (
+                    <motion.div
+                      key={item.name}
+                      className="relative"
+                      variants={itemVariants}
+                      whileHover="hover"
+                      whileTap="tap"
+                    >
+                      <button
+                        onClick={() => navigate(item.path)}
+                        className={`px-4 py-2.5 cursor-pointer rounded-md font-medium transition-all duration-200 text-md ${
+                          isActive(item.path)
+                            ? "text-blue-700 bg-blue-50"
+                            : "text-gray-700 hover:text-blue-700 hover:bg-blue-50"
+                        }`}
+                      >
+                        {item.name}
+                      </button>
+                    </motion.div>
+                  )
+                )}
+
+                {/* Dashboard link for logged in users */}
+                {isLoggedIn && (
+                  <motion.div
                     className="relative"
-                    onMouseEnter={() => setOpenDropdown(item.name)}
-                    onMouseLeave={() => setOpenDropdown(null)}
+                    variants={itemVariants}
+                    whileHover="hover"
+                    whileTap="tap"
                   >
                     <button
-                      onClick={() =>
-                        setOpenDropdown(
-                          openDropdown === item.name ? null : item.name
-                        )
-                      }
-                      className="flex items-center space-x-1 cursor-pointer text-gray-700 hover:text-blue-600 transition-colors duration-200 font-medium px-3 py-2 rounded-lg hover:bg-blue-50"
-                    >
-                      <span>{item.name}</span>
-                    </button>
-
-                    {/* DROPDOWN */}
-                    <div
-                      className={`absolute left-0 mt-2  w-56 bg-white border border-gray-200 shadow-lg rounded-lg transition-all duration-200 ${
-                        openDropdown === item.name
-                          ? "opacity-100 visible"
-                          : "opacity-0 invisible"
+                      onClick={() => navigate(`/${adminId}/admindashboard`)}
+                      className={`px-4 py-2.5 rounded-md cursor-pointer font-medium transition-all duration-200 text-md ${
+                        isActive(`/${adminId}/admindashboard`)
+                          ? "text-blue-700 bg-blue-50"
+                          : "text-gray-700 hover:text-blue-700 hover:bg-blue-50"
                       }`}
                     >
-                      {item.items.map((sub, i) => (
-                        <button
-                          key={sub.name}
-                          onClick={() => {
-                            navigate(sub.path);
-                            setOpenDropdown(null);
-                          }}
-                          className="w-full text-left px-4 cursor-pointer py-2 text-gray-700 hover:bg-blue-600 hover:text-white transition-colors duration-150 rounded-lg"
-                        >
-                          {sub.name}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                ) : (
-                  <motion.button
-                    key={item.name}
-                    onClick={() => navigate(item.path)}
-                    className="relative flex items-center space-x-1 cursor-pointer text-gray-700 hover:text-blue-600 transition-colors duration-200 font-medium group px-3 py-2 rounded-lg hover:bg-blue-50"
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.5, delay: index * 0.1 }}
-                  >
-                    <span>{item.name}</span>
-                  </motion.button>
-                )
-              )}
+                      Dashboard
+                    </button>
+                  </motion.div>
+                )}
+              </div>
             </div>
 
-            {/* Desktop Auth Buttons */}
-            <div className="hidden md:flex items-center space-x-4">
+            {/* Desktop Right Section - User/Auth */}
+            <div className="hidden  lg:flex items-center space-x-4 flex-shrink-0">
               {isLoggedIn ? (
+                <div className="relative">
+                  <motion.button
+                    onClick={toggleUserDropdown}
+                    className="flex items-center cursor-pointer space-x-3 px-4 py-2 rounded-lg hover:bg-gray-50 transition-all duration-200 border border-gray-200"
+                    variants={itemVariants}
+                    whileHover="hover"
+                    whileTap="tap"
+                  >
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-r from-blue-500 to-cyan-400 flex items-center justify-center">
+                      {userName ? (
+                        <span className="text-white text-sm font-semibold">
+                          {userName.charAt(0).toUpperCase()}
+                        </span>
+                      ) : (
+                        <User className="w-4 h-4 text-white" />
+                      )}
+                    </div>
+                    <div className="flex flex-col items-start">
+                      <span className="text-sm  font-medium text-gray-800">
+                        {userName || "Admin"}
+                      </span>
+                     
+                    </div>
+                    <ChevronDown
+                      className={`w-4 h-4 text-gray-500 cursor-pointer transition-transform duration-200 ${
+                        userDropdown ? "rotate-180" : ""
+                      }`}
+                    />
+                  </motion.button>
+
+                  {/* User Dropdown Menu */}
+                  <AnimatePresence>
+                    {userDropdown && (
+                      <motion.div
+                        className="absolute right-0 mt-2 w-64 bg-white border border-gray-200 shadow-xl rounded-lg overflow-hidden"
+                        variants={dropdownVariants}
+                        initial="closed"
+                        animate="open"
+                        exit="closed"
+                        onMouseLeave={() => setUserDropdown(false)}
+                      >
+                        {/* User Info */}
+                        <div className="px-4 py-3 border-b border-gray-100 bg-gray-50">
+                          <div className="flex items-center space-x-3">
+                            <div className="w-10 h-10 rounded-full bg-gradient-to-r from-blue-500 to-cyan-400 flex items-center justify-center">
+                              {userName ? (
+                                <span className="text-white  font-semibold">
+                                  {userName.charAt(0).toUpperCase()}
+                                </span>
+                              ) : (
+                                <User className="w-5 h-5  text-white" />
+                              )}
+                            </div>
+                            <div>
+                              <div className="font-semibold cursor-pointer text-gray-800">
+                                {userName || "Admin User"}
+                              </div>
+                             
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Menu Items */}
+                        <div className="py-1">
+                          
+                         
+                          <div className="border-t border-gray-100 my-1"></div>
+                          <button
+                            onClick={handleLogout}
+                            className="w-full flex items-center cursor-pointer space-x-3 px-4 py-3 text-red-600 hover:bg-red-50 transition-all duration-150"
+                          >
+                            <LogOut className="w-4 h-4" />
+                            <span>Logout</span>
+                          </button>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              ) : (
                 <motion.div
-                  className="flex items-center space-x-3"
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ duration: 0.5, delay: 0.3 }}
                 >
-                  {/* USER GREETING */}
-                  <div className="flex items-center space-x-2 bg-gradient-to-r from-blue-50 to-cyan-50 px-4 py-2 rounded-lg border border-blue-100">
-                    <User className="w-4 h-4 text-blue-600" />
-                    <span className="text-sm font-medium text-blue-800">
-                      {userName}
-                    </span>
-                  </div>
-
-                  {/* LOGOUT BUTTON */}
                   <motion.button
-                    onClick={handleLogout}
-                    className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-lg hover:from-red-600 hover:to-red-700 transition-all duration-200 font-medium shadow-sm"
-                    whileHover={{
-                      scale: 1.05,
-                      shadow: "0 4px 12px rgba(239, 68, 68, 0.3)",
-                    }}
-                    whileTap={{ scale: 0.95 }}
+                    onClick={openLogin}
+                    className="px-6 py-2.5 bg-gradient-to-r from-blue-600 to-cyan-500 text-white rounded-lg font-medium shadow-sm hover:shadow-md transition-all duration-200 flex items-center space-x-2"
+                    variants={itemVariants}
+                    whileHover="hover"
+                    whileTap="tap"
                   >
-                    <LogOut className="w-4 h-4" />
-                    <span>Logout</span>
+                    <LogIn className="w-4 h-4" />
+                    <span>Login</span>
                   </motion.button>
                 </motion.div>
-              ) : (
-                <motion.button
-                  onClick={openLogin}
-                  className="flex items-center space-x-2 px-6 py-2 bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-lg hover:from-blue-700 hover:to-cyan-700 transition-all duration-200 font-medium shadow-sm"
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.5, delay: 0.3 }}
-                  whileHover={{
-                    scale: 1.05,
-                    shadow: "0 4px 12px rgba(37, 99, 235, 0.3)",
-                  }}
-                  whileTap={{ scale: 0.95 }}
-                >
-                  <LogIn className="w-4 h-4" />
-                  <span>Login</span>
-                </motion.button>
               )}
             </div>
 
             {/* Mobile Menu Button */}
             <motion.button
-              className="md:hidden p-2 rounded-lg text-gray-700 hover:bg-gradient-to-r hover:from-blue-600 hover:to-cyan-600 hover:text-white transition-all duration-200"
+              className="lg:hidden p-2 rounded-md text-gray-700 hover:bg-gray-100 transition-all duration-200"
               onClick={toggleMenu}
-              whileTap={{ scale: 0.95 }}
+              variants={itemVariants}
+              whileTap="tap"
             >
               {isMenuOpen ? (
                 <X className="w-6 h-6" />
@@ -314,32 +417,58 @@ const Navbar = () => {
           <AnimatePresence>
             {isMenuOpen && (
               <motion.div
-                className="md:hidden bg-white/95 backdrop-blur-md border-t border-gray-200 shadow-lg"
+                className="lg:hidden bg-white border-t border-gray-200 shadow-lg mt-1 rounded-b-lg overflow-hidden"
                 initial="closed"
                 animate="open"
                 exit="closed"
                 variants={menuVariants}
               >
-                <div className="py-4 space-y-3">
+                <div className="py-3 space-y-1">
                   {navItems.map((item, index) =>
                     item.dropdown ? (
-                      <div key={item.name} className="px-4">
-                        <div className="text-gray-700 font-semibold mb-2">
-                          {item.name}
-                        </div>
+                      <div key={item.name} className="space-y-1">
+                        <motion.button
+                          onClick={() => toggleMobileDropdown(item.name)}
+                          className="w-full flex items-center justify-between px-4 py-3 text-gray-700 hover:bg-blue-50 rounded-md transition-all duration-200 font-medium"
+                          variants={itemVariants}
+                          whileTap="tap"
+                        >
+                          <span>{item.name}</span>
+                          {mobileDropdown === item.name ? (
+                            <ChevronUp className="w-4 h-4 text-blue-600" />
+                          ) : (
+                            <ChevronDown className="w-4 h-4 text-gray-400" />
+                          )}
+                        </motion.button>
 
-                        {item.items.map((sub) => (
-                          <button
-                            key={sub.name}
-                            onClick={() => {
-                              navigate(sub.path);
-                              setIsMenuOpen(false);
-                            }}
-                            className="w-full flex items-center px-4 py-2 text-gray-600 hover:bg-blue-600 hover:text-white rounded-lg transition-all duration-200 mb-1"
-                          >
-                            {sub.name}
-                          </button>
-                        ))}
+                        {/* Mobile Dropdown Content */}
+                        <AnimatePresence>
+                          {mobileDropdown === item.name && (
+                            <motion.div
+                              className="ml-4 space-y-1 border-l-2 border-blue-200 pl-4 py-2"
+                              variants={dropdownVariants}
+                              initial="closed"
+                              animate="open"
+                              exit="closed"
+                            >
+                              {item.items.map((sub) => (
+                                <motion.button
+                                  key={sub.name}
+                                  onClick={() => {
+                                    navigate(sub.path);
+                                    setIsMenuOpen(false);
+                                    setMobileDropdown(null);
+                                  }}
+                                  className="w-full text-left px-4 py-2.5 text-gray-600 hover:bg-blue-50 hover:text-blue-700 rounded-md transition-all duration-200 text-sm"
+                                  whileHover={{ x: 5 }}
+                                  transition={{ duration: 0.2 }}
+                                >
+                                  {sub.name}
+                                </motion.button>
+                              ))}
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
                       </div>
                     ) : (
                       <motion.button
@@ -348,38 +477,69 @@ const Navbar = () => {
                           navigate(item.path);
                           setIsMenuOpen(false);
                         }}
-                        className="w-full flex items-center space-x-3 px-4 py-3 text-gray-700 hover:bg-gradient-to-r hover:from-blue-600 hover:to-cyan-600 hover:text-white rounded-lg transition-all duration-200 font-medium text-left mx-2"
+                        className={`w-full text-left px-4 py-3 rounded-md transition-all duration-200 font-medium ${
+                          isActive(item.path)
+                            ? "text-blue-700 bg-blue-50"
+                            : "text-gray-700 hover:bg-blue-50 hover:text-blue-700"
+                        }`}
                         variants={itemVariants}
-                        transition={{ delay: index * 0.1 }}
+                        whileTap="tap"
                       >
-                        <span>{item.name}</span>
+                        {item.name}
                       </motion.button>
                     )
                   )}
 
-                  <div className="border-t border-gray-200 pt-4 px-4 space-y-3">
+                  {/* Dashboard for mobile */}
+                  {isLoggedIn && (
+                    <motion.button
+                      onClick={() => {
+                        navigate(`/${adminId}/admindashboard`);
+                        setIsMenuOpen(false);
+                      }}
+                      className={`w-full text-left px-4 py-3 rounded-md transition-all duration-200 font-medium ${
+                        isActive(`/${adminId}/admindashboard`)
+                          ? "text-blue-700 bg-blue-50"
+                          : "text-gray-700 hover:bg-blue-50 hover:text-blue-700"
+                      }`}
+                      variants={itemVariants}
+                      whileTap="tap"
+                    >
+                      Dashboard
+                    </motion.button>
+                  )}
+
+                  {/* Mobile Auth Section */}
+                  <div className="pt-3 border-t border-gray-200 space-y-3">
                     {isLoggedIn ? (
                       <>
-                        <motion.div
-                          className="w-full flex items-center justify-between px-4 py-3 bg-gradient-to-r from-blue-50 to-cyan-50 rounded-lg border border-blue-100 mx-2"
-                          variants={itemVariants}
-                          transition={{ delay: 0.3 }}
-                        >
-                          <div className="flex items-center space-x-2">
-                            <User className="w-4 h-4 text-blue-600" />
-                            <span className="text-blue-800 font-medium">
-                              {userName}
-                            </span>
+                        <div className="px-4 py-3 bg-gray-50 rounded-md border border-gray-200">
+                          <div className="flex items-center space-x-3">
+                            <div className="w-10 h-10 rounded-full bg-gradient-to-r from-blue-500 to-cyan-400 flex items-center justify-center">
+                              {userName ? (
+                                <span className="text-white font-semibold">
+                                  {userName.charAt(0).toUpperCase()}
+                                </span>
+                              ) : (
+                                <User className="w-5 h-5 text-white" />
+                              )}
+                            </div>
+                            <div className="flex-1">
+                              <div className="font-semibold text-gray-800">
+                                {userName || "Admin"}
+                              </div>
+                            </div>
                           </div>
-                        </motion.div>
+                        </div>
+
                         <motion.button
                           onClick={() => {
                             handleLogout();
                             setIsMenuOpen(false);
                           }}
-                          className="w-full flex items-center justify-center space-x-2 px-4 py-3 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-lg hover:from-red-600 hover:to-red-700 transition-all duration-200 font-medium mx-2"
+                          className="w-full flex items-center justify-center space-x-2 px-4 py-3 bg-white text-red-600 hover:bg-red-50 border border-red-200 rounded-md font-medium transition-all duration-200"
                           variants={itemVariants}
-                          transition={{ delay: 0.4 }}
+                          whileTap="tap"
                         >
                           <LogOut className="w-4 h-4" />
                           <span>Logout</span>
@@ -391,9 +551,9 @@ const Navbar = () => {
                           openLogin();
                           setIsMenuOpen(false);
                         }}
-                        className="w-full flex items-center justify-center space-x-2 px-4 py-3 bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-lg hover:from-blue-700 hover:to-cyan-700 transition-all duration-200 font-medium mx-2"
+                        className="w-full flex items-center justify-center space-x-2 px-4 py-3 bg-gradient-to-r from-blue-600 to-cyan-500 text-white rounded-md font-medium shadow-sm"
                         variants={itemVariants}
-                        transition={{ delay: 0.3 }}
+                        whileTap="tap"
                       >
                         <LogIn className="w-4 h-4" />
                         <span>Login</span>
@@ -412,13 +572,17 @@ const Navbar = () => {
         {toast.show && (
           <motion.div
             className="fixed top-20 left-1/2 transform -translate-x-1/2 z-50"
-            variants={toastVariants}
-            initial="hidden"
-            animate="visible"
-            exit="exit"
+            initial={{ opacity: 0, y: -20, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -20, scale: 0.9 }}
+            transition={{
+              type: "spring",
+              stiffness: 300,
+              damping: 25,
+            }}
           >
             <div
-              className={`flex items-center space-x-2 px-6 py-3 rounded-lg shadow-lg border ${
+              className={`flex items-center space-x-3 px-6 py-3 rounded-md shadow-lg border ${
                 toast.type === "success"
                   ? "bg-green-50 border-green-200 text-green-800"
                   : "bg-red-50 border-red-200 text-red-800"
@@ -442,7 +606,6 @@ const Navbar = () => {
             onClose={closeAuth}
             onLoginSuccess={() => {
               closeAuth();
-              // The page will refresh due to localStorage change
             }}
           />
         )}

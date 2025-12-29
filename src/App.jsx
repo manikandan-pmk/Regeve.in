@@ -10,7 +10,7 @@ import Dashboard from "./pages/Dashboard";
 import EventForm from "./components/EventForm";
 import LuckyDraw from "../src/pages/LuckyDraw/LuckyDraw";
 import EventRegistration from "./components/services/EventRegistration";
-import LuckydrawFooter from "./components/services/LuckydrawFooter";
+import LuckydrawServices from "./components/services/LuckydrawServices";
 import FoodManagement from "./components/services/FoodManagement";
 import DashboardSystemPage from "./components/services/DashboardSystemPage";
 import ScrollToTop from "./components/ScrollToTop";
@@ -39,6 +39,7 @@ import AdminProtectedRoute from "./routes/AdminProtectedRoute";
 //Luckydraw
 import LuckyDrawDashboard from "./pages/LuckyDraw/LuckyDrawDashboard";
 import RegistrationFormLuckydraw from "./pages/LuckyDraw/RegistrationFormLuckydraw";
+import EventGallery from "./pages/EventGallery";
 
 export default function App() {
   const location = useLocation();
@@ -82,6 +83,7 @@ export default function App() {
         <Route path="/blog" element={<BlogPage />} />
         <Route path="/help" element={<HelpCenter />} />
         <Route path="/privacy" element={<PrivacyPolicy />} />
+        <Route path="/eventgallery" element={<EventGallery />} />
         {/* ================= SERVICES ================= */}
         <Route path="/:adminId/dashboard" element={<Dashboard />} />
         <Route path="/event-form" element={<EventForm />} />
@@ -89,7 +91,7 @@ export default function App() {
         <Route path="/service/registration" element={<EventRegistration />} />
         <Route
           path="/service/luckydraw-system-page"
-          element={<LuckydrawFooter />}
+          element={<LuckydrawServices />}
         />
         <Route path="/service/food-management" element={<FoodManagement />} />
         <Route

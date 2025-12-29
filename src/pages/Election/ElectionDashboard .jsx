@@ -318,7 +318,7 @@ const ElectionDashboard = () => {
           </div>
           <button
             onClick={exportToExcel}
-            className="w-full md:w-auto px-4 md:px-5 py-2.5 bg-white border border-gray-200
+            className="w-full cursor-pointer md:w-auto px-4 md:px-5 py-2.5 bg-white border border-gray-200
   text-gray-700 rounded-xl hover:bg-gray-50 transition-all duration-300
   flex items-center justify-center gap-2 font-medium text-sm shadow-sm"
           >
@@ -504,7 +504,7 @@ const ElectionDashboard = () => {
               <select
                 value={positionFilter}
                 onChange={(e) => setPositionFilter(e.target.value)}
-                className="flex items-center bg-white border border-gray-300 rounded-lg md:rounded-xl px-3 md:px-4 py-2 md:py-3 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all duration-300 hover:shadow-md text-sm md:text-base min-w-[180px]"
+                className="flex cursor-pointer items-center bg-white border border-gray-300 rounded-lg md:rounded-xl px-3 md:px-4 py-2 md:py-3 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all duration-300 hover:shadow-md text-sm md:text-base min-w-[180px]"
                 disabled={positions.length === 0}
               >
                 <option value="all">All Positions</option>

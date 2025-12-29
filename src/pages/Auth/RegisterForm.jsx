@@ -3,6 +3,7 @@ import axios from "axios";
 import { useNavigate } from "react-router-dom";
 
 export default function RegisterForm() {
+  const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState({
     companyName: "",
     name: "",
@@ -16,7 +17,6 @@ export default function RegisterForm() {
     confirmPassword: "",
   });
 
-  // Service selection state
   const [selectedServices, setSelectedServices] = useState({
     foodManagement: false,
     electionSystem: false,
@@ -25,8 +25,7 @@ export default function RegisterForm() {
     digitalRegistration: false,
   });
 
-  const navigate = useNavigate()
-
+  const navigate = useNavigate();
   const [errors, setErrors] = useState({});
   const [touched, setTouched] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -34,7 +33,6 @@ export default function RegisterForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  // OTP Verification States
   const [otp, setOtp] = useState("");
   const [isOtpSent, setIsOtpSent] = useState(false);
   const [isOtpVerified, setIsOtpVerified] = useState(false);
@@ -42,7 +40,6 @@ export default function RegisterForm() {
   const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
   const [otpError, setOtpError] = useState("");
 
-  // Handle service checkbox changes
   const handleServiceChange = (service) => {
     setSelectedServices((prev) => ({
       ...prev,
@@ -50,68 +47,58 @@ export default function RegisterForm() {
     }));
   };
 
-  const validateForm = () => {
+  const validateStep1 = () => {
     const newErrors = {};
 
-    // Company Name validation
     if (!formData.companyName.trim()) {
       newErrors.companyName = "Company Name is required";
     } else if (formData.companyName.trim().length < 2) {
       newErrors.companyName = "Company Name must be at least 2 characters";
     }
 
-    // Name validation
     if (!formData.name.trim()) {
       newErrors.name = "Name is required";
     } else if (formData.name.trim().length < 2) {
       newErrors.name = "Name must be at least 2 characters";
     }
 
-    // Email validation
     if (!formData.email) {
       newErrors.email = "Email is required";
     } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
       newErrors.email = "Email is invalid";
     }
 
-    // Date of Birth validation
     if (!formData.dob) {
       newErrors.dob = "Date of Birth is required";
     } else {
       const dob = new Date(formData.dob);
       const today = new Date();
       const age = today.getFullYear() - dob.getFullYear();
-
       if (age < 18) {
         newErrors.dob = "Must be at least 18 years old";
       }
     }
 
-    // Gender validation
     if (!formData.gender) {
       newErrors.gender = "Gender is required";
     }
 
-    // Occupation validation
     if (!formData.occupation.trim()) {
       newErrors.occupation = "Occupation is required";
     }
 
-    // Phone Number validation
     if (!formData.phoneNumber) {
       newErrors.phoneNumber = "Phone Number is required";
     } else if (!/^\d{10,15}$/.test(formData.phoneNumber.replace(/\D/g, ""))) {
       newErrors.phoneNumber = "Phone Number must be 10-15 digits";
     }
 
-    // ID Card validation
     if (!formData.idCard.trim()) {
       newErrors.idCard = "ID Card is required";
     } else if (formData.idCard.trim().length < 5) {
       newErrors.idCard = "ID Card must be at least 5 characters";
     }
 
-    // Password validation
     if (!formData.password) {
       newErrors.password = "Password is required";
     } else if (formData.password.length < 8) {
@@ -121,20 +108,26 @@ export default function RegisterForm() {
         "Password must contain uppercase, lowercase and number";
     }
 
-    // Confirm Password validation
     if (!formData.confirmPassword) {
       newErrors.confirmPassword = "Please confirm your password";
     } else if (formData.password !== formData.confirmPassword) {
       newErrors.confirmPassword = "Passwords do not match";
     }
 
-    // Service selection validation
+    if (!isOtpVerified) {
+      newErrors.otp = "Please verify your email address";
+    }
+
+    return newErrors;
+  };
+
+  const validateStep2 = () => {
+    const newErrors = {};
     const selectedCount =
       Object.values(selectedServices).filter(Boolean).length;
     if (selectedCount === 0) {
       newErrors.services = "Please select at least one service";
     }
-
     return newErrors;
   };
 
@@ -145,7 +138,6 @@ export default function RegisterForm() {
       [name]: value,
     }));
 
-    // Clear error when user starts typing
     if (errors[name]) {
       setErrors((prev) => ({
         ...prev,
@@ -153,7 +145,6 @@ export default function RegisterForm() {
       }));
     }
 
-    // Reset OTP verification if email changes
     if (name === "email" && (isOtpSent || isOtpVerified)) {
       setIsOtpSent(false);
       setIsOtpVerified(false);
@@ -169,15 +160,13 @@ export default function RegisterForm() {
       [name]: true,
     }));
 
-    // Validate specific field
-    const newErrors = validateForm();
+    const newErrors = validateStep1();
     setErrors((prev) => ({
       ...prev,
       [name]: newErrors[name],
     }));
   };
 
-  // Send OTP API call using Axios
   const sendOtp = async () => {
     if (!formData.email || errors.email) {
       setOtpError("Please enter a valid email address first");
@@ -188,35 +177,22 @@ export default function RegisterForm() {
     setOtpError("");
 
     try {
-      const requestData = {
-        Email: formData.email,
-      };
-
-      console.log("Sending OTP request with data:", requestData);
-
-      const response = await axios.post(
+      const requestData = { Email: formData.email };
+      await axios.post(
         "https://api.regeve.in/api/admin/requestOtp",
         requestData,
         {
-          headers: {
-            "Content-Type": "application/json",
-          },
+          headers: { "Content-Type": "application/json" },
           timeout: 10000,
         }
       );
 
-      console.log("OTP Sent Success:", response.data);
       setIsOtpSent(true);
-      setOtpError("");
-
-      // Show success message
       setOtpError("OTP sent successfully! Check your email.");
       setTimeout(() => setOtpError(""), 3000);
     } catch (error) {
       console.error("Error sending OTP:", error);
-
       if (error.response) {
-        console.error("OTP Error Response:", error.response.data);
         const serverMessage =
           error.response.data?.error?.message ||
           error.response.data?.message ||
@@ -232,7 +208,6 @@ export default function RegisterForm() {
     }
   };
 
-  // Verify OTP API call using Axios
   const verifyOtp = async () => {
     if (!otp.trim()) {
       setOtpError("Please enter the OTP");
@@ -248,27 +223,20 @@ export default function RegisterForm() {
         Email_Otp: otp.trim(),
       };
 
-      console.log("Verifying OTP with data:", requestData);
-
-      const response = await axios.post(
+      await axios.post(
         "https://api.regeve.in/api/admin/verifyOtp",
         requestData,
         {
-          headers: {
-            "Content-Type": "application/json",
-          },
+          headers: { "Content-Type": "application/json" },
           timeout: 10000,
         }
       );
 
-      console.log("OTP Verified Success:", response.data);
       setIsOtpVerified(true);
       setOtpError("");
     } catch (error) {
       console.error("Error verifying OTP:", error);
-
       if (error.response) {
-        console.error("OTP Verification Error Response:", error.response.data);
         const serverMessage =
           error.response.data?.error?.message ||
           error.response.data?.message ||
@@ -284,56 +252,43 @@ export default function RegisterForm() {
     }
   };
 
-  // Submit form with selected services
-  const submitToAPI = async (data) => {
+  const submitToAPI = async () => {
     const apiData = {
-      Company_Name: data.companyName.trim(),
-      Name: data.name.trim(),
-      Email: data.email.trim().toLowerCase(),
-      DOB: data.dob,
+      Company_Name: formData.companyName.trim(),
+      Name: formData.name.trim(),
+      Email: formData.email.trim().toLowerCase(),
+      DOB: formData.dob,
       Gender:
-        data.gender === "other"
+        formData.gender === "other"
           ? "Others"
-          : data.gender.charAt(0).toUpperCase() + data.gender.slice(1),
-      Occupation: data.occupation.trim(),
-      Phone_Number: Number(data.phoneNumber.replace(/\D/g, "")),
-      ID_Card: data.idCard.trim(),
-      Password: data.password,
+          : formData.gender.charAt(0).toUpperCase() + formData.gender.slice(1),
+      Occupation: formData.occupation.trim(),
+      Phone_Number: Number(formData.phoneNumber.replace(/\D/g, "")),
+      ID_Card: formData.idCard.trim(),
+      Password: formData.password,
       Email_Verify: true,
       Approved_Admin: false,
-      // Add selected services
       Services: {
         "Digital Registration": selectedServices.digitalRegistration,
         "Food Management": selectedServices.foodManagement,
         "Election System": selectedServices.electionSystem,
         "Lucky Draw": selectedServices.luckydraw,
-        "Dashboard": selectedServices.dashboard,
+        Dashboard: selectedServices.dashboard,
       },
     };
-
-    console.log("Submitting form data to API:", apiData);
 
     try {
       const response = await axios.post(
         "https://api.regeve.in/api/admin/create",
+        { data: apiData },
         {
-          data: apiData,
-        },
-        {
-          headers: {
-            "Content-Type": "application/json",
-          },
+          headers: { "Content-Type": "application/json" },
           timeout: 15000,
         }
       );
-
-      console.log("API Response Success:", response.data);
-      navigate("/")
       return response.data;
     } catch (error) {
-      console.error("Error submitting form - Full Error:", error);
-      console.error("Error response data:", error.response?.data);
-
+      console.error("Error submitting form:", error);
       let errorMessage = "Registration failed. Please try again.";
 
       if (error.response) {
@@ -356,92 +311,74 @@ export default function RegisterForm() {
       } else {
         errorMessage = `Error: ${error.message}`;
       }
-
       throw new Error(errorMessage);
     }
+  };
+
+  const handleNextStep = async () => {
+    if (currentStep === 1) {
+      const newErrors = validateStep1();
+      setErrors(newErrors);
+
+      if (Object.keys(newErrors).length === 0) {
+        const allTouched = {};
+        Object.keys(formData).forEach((key) => {
+          allTouched[key] = true;
+        });
+        setTouched(allTouched);
+        setCurrentStep(2);
+      } else {
+        const allTouched = {};
+        Object.keys(formData).forEach((key) => {
+          allTouched[key] = true;
+        });
+        setTouched(allTouched);
+      }
+    }
+  };
+
+  const handlePreviousStep = () => {
+    setCurrentStep(1);
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Check if email is verified
-    if (!isOtpVerified) {
-      setOtpError("Please verify your email address before submitting");
-      return;
-    }
+    if (currentStep === 2) {
+      const newErrors = validateStep2();
+      setErrors(newErrors);
 
-    const newErrors = validateForm();
-    setErrors(newErrors);
+      if (Object.keys(newErrors).length === 0) {
+        setIsSubmitting(true);
+        setOtpError("");
 
-    if (Object.keys(newErrors).length === 0) {
-      setIsSubmitting(true);
-      setOtpError("");
-
-      try {
-        const result = await submitToAPI(formData);
-        console.log("Final API Response:", result);
-
-        // Show success popup
-        setShowSuccess(true);
-
-        // Reset form after successful submission
-        setFormData({
-          companyName: "",
-          name: "",
-          email: "",
-          dob: "",
-          gender: "",
-          occupation: "",
-          phoneNumber: "",
-          idCard: "",
-          password: "",
-          confirmPassword: "",
-        });
-        setSelectedServices({
-          foodManagement: false,
-          electionSystem: false,
-          luckydraw: false,
-          dashboard: false,
-        });
-        setIsOtpSent(false);
-        setIsOtpVerified(false);
-        setOtp("");
-
-        // Hide success popup after 5 seconds
-        setTimeout(() => {
-          setShowSuccess(false);
-        }, 5000);
-      } catch (error) {
-        console.error("Submission error:", error);
-        alert(error.message || "Registration failed. Please try again.");
-      } finally {
-        setIsSubmitting(false);
+        try {
+          await submitToAPI();
+          setShowSuccess(true);
+          setTimeout(() => {
+            setShowSuccess(false);
+            navigate("/");
+          }, 4000);
+        } catch (error) {
+          console.error("Submission error:", error);
+          alert(error.message || "Registration failed. Please try again.");
+        } finally {
+          setIsSubmitting(false);
+        }
       }
-    } else {
-      // Mark all fields as touched to show errors
-      const allTouched = {};
-      Object.keys(formData).forEach((key) => {
-        allTouched[key] = true;
-      });
-      setTouched(allTouched);
     }
   };
 
-  const inputClass =
-    "w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent";
-  const errorClass = "text-red-500 text-sm mt-1";
-  const labelClass = "block text-sm font-medium text-gray-700 mb-1";
-
   return (
-    <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      {/* Success Popup */}
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 py-12 px-4 sm:px-6 lg:px-8">
+      {/* Classic Success Popup */}
       {showSuccess && (
-        <div className="fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-50">
-          <div className="bg-white rounded-lg p-8 max-w-md mx-4 transform transition-all duration-500 scale-100 animate-bounce-in">
-            <div className="text-center">
-              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+        <div className="fixed inset-0 flex items-center justify-center z-50 bg-black/30 backdrop-blur-sm">
+          <div className="relative bg-gradient-to-b from-white to-gray-50 rounded-xl p-8 max-w-md mx-4 shadow-2xl border border-gray-200 transform transition-all duration-500">
+            <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
+              <div className="w-16 h-16 bg-gradient-to-r from-emerald-500 to-green-500 rounded-full flex items-center justify-center shadow-lg animate-bounce">
                 <svg
-                  className="w-8 h-8 text-green-500"
+                  className="w-8 h-8 text-white"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -454,682 +391,1484 @@ export default function RegisterForm() {
                   ></path>
                 </svg>
               </div>
-              <h3 className="text-2xl font-bold text-gray-900 mb-2 animate-pulse">
+            </div>
+            <div className="pt-8 text-center">
+              <h3 className="text-2xl font-serif font-bold text-gray-800 mb-3">
                 Registration Successful!
               </h3>
-              <p className="text-gray-600 mb-4">
-                Admin account has been created successfully. Please wait for
-                approval.
+              <p className="text-gray-600 mb-6">
+                Your admin account has been created successfully.
               </p>
-              <div className="space-y-2 text-sm text-gray-500">
-                <p
-                  className="animate-fade-in-up"
+              <div className="space-y-3 text-left max-w-xs mx-auto">
+                <div className="flex items-center space-x-3 text-sm text-gray-500 animate-fade-in-up">
+                  <div className="w-2 h-2 bg-emerald-500 rounded-full"></div>
+                  <span>Account created & verified</span>
+                </div>
+                <div
+                  className="flex items-center space-x-3 text-sm text-gray-500 animate-fade-in-up"
                   style={{ animationDelay: "0.1s" }}
                 >
-                  ✓ Account created successfully
-                </p>
-                <p
-                  className="animate-fade-in-up"
-                  style={{ animationDelay: "0.3s" }}
+                  <div className="w-2 h-2 bg-emerald-500 rounded-full"></div>
+                  <span>Services configured</span>
+                </div>
+                <div
+                  className="flex items-center space-x-3 text-sm text-gray-500 animate-fade-in-up"
+                  style={{ animationDelay: "0.2s" }}
                 >
-                  ✓ Details submitted for verification
-                </p>
-                <p
-                  className="animate-fade-in-up"
-                  style={{ animationDelay: "0.5s" }}
-                >
-                  ✓ You will be notified via email
+                  <div className="w-2 h-2 bg-emerald-500 rounded-full"></div>
+                  <span>Email confirmation sent</span>
+                </div>
+              </div>
+              <div className="mt-8 pt-6 border-t border-gray-200">
+                <div className="relative h-2 bg-gray-200 rounded-full overflow-hidden">
+                  <div className="absolute top-0 left-0 h-full bg-gradient-to-r from-blue-500 to-emerald-500 rounded-full animate-progress"></div>
+                </div>
+                <p className="text-sm text-gray-500 mt-3 animate-pulse">
+                  Redirecting to login page...
                 </p>
               </div>
-              <button
-                onClick={() => setShowSuccess(false)}
-                className="mt-6 px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition duration-200"
-              >
-                Close
-              </button>
             </div>
           </div>
         </div>
       )}
 
-      <div className="max-w-6xl mx-auto">
-        <div className="flex flex-col lg:flex-row gap-8">
-          {/* Left Side - Service Selection Panel */}
-          <div className="lg:w-2/3">
-            <div className="bg-white py-8 px-6 shadow rounded-lg h-full">
-              <div className="text-center mb-8">
-                <h2 className="text-3xl font-bold text-gray-900">
-                  Admin Registration
-                </h2>
-                <p className="mt-2 text-gray-600">Create a new admin account</p>
-              </div>
-
-              <form onSubmit={handleSubmit} className="space-y-6">
-                {/* Company Name */}
-                <div>
-                  <label htmlFor="companyName" className={labelClass}>
-                    Company Name *
-                  </label>
-                  <input
-                    type="text"
-                    id="companyName"
-                    name="companyName"
-                    value={formData.companyName}
-                    onChange={handleChange}
-                    onBlur={handleBlur}
-                    className={`${inputClass} ${
-                      touched.companyName && errors.companyName
-                        ? "border-red-500"
-                        : ""
-                    }`}
-                    placeholder="Enter your company name"
-                  />
-                  {touched.companyName && errors.companyName && (
-                    <div className={errorClass}>{errors.companyName}</div>
-                  )}
+      <div className="max-w-4xl mx-auto">
+        {/* Progress Steps - Classic Design */}
+        <div className="mb-12">
+          <div className="flex justify-between items-center relative">
+            <div className="absolute top-5 left-0 right-0 h-0.5 bg-gray-200 -z-10"></div>
+            {[1, 2, 3].map((step) => (
+              <div key={step} className="flex flex-col items-center">
+                <div
+                  className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-bold border-4 border-white shadow-lg transition-all duration-300 ${
+                    currentStep >= step
+                      ? "bg-gradient-to-r from-blue-600 to-blue-800"
+                      : "bg-gray-300"
+                  }`}
+                >
+                  {step}
                 </div>
-
-                {/* Name */}
-                <div>
-                  <label htmlFor="name" className={labelClass}>
-                    Full Name *
-                  </label>
-                  <input
-                    type="text"
-                    id="name"
-                    name="name"
-                    value={formData.name}
-                    onChange={handleChange}
-                    onBlur={handleBlur}
-                    className={`${inputClass} ${
-                      touched.name && errors.name ? "border-red-500" : ""
-                    }`}
-                    placeholder="Enter your full name"
-                  />
-                  {touched.name && errors.name && (
-                    <div className={errorClass}>{errors.name}</div>
-                  )}
-                </div>
-
-                {/* Email with OTP Verification */}
-                <div>
-                  <label htmlFor="email" className={labelClass}>
-                    Email Address *
-                  </label>
-                  <div className="flex space-x-2">
-                    <input
-                      type="email"
-                      id="email"
-                      name="email"
-                      value={formData.email}
-                      onChange={handleChange}
-                      onBlur={handleBlur}
-                      className={`${inputClass} flex-1 ${
-                        touched.email && errors.email ? "border-red-500" : ""
-                      }`}
-                      placeholder="Enter your email"
-                      disabled={isOtpVerified}
-                    />
-                    <button
-                      type="button"
-                      onClick={sendOtp}
-                      disabled={
-                        !formData.email ||
-                        errors.email ||
-                        isOtpVerified ||
-                        isSendingOtp
-                      }
-                      className={`px-4 py-2 rounded-md text-sm font-medium transition duration-200 ${
-                        !formData.email ||
-                        errors.email ||
-                        isOtpVerified ||
-                        isSendingOtp
-                          ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                          : "bg-blue-600 text-white hover:bg-blue-700"
-                      }`}
-                    >
-                      {isSendingOtp
-                        ? "Sending..."
-                        : isOtpVerified
-                        ? "Verified ✓"
-                        : "Get OTP"}
-                    </button>
-                  </div>
-                  {touched.email && errors.email && (
-                    <div className={errorClass}>{errors.email}</div>
-                  )}
-                </div>
-
-                {/* OTP Verification Section */}
-                {isOtpSent && !isOtpVerified && (
-                  <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-                    <label htmlFor="otp" className={labelClass}>
-                      Enter OTP *
-                    </label>
-                    <div className="flex space-x-2">
-                      <input
-                        type="text"
-                        id="otp"
-                        value={otp}
-                        onChange={(e) => setOtp(e.target.value)}
-                        className={`${inputClass} flex-1`}
-                        placeholder="Enter OTP sent to your email"
-                        maxLength={6}
-                      />
-                      <button
-                        type="button"
-                        onClick={verifyOtp}
-                        disabled={!otp.trim() || isVerifyingOtp}
-                        className={`px-4 py-2 rounded-md text-sm font-medium transition duration-200 ${
-                          !otp.trim() || isVerifyingOtp
-                            ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                            : "bg-green-600 text-white hover:bg-green-700"
-                        }`}
-                      >
-                        {isVerifyingOtp ? "Verifying..." : "Verify OTP"}
-                      </button>
-                    </div>
-                    {otpError && (
-                      <div
-                        className={`text-sm mt-2 ${
-                          otpError.includes("successfully")
-                            ? "text-green-600"
-                            : "text-red-500"
-                        }`}
-                      >
-                        {otpError}
-                      </div>
-                    )}
-                    <p className="text-sm text-blue-600 mt-2">
-                      We've sent a verification code to your email address.
-                    </p>
-                  </div>
-                )}
-
-                {/* OTP Verified Success */}
-                {isOtpVerified && (
-                  <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-                    <div className="flex items-center space-x-2 text-green-700">
-                      <svg
-                        className="w-5 h-5"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth="2"
-                          d="M5 13l4 4L19 7"
-                        ></path>
-                      </svg>
-                      <span className="font-medium">
-                        Email verified successfully!
-                      </span>
-                    </div>
-                  </div>
-                )}
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label htmlFor="dob" className={labelClass}>
-                      Date of Birth *
-                    </label>
-                    <input
-                      type="date"
-                      id="dob"
-                      name="dob"
-                      value={formData.dob}
-                      onChange={handleChange}
-                      onBlur={handleBlur}
-                      className={`${inputClass} ${
-                        touched.dob && errors.dob ? "border-red-500" : ""
-                      }`}
-                    />
-                    {touched.dob && errors.dob && (
-                      <div className={errorClass}>{errors.dob}</div>
-                    )}
-                  </div>
-
-                  <div>
-                    <label htmlFor="gender" className={labelClass}>
-                      Gender *
-                    </label>
-                    <select
-                      id="gender"
-                      name="gender"
-                      value={formData.gender}
-                      onChange={handleChange}
-                      onBlur={handleBlur}
-                      className={`${inputClass} ${
-                        touched.gender && errors.gender ? "border-red-500" : ""
-                      }`}
-                    >
-                      <option value="">Select Gender</option>
-                      <option value="male">Male</option>
-                      <option value="female">Female</option>
-                      <option value="other">Other</option>
-                    </select>
-                    {touched.gender && errors.gender && (
-                      <div className={errorClass}>{errors.gender}</div>
-                    )}
-                  </div>
-                </div>
-
-                <div>
-                  <label htmlFor="occupation" className={labelClass}>
-                    Occupation *
-                  </label>
-                  <input
-                    type="text"
-                    id="occupation"
-                    name="occupation"
-                    value={formData.occupation}
-                    onChange={handleChange}
-                    onBlur={handleBlur}
-                    className={`${inputClass} ${
-                      touched.occupation && errors.occupation
-                        ? "border-red-500"
-                        : ""
-                    }`}
-                    placeholder="Enter your occupation"
-                  />
-                  {touched.occupation && errors.occupation && (
-                    <div className={errorClass}>{errors.occupation}</div>
-                  )}
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label htmlFor="phoneNumber" className={labelClass}>
-                      Phone Number *
-                    </label>
-                    <input
-                      type="tel"
-                      id="phoneNumber"
-                      name="phoneNumber"
-                      value={formData.phoneNumber}
-                      onChange={handleChange}
-                      onBlur={handleBlur}
-                      className={`${inputClass} ${
-                        touched.phoneNumber && errors.phoneNumber
-                          ? "border-red-500"
-                          : ""
-                      }`}
-                      placeholder="Enter phone number"
-                      maxLength={10}
-                    />
-                    {touched.phoneNumber && errors.phoneNumber && (
-                      <div className={errorClass}>{errors.phoneNumber}</div>
-                    )}
-                  </div>
-
-                  <div>
-                    <label htmlFor="idCard" className={labelClass}>
-                      ID Card Number *
-                    </label>
-                    <input
-                      type="text"
-                      id="idCard"
-                      name="idCard"
-                      value={formData.idCard}
-                      onChange={handleChange}
-                      onBlur={handleBlur}
-                      className={`${inputClass} ${
-                        touched.idCard && errors.idCard ? "border-red-500" : ""
-                      }`}
-                      placeholder="Enter ID card number"
-                    />
-                    {touched.idCard && errors.idCard && (
-                      <div className={errorClass}>{errors.idCard}</div>
-                    )}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="relative">
-                    <label htmlFor="password" className={labelClass}>
-                      Password *
-                    </label>
-                    <input
-                      type={showPassword ? "text" : "password"}
-                      id="password"
-                      name="password"
-                      value={formData.password}
-                      onChange={handleChange}
-                      onBlur={handleBlur}
-                      className={`${inputClass} ${
-                        touched.password && errors.password
-                          ? "border-red-500"
-                          : ""
-                      }`}
-                      placeholder="Enter password"
-                    />
-                    <span
-                      className="absolute right-3 top-10 cursor-pointer text-gray-600"
-                      onClick={() => setShowPassword(!showPassword)}
-                    >
-                      {showPassword ? "👁️‍🗨️" : "👁️"}
-                    </span>
-                    {touched.password && errors.password && (
-                      <div className={errorClass}>{errors.password}</div>
-                    )}
-                  </div>
-
-                  <div className="relative">
-                    <label htmlFor="confirmPassword" className={labelClass}>
-                      Confirm Password *
-                    </label>
-                    <input
-                      type={showConfirmPassword ? "text" : "password"}
-                      id="confirmPassword"
-                      name="confirmPassword"
-                      value={formData.confirmPassword}
-                      onChange={handleChange}
-                      onBlur={handleBlur}
-                      className={`${inputClass} ${
-                        touched.confirmPassword && errors.confirmPassword
-                          ? "border-red-500"
-                          : ""
-                      }`}
-                      placeholder="Confirm your password"
-                    />
-                    <span
-                      className="absolute right-3 top-10 cursor-pointer text-gray-600"
-                      onClick={() =>
-                        setShowConfirmPassword(!showConfirmPassword)
-                      }
-                    >
-                      {showConfirmPassword ? "👁️‍🗨️" : "👁️"}
-                    </span>
-                    {touched.confirmPassword && errors.confirmPassword && (
-                      <div className={errorClass}>{errors.confirmPassword}</div>
-                    )}
-                  </div>
-                </div>
-
-                <div>
-                  <button
-                    type="submit"
-                    disabled={isSubmitting || !isOtpVerified}
-                    className={`w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white transition duration-200 ${
-                      isSubmitting || !isOtpVerified
-                        ? "bg-gray-400 cursor-not-allowed"
-                        : "bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                <div className="text-center mt-3">
+                  <div
+                    className={`text-sm font-medium tracking-wide ${
+                      currentStep >= step ? "text-blue-800" : "text-gray-500"
                     }`}
                   >
-                    {isSubmitting ? (
-                      <div className="flex items-center">
-                        <svg
-                          className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
-                          xmlns="http://www.w3.org/2000/svg"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                        >
-                          <circle
-                            className="opacity-25"
-                            cx="12"
-                            cy="12"
-                            r="10"
-                            stroke="currentColor"
-                            strokeWidth="4"
-                          ></circle>
-                          <path
-                            className="opacity-75"
-                            fill="currentColor"
-                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                          ></path>
-                        </svg>
-                        Submitting...
-                      </div>
-                    ) : (
-                      "Register Admin"
-                    )}
-                  </button>
-                  {!isOtpVerified && (
-                    <div className="text-orange-500 text-sm mt-2 text-center">
-                      Please verify your email address before submitting
-                    </div>
-                  )}
+                    {step === 1
+                      ? "Admin Details"
+                      : step === 2
+                      ? "Services"
+                      : "Complete"}
+                  </div>
                 </div>
-              </form>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
+          {/* Form Header */}
+          <div className="border-b border-gray-200 bg-white">
+            <div className="px-8 py-10">
+              <div className="max-w-4xl mx-auto">
+                <div className="mb-6">
+                  <div className="flex items-center space-x-2 text-sm text-gray-500 mb-3">
+                    <span>Setup Wizard</span>
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth="2"
+                        d="M9 5l7 7-7 7"
+                      />
+                    </svg>
+                    <span className="font-medium text-blue-600">
+                      {currentStep === 1
+                        ? "Admin Registration"
+                        : "Service Selection"}
+                    </span>
+                  </div>
+
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <h1 className="text-3xl font-bold text-gray-900 mb-3">
+                        {currentStep === 1
+                          ? "Register as Administrator"
+                          : "Select Your Services"}
+                      </h1>
+                      <p className="text-gray-600 text-lg">
+                        {currentStep === 1
+                          ? "Provide your details to create an administrator account"
+                          : "Choose the services you want to enable for your organization"}
+                      </p>
+                    </div>
+
+                    {/* Progress indicator */}
+                    <div className="hidden lg:block">
+                      <div className="text-right">
+                        <div className="text-sm text-gray-500 mb-1">
+                          Progress
+                        </div>
+                        <div className="flex items-center space-x-3">
+                          <div className="w-32 h-2 bg-gray-200 rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-gradient-to-r from-blue-600 to-cyan-500 rounded-full transition-all duration-500"
+                              style={{
+                                width: currentStep === 1 ? "50%" : "100%",
+                              }}
+                            ></div>
+                          </div>
+                          <span className="font-semibold text-gray-900">
+                            {currentStep === 1 ? "1/2" : "2/2"}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* Right Side - Registration Form */}
-          <div className="lg:w-1/3">
-            <div className="bg-white py-8 px-6 shadow rounded-lg h-full">
-              <div className="text-center mb-8">
-                <h2 className="text-2xl font-bold text-gray-900">
-                  Choose Services
-                </h2>
-                <p className="mt-2 text-gray-600">
-                  Select the services you want to use
+          <div className="p-8">
+            {currentStep === 1 && (
+              <>
+                {/* Header */}
+
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    handleNextStep();
+                  }}
+                  className="space-y-8"
+                >
+                  {/* Form Grid */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-6">
+                    {/* Company Name - Enhanced */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label
+                          htmlFor="companyName"
+                          className="block text-sm font-semibold text-gray-800"
+                        >
+                          Company Name
+                        </label>
+                      </div>
+                      <div className="relative group">
+                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none transition-transform duration-200 group-focus-within:scale-110">
+                          <svg
+                            className="w-5 h-5 text-gray-400"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth="1.5"
+                              d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
+                            />
+                          </svg>
+                        </div>
+                        <input
+                          type="text"
+                          id="companyName"
+                          name="companyName"
+                          value={formData.companyName}
+                          onChange={handleChange}
+                          onBlur={handleBlur}
+                          className={`pl-10 w-full px-4 py-3.5 border rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 ${
+                            touched.companyName && errors.companyName
+                              ? "border-red-400 bg-red-50/50"
+                              : "border-gray-300 hover:border-gray-400 focus:shadow-lg"
+                          }`}
+                          placeholder="Enter your company name"
+                        />
+                      </div>
+                      {touched.companyName && errors.companyName && (
+                        <div className="flex items-center space-x-2 text-red-600 text-sm font-medium bg-red-50 px-3 py-2 rounded-lg">
+                          <svg
+                            className="w-4 h-4 flex-shrink-0"
+                            fill="currentColor"
+                            viewBox="0 0 20 20"
+                          >
+                            <path
+                              fillRule="evenodd"
+                              d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+                              clipRule="evenodd"
+                            />
+                          </svg>
+                          <span>{errors.companyName}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Full Name - Enhanced */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label
+                          htmlFor="name"
+                          className="block text-sm font-semibold text-gray-800"
+                        >
+                          Full Name
+                        </label>
+                      </div>
+                      <div className="relative group">
+                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none transition-transform duration-200 group-focus-within:scale-110">
+                          <svg
+                            className="w-5 h-5 text-gray-400"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth="1.5"
+                              d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                            />
+                          </svg>
+                        </div>
+                        <input
+                          type="text"
+                          id="name"
+                          name="name"
+                          value={formData.name}
+                          onChange={handleChange}
+                          onBlur={handleBlur}
+                          className={`pl-10 w-full px-4 py-3.5 border rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 ${
+                            touched.name && errors.name
+                              ? "border-red-400 bg-red-50/50"
+                              : "border-gray-300 hover:border-gray-400 focus:shadow-lg"
+                          }`}
+                          placeholder="Enter your full name"
+                        />
+                      </div>
+                      {touched.name && errors.name && (
+                        <div className="flex items-center space-x-2 text-red-600 text-sm font-medium bg-red-50 px-3 py-2 rounded-lg">
+                          <svg
+                            className="w-4 h-4 flex-shrink-0"
+                            fill="currentColor"
+                            viewBox="0 0 20 20"
+                          >
+                            <path
+                              fillRule="evenodd"
+                              d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+                              clipRule="evenodd"
+                            />
+                          </svg>
+                          <span>{errors.name}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Email with OTP - Enhanced */}
+                    <div className="lg:col-span-2 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <label
+                          htmlFor="email"
+                          className="block text-sm font-semibold text-gray-800"
+                        >
+                          Email Address
+                        </label>
+                      </div>
+
+                      <div className="flex flex-col sm:flex-row gap-3">
+                        <div className="relative group flex-1">
+                          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none transition-transform duration-200 group-focus-within:scale-110">
+                            <svg
+                              className="w-5 h-5 text-gray-400"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth="1.5"
+                                d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+                              />
+                            </svg>
+                          </div>
+                          <input
+                            type="email"
+                            id="email"
+                            name="email"
+                            value={formData.email}
+                            onChange={handleChange}
+                            onBlur={handleBlur}
+                            className={`pl-10 w-full px-4 py-3.5 border rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 ${
+                              touched.email && errors.email
+                                ? "border-red-400 bg-red-50/50"
+                                : isOtpVerified
+                                ? "border-green-500 bg-green-50/30"
+                                : "border-gray-300 hover:border-gray-400 focus:shadow-lg"
+                            }`}
+                            placeholder="name@company.com"
+                            disabled={isOtpVerified}
+                          />
+                          {isOtpVerified && (
+                            <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
+                              <div className="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center">
+                                <svg
+                                  className="w-4 h-4 text-green-600"
+                                  fill="currentColor"
+                                  viewBox="0 0 20 20"
+                                >
+                                  <path
+                                    fillRule="evenodd"
+                                    d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                                    clipRule="evenodd"
+                                  />
+                                </svg>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={sendOtp}
+                          disabled={
+                            !formData.email ||
+                            errors.email ||
+                            isOtpVerified ||
+                            isSendingOtp
+                          }
+                          className={`px-6 py-3.5 rounded-xl text-sm font-semibold transition-all duration-200 whitespace-nowrap flex items-center justify-center space-x-2 ${
+                            !formData.email ||
+                            errors.email ||
+                            isOtpVerified ||
+                            isSendingOtp
+                              ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                              : "bg-gradient-to-r from-blue-600 to-blue-700 text-white hover:from-blue-700 hover:to-blue-800 shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
+                          }`}
+                        >
+                          {isSendingOtp ? (
+                            <>
+                              <svg
+                                className="animate-spin h-4 w-4 text-white"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                              >
+                                <circle
+                                  className="opacity-25"
+                                  cx="12"
+                                  cy="12"
+                                  r="10"
+                                  stroke="currentColor"
+                                  strokeWidth="4"
+                                />
+                                <path
+                                  className="opacity-75"
+                                  fill="currentColor"
+                                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                                />
+                              </svg>
+                              <span>Sending...</span>
+                            </>
+                          ) : isOtpVerified ? (
+                            <>
+                              <svg
+                                className="w-4 h-4"
+                                fill="currentColor"
+                                viewBox="0 0 20 20"
+                              >
+                                <path
+                                  fillRule="evenodd"
+                                  d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                                  clipRule="evenodd"
+                                />
+                              </svg>
+                              <span>Verified</span>
+                            </>
+                          ) : (
+                            <>
+                              <svg
+                                className="w-4 h-4"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth="2"
+                                  d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+                                />
+                              </svg>
+                              <span>Get OTP</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+
+                      {touched.email && errors.email && (
+                        <div className="flex items-center space-x-2 text-red-600 text-sm font-medium bg-red-50 px-3 py-2 rounded-lg">
+                          <svg
+                            className="w-4 h-4 flex-shrink-0"
+                            fill="currentColor"
+                            viewBox="0 0 20 20"
+                          >
+                            <path
+                              fillRule="evenodd"
+                              d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+                              clipRule="evenodd"
+                            />
+                          </svg>
+                          <span>{errors.email}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* OTP Verification Section - Enhanced */}
+                    {isOtpSent && !isOtpVerified && (
+                      <div className="lg:col-span-2 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <label className="block text-sm font-semibold text-gray-800">
+                            Email Verification
+                          </label>
+                          <span className="text-xs text-blue-600 font-medium">
+                            Enter code sent to your email
+                          </span>
+                        </div>
+
+                        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl p-5">
+                          <div className="flex flex-col sm:flex-row gap-4">
+                            <div className="relative group flex-1">
+                              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <svg
+                                  className="w-5 h-5 text-blue-500"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth="2"
+                                    d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+                                  />
+                                </svg>
+                              </div>
+                              <input
+                                type="text"
+                                value={otp}
+                                onChange={(e) =>
+                                  setOtp(
+                                    e.target.value
+                                      .replace(/\D/g, "")
+                                      .slice(0, 6)
+                                  )
+                                }
+                                className="pl-10 w-full px-4 py-3.5 border-2 border-blue-300 rounded-xl focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 bg-white"
+                                placeholder="Enter 6-digit code"
+                                maxLength={6}
+                              />
+                              <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-sm text-gray-400">
+                                {otp.length}/6
+                              </div>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={verifyOtp}
+                              disabled={otp.length !== 6 || isVerifyingOtp}
+                              className={`px-6 py-3.5 rounded-xl text-sm font-semibold transition-all duration-200 flex items-center justify-center space-x-2 ${
+                                otp.length !== 6 || isVerifyingOtp
+                                  ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                                  : "bg-gradient-to-r from-green-600 to-emerald-700 text-white hover:from-green-700 hover:to-emerald-800 shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
+                              }`}
+                            >
+                              {isVerifyingOtp ? (
+                                <>
+                                  <svg
+                                    className="animate-spin h-4 w-4 text-white"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <circle
+                                      className="opacity-25"
+                                      cx="12"
+                                      cy="12"
+                                      r="10"
+                                      stroke="currentColor"
+                                      strokeWidth="4"
+                                    />
+                                    <path
+                                      className="opacity-75"
+                                      fill="currentColor"
+                                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                                    />
+                                  </svg>
+                                  <span>Verifying...</span>
+                                </>
+                              ) : (
+                                <>
+                                  <svg
+                                    className="w-4 h-4"
+                                    fill="currentColor"
+                                    viewBox="0 0 20 20"
+                                  >
+                                    <path
+                                      fillRule="evenodd"
+                                      d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                                      clipRule="evenodd"
+                                    />
+                                  </svg>
+                                  <span>Verify OTP</span>
+                                </>
+                              )}
+                            </button>
+                          </div>
+
+                          {otpError && (
+                            <div
+                              className={`mt-4 flex items-center space-x-2 px-4 py-3 rounded-lg text-sm font-medium ${
+                                otpError.includes("successfully")
+                                  ? "bg-green-100 text-green-800 border border-green-200"
+                                  : "bg-red-100 text-red-800 border border-red-200"
+                              }`}
+                            >
+                              {otpError.includes("successfully") ? (
+                                <svg
+                                  className="w-5 h-5 text-green-600 flex-shrink-0"
+                                  fill="currentColor"
+                                  viewBox="0 0 20 20"
+                                >
+                                  <path
+                                    fillRule="evenodd"
+                                    d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                                    clipRule="evenodd"
+                                  />
+                                </svg>
+                              ) : (
+                                <svg
+                                  className="w-5 h-5 text-red-600 flex-shrink-0"
+                                  fill="currentColor"
+                                  viewBox="0 0 20 20"
+                                >
+                                  <path
+                                    fillRule="evenodd"
+                                    d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+                                    clipRule="evenodd"
+                                  />
+                                </svg>
+                              )}
+                              <span>{otpError}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Date of Birth - Enhanced */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label
+                          htmlFor="dob"
+                          className="block text-sm font-semibold text-gray-800"
+                        >
+                          Date of Birth
+                        </label>
+                      </div>
+                      <div className="relative group">
+                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                          <svg
+                            className="w-5 h-5 text-gray-400"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth="1.5"
+                              d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                            />
+                          </svg>
+                        </div>
+                        <input
+                          type="date"
+                          id="dob"
+                          name="dob"
+                          value={formData.dob}
+                          onChange={handleChange}
+                          onBlur={handleBlur}
+                          className={`pl-10 w-full px-4 py-3.5 border rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 ${
+                            touched.dob && errors.dob
+                              ? "border-red-400 bg-red-50/50"
+                              : "border-gray-300 hover:border-gray-400 focus:shadow-lg"
+                          }`}
+                        />
+                      </div>
+                      {touched.dob && errors.dob && (
+                        <div className="flex items-center space-x-2 text-red-600 text-sm font-medium bg-red-50 px-3 py-2 rounded-lg">
+                          <svg
+                            className="w-4 h-4 flex-shrink-0"
+                            fill="currentColor"
+                            viewBox="0 0 20 20"
+                          >
+                            <path
+                              fillRule="evenodd"
+                              d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+                              clipRule="evenodd"
+                            />
+                          </svg>
+                          <span>{errors.dob}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Gender - Enhanced */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label
+                          htmlFor="gender"
+                          className="block text-sm font-semibold text-gray-800"
+                        >
+                          Gender
+                        </label>
+                      </div>
+                      <div className="relative group">
+                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                          <svg
+                            className="w-5 h-5 text-gray-400"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth="1.5"
+                              d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13 0h-5m0 0V8m0 4h5"
+                            />
+                          </svg>
+                        </div>
+                        <select
+                          id="gender"
+                          name="gender"
+                          value={formData.gender}
+                          onChange={handleChange}
+                          onBlur={handleBlur}
+                          className={`pl-10 w-full px-4 py-3.5 border rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 appearance-none ${
+                            touched.gender && errors.gender
+                              ? "border-red-400 bg-red-50/50"
+                              : "border-gray-300 hover:border-gray-400 focus:shadow-lg"
+                          }`}
+                        >
+                          <option value="" className="text-gray-400">
+                            Select your gender
+                          </option>
+                          <option value="male">Male</option>
+                          <option value="female">Female</option>
+                          <option value="other">Prefer not to say</option>
+                        </select>
+                        <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                          <svg
+                            className="w-5 h-5 text-gray-400"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth="2"
+                              d="M19 9l-7 7-7-7"
+                            />
+                          </svg>
+                        </div>
+                      </div>
+                      {touched.gender && errors.gender && (
+                        <div className="flex items-center space-x-2 text-red-600 text-sm font-medium bg-red-50 px-3 py-2 rounded-lg">
+                          <svg
+                            className="w-4 h-4 flex-shrink-0"
+                            fill="currentColor"
+                            viewBox="0 0 20 20"
+                          >
+                            <path
+                              fillRule="evenodd"
+                              d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+                              clipRule="evenodd"
+                            />
+                          </svg>
+                          <span>{errors.gender}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Occupation - Enhanced */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label
+                          htmlFor="occupation"
+                          className="block text-sm font-semibold text-gray-800"
+                        >
+                          Occupation
+                        </label>
+                      </div>
+                      <div className="relative group">
+                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none transition-transform duration-200 group-focus-within:scale-110">
+                          <svg
+                            className="w-5 h-5 text-gray-400"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth="1.5"
+                              d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+                            />
+                          </svg>
+                        </div>
+                        <input
+                          type="text"
+                          id="occupation"
+                          name="occupation"
+                          value={formData.occupation}
+                          onChange={handleChange}
+                          onBlur={handleBlur}
+                          className={`pl-10 w-full px-4 py-3.5 border rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 ${
+                            touched.occupation && errors.occupation
+                              ? "border-red-400 bg-red-50/50"
+                              : "border-gray-300 hover:border-gray-400 focus:shadow-lg"
+                          }`}
+                          placeholder="e.g., Software Engineer"
+                        />
+                      </div>
+                      {touched.occupation && errors.occupation && (
+                        <div className="flex items-center space-x-2 text-red-600 text-sm font-medium bg-red-50 px-3 py-2 rounded-lg">
+                          <svg
+                            className="w-4 h-4 flex-shrink-0"
+                            fill="currentColor"
+                            viewBox="0 0 20 20"
+                          >
+                            <path
+                              fillRule="evenodd"
+                              d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+                              clipRule="evenodd"
+                            />
+                          </svg>
+                          <span>{errors.occupation}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Phone Number - Enhanced */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label
+                          htmlFor="phoneNumber"
+                          className="block text-sm font-semibold text-gray-800"
+                        >
+                          Phone Number
+                        </label>
+                      </div>
+                      <div className="relative group">
+                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none transition-transform duration-200 group-focus-within:scale-110">
+                          <svg
+                            className="w-5 h-5 text-gray-400"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth="1.5"
+                              d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"
+                            />
+                          </svg>
+                        </div>
+                        <input
+                          type="tel"
+                          id="phoneNumber"
+                          name="phoneNumber"
+                          value={formData.phoneNumber}
+                          onChange={handleChange}
+                          onBlur={handleBlur}
+                          className={`pl-10 w-full px-4 py-3.5 border rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 ${
+                            touched.phoneNumber && errors.phoneNumber
+                              ? "border-red-400 bg-red-50/50"
+                              : "border-gray-300 hover:border-gray-400 focus:shadow-lg"
+                          }`}
+                          placeholder="+1 (555) 123-4567"
+                        />
+                      </div>
+                      {touched.phoneNumber && errors.phoneNumber && (
+                        <div className="flex items-center space-x-2 text-red-600 text-sm font-medium bg-red-50 px-3 py-2 rounded-lg">
+                          <svg
+                            className="w-4 h-4 flex-shrink-0"
+                            fill="currentColor"
+                            viewBox="0 0 20 20"
+                          >
+                            <path
+                              fillRule="evenodd"
+                              d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+                              clipRule="evenodd"
+                            />
+                          </svg>
+                          <span>{errors.phoneNumber}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* ID Card - Enhanced */}
+                    <div className="lg:col-span-2 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label
+                          htmlFor="idCard"
+                          className="block text-sm font-semibold text-gray-800"
+                        >
+                          ID Card Number
+                        </label>
+                      </div>
+                      <div className="relative group">
+                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none transition-transform duration-200 group-focus-within:scale-110">
+                          <svg
+                            className="w-5 h-5 text-gray-400"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth="1.5"
+                              d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2M15 11h3m-3 4h2"
+                            />
+                          </svg>
+                        </div>
+                        <input
+                          type="text"
+                          id="idCard"
+                          name="idCard"
+                          value={formData.idCard}
+                          onChange={handleChange}
+                          onBlur={handleBlur}
+                          className={`pl-10 w-full px-4 py-3.5 border rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 ${
+                            touched.idCard && errors.idCard
+                              ? "border-red-400 bg-red-50/50"
+                              : "border-gray-300 hover:border-gray-400 focus:shadow-lg"
+                          }`}
+                          placeholder="Enter your ID card number"
+                        />
+                      </div>
+                      {touched.idCard && errors.idCard && (
+                        <div className="flex items-center space-x-2 text-red-600 text-sm font-medium bg-red-50 px-3 py-2 rounded-lg">
+                          <svg
+                            className="w-4 h-4 flex-shrink-0"
+                            fill="currentColor"
+                            viewBox="0 0 20 20"
+                          >
+                            <path
+                              fillRule="evenodd"
+                              d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+                              clipRule="evenodd"
+                            />
+                          </svg>
+                          <span>{errors.idCard}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Password - Enhanced */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label
+                          htmlFor="password"
+                          className="block text-sm font-semibold text-gray-800"
+                        >
+                          Password
+                        </label>
+                      </div>
+                      <div className="relative group">
+                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                          <svg
+                            className="w-5 h-5 text-gray-400"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth="1.5"
+                              d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+                            />
+                          </svg>
+                        </div>
+                        <input
+                          type={showPassword ? "text" : "password"}
+                          id="password"
+                          name="password"
+                          value={formData.password}
+                          onChange={handleChange}
+                          onBlur={handleBlur}
+                          className={`pl-10 pr-12 w-full px-4 py-3.5 border rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 ${
+                            touched.password && errors.password
+                              ? "border-red-400 bg-red-50/50"
+                              : "border-gray-300 hover:border-gray-400 focus:shadow-lg"
+                          }`}
+                          placeholder="Create a strong password"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 hover:text-gray-700 transition-colors"
+                        >
+                          {showPassword ? (
+                            <svg
+                              className="w-5 h-5"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth="1.5"
+                                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                              />
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth="1.5"
+                                d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                              />
+                            </svg>
+                          ) : (
+                            <svg
+                              className="w-5 h-5"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth="1.5"
+                                d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L6.59 6.59m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"
+                              />
+                            </svg>
+                          )}
+                        </button>
+                      </div>
+                      {touched.password && errors.password && (
+                        <div className="flex items-center space-x-2 text-red-600 text-sm font-medium bg-red-50 px-3 py-2 rounded-lg">
+                          <svg
+                            className="w-4 h-4 flex-shrink-0"
+                            fill="currentColor"
+                            viewBox="0 0 20 20"
+                          >
+                            <path
+                              fillRule="evenodd"
+                              d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+                              clipRule="evenodd"
+                            />
+                          </svg>
+                          <span>{errors.password}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Confirm Password - Enhanced */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label
+                          htmlFor="confirmPassword"
+                          className="block text-sm font-semibold text-gray-800"
+                        >
+                          Confirm Password
+                        </label>
+                      </div>
+                      <div className="relative group">
+                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                          <svg
+                            className="w-5 h-5 text-gray-400"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth="1.5"
+                              d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
+                            />
+                          </svg>
+                        </div>
+                        <input
+                          type={showConfirmPassword ? "text" : "password"}
+                          id="confirmPassword"
+                          name="confirmPassword"
+                          value={formData.confirmPassword}
+                          onChange={handleChange}
+                          onBlur={handleBlur}
+                          className={`pl-10 pr-12 w-full px-4 py-3.5 border rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 ${
+                            touched.confirmPassword && errors.confirmPassword
+                              ? "border-red-400 bg-red-50/50"
+                              : formData.password ===
+                                  formData.confirmPassword &&
+                                formData.confirmPassword
+                              ? "border-green-400 bg-green-50/30"
+                              : "border-gray-300 hover:border-gray-400 focus:shadow-lg"
+                          }`}
+                          placeholder="Confirm your password"
+                        />
+                        {formData.password === formData.confirmPassword &&
+                          formData.confirmPassword && (
+                            <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
+                              <div className="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center">
+                                <svg
+                                  className="w-4 h-4 text-green-600"
+                                  fill="currentColor"
+                                  viewBox="0 0 20 20"
+                                >
+                                  <path
+                                    fillRule="evenodd"
+                                    d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                                    clipRule="evenodd"
+                                  />
+                                </svg>
+                              </div>
+                            </div>
+                          )}
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setShowConfirmPassword(!showConfirmPassword)
+                          }
+                          className={`absolute inset-y-0 right-0 ${
+                            formData.password === formData.confirmPassword &&
+                            formData.confirmPassword
+                              ? "pr-10"
+                              : "pr-3"
+                          } flex items-center text-gray-500 hover:text-gray-700 transition-colors`}
+                        >
+                          {showConfirmPassword ? (
+                            <svg
+                              className="w-5 h-5"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth="1.5"
+                                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                              />
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth="1.5"
+                                d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                              />
+                            </svg>
+                          ) : (
+                            <svg
+                              className="w-5 h-5"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth="1.5"
+                                d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L6.59 6.59m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"
+                              />
+                            </svg>
+                          )}
+                        </button>
+                      </div>
+                      {touched.confirmPassword && errors.confirmPassword && (
+                        <div className="flex items-center space-x-2 text-red-600 text-sm font-medium bg-red-50 px-3 py-2 rounded-lg">
+                          <svg
+                            className="w-4 h-4 flex-shrink-0"
+                            fill="currentColor"
+                            viewBox="0 0 20 20"
+                          >
+                            <path
+                              fillRule="evenodd"
+                              d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+                              clipRule="evenodd"
+                            />
+                          </svg>
+                          <span>{errors.confirmPassword}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Next Button - Enhanced */}
+                  <div className="pt-8 border-t border-gray-200 mt-10">
+                    <div className="flex items-center justify-between">
+                      <div className="text-sm text-gray-500">
+                        All fields marked with{" "}
+                        <span className="text-red-500">*</span> are required
+                      </div>
+                      <button
+                        type="submit"
+                        className="group px-8 py-4 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all duration-200 font-semibold shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 flex items-center space-x-3"
+                      >
+                        <span>Continue to Services</span>
+                        <svg
+                          className="w-5 h-5 transform group-hover:translate-x-1 transition-transform duration-200"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth="2"
+                            d="M13 7l5 5m0 0l-5 5m5-5H6"
+                          />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                </form>
+              </>
+            )}
+
+            {currentStep === 2 && (
+              <>
+                <div className="mb-8">
+                  <h3 className="text-lg font-semibold text-gray-800 mb-2">
+                    Service Selection
+                  </h3>
+                  <p className="text-gray-600">
+                    Choose the services you need for your organization
+                  </p>
+                </div>
+
+                <form onSubmit={handleSubmit} className="space-y-8">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+  {/* Service Cards */}
+  {[
+    {
+      id: "digitalRegistration",
+      name: "Digital Registration",
+      description: "Online form submissions and e-registration",
+      icon: "📝",
+      borderColor: "border-blue-500",
+      checkColor: "text-blue-500",
+      bgColor: "bg-blue-50",
+      hoverBorder: "hover:border-blue-300",
+    },
+    {
+      id: "foodManagement",
+      name: "Food Management",
+      description: "Manage menus, orders, and operations",
+      icon: "🍽️",
+      borderColor: "border-green-500",
+      checkColor: "text-green-500",
+      bgColor: "bg-green-50",
+      hoverBorder: "hover:border-green-300",
+    },
+    {
+      id: "electionSystem",
+      name: "Election System",
+      description: "Conduct polls and voting processes",
+      icon: "🗳️",
+      borderColor: "border-purple-500",
+      checkColor: "text-purple-500",
+      bgColor: "bg-purple-50",
+      hoverBorder: "hover:border-purple-300",
+    },
+    {
+      id: "luckydraw",
+      name: "Lucky Draw",
+      description: "Create raffles and prize distributions",
+      icon: "🎁",
+      borderColor: "border-pink-500",
+      checkColor: "text-pink-500",
+      bgColor: "bg-pink-50",
+      hoverBorder: "hover:border-pink-300",
+    },
+    {
+      id: "dashboard",
+      name: "Dashboard",
+      description: "Analytics and data visualization",
+      icon: "📊",
+      borderColor: "border-orange-500",
+      checkColor: "text-orange-500",
+      bgColor: "bg-orange-50",
+      hoverBorder: "hover:border-orange-300",
+    },
+  ].map((service) => (
+    <div
+      key={service.id}
+      className={`relative group cursor-pointer transition-all duration-300`}
+      onClick={() => handleServiceChange(service.id)}
+    >
+      <div
+        className={`relative rounded-xl overflow-hidden transition-all duration-300 ${
+          selectedServices[service.id]
+            ? 'scale-[1.02] shadow-lg'
+            : 'scale-100 shadow-sm hover:shadow-md'
+        }`}
+      >
+        {/* Main Card Content */}
+        <div
+          className={`relative p-6 bg-white border-2 transition-all duration-300 ${
+            selectedServices[service.id]
+              ? `${service.borderColor} ${service.bgColor}`
+              : `border-gray-200 group-hover:border-gray-300`
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            {/* Icon Section */}
+            <div className="flex items-center space-x-4">
+              <div
+                className={`relative w-12 h-12 rounded-lg flex items-center justify-center text-xl transition-all duration-300 ${
+                  selectedServices[service.id]
+                    ? `${service.bgColor} ${service.checkColor}`
+                    : 'bg-gray-50 text-gray-600 group-hover:bg-gray-100'
+                }`}
+              >
+                <span>{service.icon}</span>
+              </div>
+              
+              {/* Text Content */}
+              <div className="flex-1">
+                <h4 className={`font-medium transition-colors duration-300 ${
+                  selectedServices[service.id] ? 'text-gray-900' : 'text-gray-800'
+                }`}>
+                  {service.name}
+                </h4>
+                <p className={`text-sm transition-colors duration-300 ${
+                  selectedServices[service.id] ? 'text-gray-700' : 'text-gray-600'
+                } mt-1`}>
+                  {service.description}
                 </p>
               </div>
-
-              <div className="space-y-4">
-                {/* Digital Registration */}
-                <div className="border border-gray-200 rounded-lg p-4 hover:border-blue-300 transition duration-200">
-                  <div className="flex items-center">
-                    <input
-                      type="checkbox"
-                      id="digitalRegistration"
-                      checked={selectedServices.digitalRegistration}
-                      onChange={() =>
-                        handleServiceChange("digitalRegistration")
-                      }
-                      className="h-6 w-6 text-blue-600 rounded focus:ring-blue-500"
-                    />
-                    <label
-                      htmlFor="digitalRegistration"
-                      className="ml-3 flex items-center"
-                    >
-                      <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center mr-3">
-                        <span className="text-blue-600 text-xl">📝</span>
-                      </div>
-                      <div>
-                        <span className="block font-medium text-gray-900">
-                          Digital Registration
-                        </span>
-                        <span className="block text-sm text-gray-500">
-                          Online form submissions, digital applications, and
-                          e-registration
-                        </span>
-                      </div>
-                    </label>
-                  </div>
-                </div>
-
-                {/* Food Management Service */}
-                <div className="border border-gray-200 rounded-lg p-4 hover:border-blue-300 transition duration-200">
-                  <div className="flex items-center">
-                    <input
-                      type="checkbox"
-                      id="foodManagement"
-                      checked={selectedServices.foodManagement}
-                      onChange={() => handleServiceChange("foodManagement")}
-                      className="h-5 w-5 text-blue-600 rounded focus:ring-blue-500"
-                    />
-                    <label
-                      htmlFor="foodManagement"
-                      className="ml-3 flex items-center"
-                    >
-                      <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center mr-3">
-                        <span className="text-green-600 text-xl">🍽️</span>
-                      </div>
-                      <div>
-                        <span className="block font-medium text-gray-900">
-                          Food Management
-                        </span>
-                        <span className="block text-sm text-gray-500">
-                          Manage menus, orders, and restaurant operations
-                        </span>
-                      </div>
-                    </label>
-                  </div>
-                </div>
-
-                {/* Election System Service */}
-                <div className="border border-gray-200 rounded-lg p-4 hover:border-blue-300 transition duration-200">
-                  <div className="flex items-center">
-                    <input
-                      type="checkbox"
-                      id="electionSystem"
-                      checked={selectedServices.electionSystem}
-                      onChange={() => handleServiceChange("electionSystem")}
-                      className="h-5 w-5 text-blue-600 rounded focus:ring-blue-500"
-                    />
-                    <label
-                      htmlFor="electionSystem"
-                      className="ml-3 flex items-center"
-                    >
-                      <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center mr-3">
-                        <span className="text-blue-600 text-xl">🗳️</span>
-                      </div>
-                      <div>
-                        <span className="block font-medium text-gray-900">
-                          Election System
-                        </span>
-                        <span className="block text-sm text-gray-500">
-                          Conduct polls, surveys, and voting processes
-                        </span>
-                      </div>
-                    </label>
-                  </div>
-                </div>
-
-                {/* Lucky Draw Service */}
-                <div className="border border-gray-200 rounded-lg p-4 hover:border-blue-300 transition duration-200">
-                  <div className="flex items-center">
-                    <input
-                      type="checkbox"
-                      id="luckydraw"
-                      checked={selectedServices.luckydraw}
-                      onChange={() => handleServiceChange("luckydraw")}
-                      className="h-5 w-5 text-blue-600 rounded focus:ring-blue-500"
-                    />
-                    <label
-                      htmlFor="luckydraw"
-                      className="ml-3 flex items-center"
-                    >
-                      <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center mr-3">
-                        <span className="text-purple-600 text-xl">🎁</span>
-                      </div>
-                      <div>
-                        <span className="block font-medium text-gray-900">
-                          Lucky Draw
-                        </span>
-                        <span className="block text-sm text-gray-500">
-                          Create raffles, contests, and prize distributions
-                        </span>
-                      </div>
-                    </label>
-                  </div>
-                </div>
-
-                {/* Dashboard Service */}
-                <div className="border border-gray-200 rounded-lg p-4 hover:border-blue-300 transition duration-200">
-                  <div className="flex items-center">
-                    <input
-                      type="checkbox"
-                      id="dashboard"
-                      checked={selectedServices.dashboard}
-                      onChange={() => handleServiceChange("dashboard")}
-                      className="h-5 w-5 text-blue-600 rounded focus:ring-blue-500"
-                    />
-                    <label
-                      htmlFor="dashboard"
-                      className="ml-3 flex items-center"
-                    >
-                      <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center mr-3">
-                        <span className="text-orange-600 text-xl">📊</span>
-                      </div>
-                      <div>
-                        <span className="block font-medium text-gray-900">
-                          Dashboard
-                        </span>
-                        <span className="block text-sm text-gray-500">
-                          Analytics, reports, and data visualization tools
-                        </span>
-                      </div>
-                    </label>
-                  </div>
-                </div>
-
-                {/* Service Summary */}
-                <div className="mt-6 p-4 bg-blue-50 rounded-lg">
-                  <h3 className="font-medium text-blue-900 mb-2">
-                    Selected Services
-                  </h3>
-                  <div className="space-y-1">
-                    {Object.entries(selectedServices).map(
-                      ([key, value]) =>
-                        value && (
-                          <div key={key} className="flex items-center text-sm">
-                            <span className="w-2 h-2 bg-blue-500 rounded-full mr-2"></span>
-                            <span className="capitalize">
-                              {key.replace(/([A-Z])/g, " $1").trim()}
-                            </span>
-                          </div>
-                        )
-                    )}
-                    {Object.values(selectedServices).filter(Boolean).length ===
-                      0 && (
-                      <p className="text-gray-500 text-sm italic">
-                        No services selected
-                      </p>
-                    )}
-                  </div>
-                </div>
-
-                {errors.services && (
-                  <div className="text-red-500 text-sm mt-2">
-                    {errors.services}
-                  </div>
-                )}
-              </div>
             </div>
+            
+            {/* Checkbox - Professional Outline */}
+            <div className="relative">
+              <div
+                className={`relative w-5 h-5 rounded border-2 flex items-center justify-center transition-all duration-300 ${
+                  selectedServices[service.id]
+                    ? `${service.borderColor} bg-white`
+                    : 'border-gray-300 bg-white group-hover:border-gray-400'
+                }`}
+              >
+                {/* Checkmark */}
+                <svg
+                  className={`w-3 h-3 transition-all duration-300 ${
+                    selectedServices[service.id]
+                      ? 'opacity-100 scale-100'
+                      : 'opacity-0 scale-50'
+                  } ${service.checkColor}`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  xmlns="http://www.w3.org/2000/svg"
+                  strokeWidth="3"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M5 13l4 4L19 7"
+                  />
+                </svg>
+              </div>
+              
+              {/* Subtle Ring Effect on Selection */}
+              {selectedServices[service.id] && (
+                <div
+                  className={`absolute -inset-1 rounded border ${service.borderColor.replace('500', '200')} animate-pulse`}
+                  style={{ animationDelay: '100ms' }}
+                />
+              )}
+            </div>
+          </div>
+          
+          {/* Subtle Bottom Indicator */}
+          <div
+            className={`absolute bottom-0 left-0 right-0 h-0.5 transition-all duration-300 ${
+              selectedServices[service.id]
+                ? `${service.bgColor.replace('50', '400')}`
+                : 'bg-transparent'
+            }`}
+          />
+        </div>
+        
+        {/* Hover Overlay - Very Subtle */}
+        <div
+          className={`absolute inset-0 rounded-xl transition-opacity duration-300 ${
+            selectedServices[service.id]
+              ? `opacity-5 ${service.bgColor.replace('50', '100')}`
+              : 'opacity-0 group-hover:opacity-5 group-hover:bg-gray-100'
+          }`}
+        />
+      </div>
+      
+      {/* Selection Indicator - Professional Badge */}
+      {selectedServices[service.id] && (
+        <div
+          className={`absolute -top-1 -right-1 w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium ${service.borderColor} bg-white border shadow-sm`}
+        >
+          <svg
+            className={`w-3 h-3 ${service.checkColor}`}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+            xmlns="http://www.w3.org/2000/svg"
+            strokeWidth="3"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M5 13l4 4L19 7"
+            />
+          </svg>
+        </div>
+      )}
+    </div>
+  ))}
+</div>
+
+                  {/* Selected Services Summary */}
+                  <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-100">
+                    <h4 className="font-semibold text-gray-800 mb-4">
+                      Selected Services
+                    </h4>
+                    <div className="flex flex-wrap gap-2">
+                      {Object.entries(selectedServices).map(
+                        ([key, value]) =>
+                          value && (
+                            <span
+                              key={key}
+                              className="px-4 py-2 bg-white border border-blue-200 rounded-lg text-sm text-blue-700 font-medium flex items-center space-x-2 shadow-sm"
+                            >
+                              <span>✓</span>
+                              <span>
+                                {key.replace(/([A-Z])/g, " $1").trim()}
+                              </span>
+                            </span>
+                          )
+                      )}
+                      {Object.values(selectedServices).filter(Boolean)
+                        .length === 0 && (
+                        <div className="text-gray-500 text-sm italic">
+                          No services selected yet
+                        </div>
+                      )}
+                    </div>
+                    <div className="mt-4 text-sm text-gray-600">
+                      Total selected:{" "}
+                      <span className="font-semibold">
+                        {Object.values(selectedServices).filter(Boolean).length}{" "}
+                        of 5 services
+                      </span>
+                    </div>
+                  </div>
+
+                  {errors.services && (
+                    <div className="text-red-500 text-sm flex items-center space-x-2 bg-red-50 p-3 rounded-lg border border-red-200">
+                      <span>⚠️</span>
+                      <span>{errors.services}</span>
+                    </div>
+                  )}
+
+                  {/* Navigation Buttons */}
+                  <div className="flex justify-between pt-8 border-t border-gray-200">
+                    <button
+                      type="button"
+                      onClick={handlePreviousStep}
+                      className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition duration-200 font-medium flex items-center space-x-2"
+                    >
+                      <span>←</span>
+                      <span>Back to Details</span>
+                    </button>
+
+                    <button
+                      type="submit"
+                      disabled={isSubmitting}
+                      className={`px-8 py-3 rounded-lg text-white font-medium transition duration-200 flex items-center space-x-2 ${
+                        isSubmitting
+                          ? "bg-gray-400 cursor-not-allowed"
+                          : "bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 shadow hover:shadow-md"
+                      }`}
+                    >
+                      {isSubmitting ? (
+                        <>
+                          <svg
+                            className="animate-spin h-5 w-5 text-white"
+                            xmlns="http://www.w3.org/2000/svg"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                          >
+                            <circle
+                              className="opacity-25"
+                              cx="12"
+                              cy="12"
+                              r="10"
+                              stroke="currentColor"
+                              strokeWidth="4"
+                            ></circle>
+                            <path
+                              className="opacity-75"
+                              fill="currentColor"
+                              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                            ></path>
+                          </svg>
+                          <span>Processing...</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>Complete Registration</span>
+                          <span>✓</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </form>
+              </>
+            )}
           </div>
         </div>
       </div>
 
       <style jsx>{`
-        @keyframes bounce-in {
-          0% {
-            transform: scale(0.3);
-            opacity: 0;
-          }
-          50% {
-            transform: scale(1.05);
-          }
-          70% {
-            transform: scale(0.9);
-          }
-          100% {
-            transform: scale(1);
-            opacity: 1;
-          }
-        }
         @keyframes fade-in-up {
           0% {
-            transform: translateY(20px);
             opacity: 0;
+            transform: translateY(10px);
           }
           100% {
-            transform: translateY(0);
             opacity: 1;
+            transform: translateY(0);
           }
         }
-        .animate-bounce-in {
-          animation: bounce-in 0.6s ease-out;
+        @keyframes progress {
+          0% {
+            width: 0%;
+          }
+          100% {
+            width: 100%;
+          }
         }
         .animate-fade-in-up {
-          animation: fade-in-up 0.6s ease-out forwards;
+          animation: fade-in-up 0.5s ease-out forwards;
           opacity: 0;
         }
-        .animate-pulse {
-          animation: pulse 2s infinite;
+        .animate-progress {
+          animation: progress 3s ease-in-out forwards;
         }
       `}</style>
     </div>

@@ -524,7 +524,7 @@ const ParticipantDashboard = () => {
                   `/${adminId}/candidate-dashboard/${electionDocumentId}`
                 )
               }
-              className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white rounded-xl border border-gray-200 hover:bg-gray-50 transition-all duration-200 shadow-[0_1px_3px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_8px_rgba(0,0,0,0.05)]"
+              className="flex items-center cursor-pointer gap-2 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white rounded-xl border border-gray-200 hover:bg-gray-50 transition-all duration-200 shadow-[0_1px_3px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_8px_rgba(0,0,0,0.05)]"
             >
               <ArrowLeft className="w-4 h-4" />
               Back to Dashboard
@@ -548,7 +548,7 @@ const ParticipantDashboard = () => {
 
               <button
                 onClick={handleVotingPageClick}
-                className="px-5 py-2.5 border border-green-200 text-green-700 rounded-xl
+                className="px-5 cursor-pointer transition-all duration-300 hover:scale-105 py-1.5 border border-green-200 text-green-700 rounded-xl
              hover:bg-green-50 transition-all duration-200 flex items-center gap-2
              text-sm font-medium bg-white shadow"
               >
@@ -582,7 +582,7 @@ const ParticipantDashboard = () => {
                       showAlertMessage("Failed to copy link", "error");
                     });
                 }}
-                className="px-5 py-2.5 border border-green-200 text-green-700 rounded-xl hover:bg-green-50 transition-all duration-200 flex items-center gap-2 text-sm font-medium bg-white shadow-[0_1px_3px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_8px_rgba(0,0,0,0.05)]"
+                className="px-5 py-2.5 cursor-pointer transition-all duration-300 hover:scale-105 border border-green-200 text-green-700 rounded-xl hover:bg-green-50 transition-all duration-200 flex items-center gap-2 text-sm font-medium bg-white shadow-[0_1px_3px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_8px_rgba(0,0,0,0.05)]"
               >
                 <Share2 className="w-4 h-4" />
                 Share Election Form
@@ -591,7 +591,7 @@ const ParticipantDashboard = () => {
               {/* Existing Export Data Button */}
               <button
                 onClick={exportParticipantsToExcel}
-                className="px-5 py-2.5 border border-gray-200 text-gray-700 rounded-xl
+                className="px-5 py-2.5 cursor-pointer  hover:scale-105 border border-gray-200 text-gray-700 rounded-xl
   hover:bg-gray-50 transition-all duration-200 flex items-center gap-2
   text-sm font-medium bg-white shadow-[0_1px_3px_rgba(0,0,0,0.04)]
   hover:shadow-[0_4px_8px_rgba(0,0,0,0.05)]"

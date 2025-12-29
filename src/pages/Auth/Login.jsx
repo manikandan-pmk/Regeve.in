@@ -81,10 +81,10 @@ const Login = ({ onClose, onSwitchToRegister, onLoginSuccess }) => {
         localStorage.setItem("jwt", data.jwt);
         localStorage.setItem("adminId", adminId);
 
-        // optional profile (SAFE)
         localStorage.setItem(
           "userProfile",
           JSON.stringify({
+            name: data.admin?.name || "",
             email: data.user?.email,
             userId: data.user?.id,
             adminId,

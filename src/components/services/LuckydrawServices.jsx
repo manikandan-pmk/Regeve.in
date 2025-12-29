@@ -1,8 +1,10 @@
  // components/LuckyDrawSystemPage.jsx
 import React from 'react';
 import { Gift, Users, Shield, Award, Play, CheckCircle } from 'lucide-react';
+import Navbar from '../Navbar';
+import Footer from '../Footer';
 
-const LuckydrawFooter = () => {
+const LuckydrawServices = () => {
   const features = [
     {
       icon: <Users className="w-6 h-6" />,
@@ -45,6 +47,8 @@ const LuckydrawFooter = () => {
   ];
 
   return (
+  <>
+  <Navbar/>
     <div className="min-h-screen bg-white pt-24 py-12">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
         
@@ -191,7 +195,9 @@ const LuckydrawFooter = () => {
 
       </div>
     </div>
+    <Footer/>
+    </>
   );
 };
 
-export default LuckydrawFooter;
+export default LuckydrawServices;

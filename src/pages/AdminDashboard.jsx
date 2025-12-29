@@ -675,7 +675,7 @@ export default function AdminDashboard() {
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={handleLogout}
-                className="px-4 py-2.5 text-sm font-medium text-white bg-gradient-to-r from-red-500 to-rose-600 rounded-xl hover:shadow-lg transition-all duration-300 flex items-center space-x-2 shadow-sm"
+                className="px-4 py-2.5 cursor-pointer text-sm font-medium text-white bg-gradient-to-r from-red-500 to-rose-600 rounded-xl hover:shadow-lg transition-all duration-300 flex items-center space-x-2 shadow-sm"
               >
                 <FiLogOut className="w-4 h-4" />
                 <span>Logout</span>
@@ -713,7 +713,7 @@ export default function AdminDashboard() {
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={handleRefresh}
-                className="px-4 py-2.5 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors flex items-center space-x-2 shadow-sm"
+                className="px-4 py-2.5 cursor-pointer bg-white border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors flex items-center space-x-2 shadow-sm"
               >
                 <FiRefreshCw className="w-4 h-4" />
                 <span>Refresh</span>
@@ -723,7 +723,7 @@ export default function AdminDashboard() {
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={handleUpgradeAccess}
-                className="px-4 py-2.5 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl hover:shadow-lg transition-all duration-300 flex items-center space-x-2 shadow-lg"
+                className="px-4 py-2.5 cursor-pointer bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl hover:shadow-lg transition-all duration-300 flex items-center space-x-2 shadow-lg"
               >
                 <FiStar className="w-4 h-4" />
                 <span>Upgrade</span>
@@ -771,7 +771,7 @@ export default function AdminDashboard() {
                 key={tab}
                 onClick={() => setActiveTab(tab)}
                 className={`
-                  px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300
+                  px-4 py-2 rounded-lg cursor-pointer text-sm font-medium transition-all duration-300
                   ${
                     activeTab === tab
                       ? "bg-white text-gray-900 shadow-sm"
@@ -941,7 +941,7 @@ export default function AdminDashboard() {
                   <p className="text-gray-600 text-sm mb-4">
                     24/7 event support and technical assistance
                   </p>
-                  <button className="w-full px-4 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold rounded-xl hover:shadow-lg transition-all duration-300 shadow-md">
+                  <button className="w-full cursor-pointer px-4 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold rounded-xl hover:shadow-lg transition-all duration-300 shadow-md">
                     Contact Support
                   </button>
                 </div>
@@ -1007,13 +1007,13 @@ export default function AdminDashboard() {
               </p>
 
               <div className="space-y-3">
-                <button className="w-full py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl font-semibold">
+                <button className="w-full cursor-pointer py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl font-semibold">
                   Contact Support
                 </button>
 
                 <button
                   onClick={() => setShowUpgradeModal(false)}
-                  className="w-full py-3 bg-gray-100 rounded-xl text-gray-700"
+                  className="w-full py-3 cursor-pointer bg-gray-100 rounded-xl text-gray-700"
                 >
                   Maybe Later
                 </button>

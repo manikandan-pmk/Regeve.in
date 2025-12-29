@@ -66,7 +66,7 @@ const ElectionHome = () => {
 
   const handleBack = () => {
     // Go back if possible, otherwise fallback to admin home
-      navigate(`/${adminId}/admindashboard`);
+    navigate(`/${adminId}/admindashboard`);
   };
 
   const handleCreateElection = async () => {
@@ -188,7 +188,7 @@ const ElectionHome = () => {
           <header className="mb-16 relative">
             <button
               onClick={handleBack}
-              className="absolute left-0 -top-12 flex items-center gap-2
+              className="absolute cursor-pointer left-0 -top-12 flex items-center gap-2
       text-slate-600 hover:text-blue-600 font-semibold
       transition-colors duration-200"
             >
@@ -222,7 +222,7 @@ const ElectionHome = () => {
             {/* Start New Election Button */}
             <button
               onClick={() => setShowCreatePopup(true)}
-              className="group bg-blue-600 text-white px-8 py-4 rounded-xl hover:bg-blue-700 transition-all duration-300 font-bold shadow-xl hover:shadow-2xl flex items-center gap-3 w-full sm:w-auto min-w-[240px] justify-center text-lg"
+              className="group cursor-pointer bg-blue-600 text-white px-8 py-4 rounded-xl hover:bg-blue-700 transition-all duration-300 font-bold shadow-xl hover:shadow-2xl flex items-center gap-3 w-full sm:w-auto min-w-[240px] justify-center text-lg"
             >
               <svg
                 className="w-5 h-5 group-hover:scale-110 transition-transform duration-300"
@@ -244,7 +244,7 @@ const ElectionHome = () => {
             <div className="relative w-full sm:w-auto min-w-[240px]">
               <button
                 onClick={() => setShowDropdown(!showDropdown)}
-                className="group bg-white text-slate-700 px-8 py-4 rounded-xl border border-slate-300 hover:border-blue-500 transition-all duration-300 font-bold shadow-lg hover:shadow-xl flex items-center gap-3 w-full justify-center text-lg"
+                className="group cursor-pointer bg-white text-slate-700 px-8 py-4 rounded-xl border border-slate-300 hover:border-blue-500 transition-all duration-300 font-bold shadow-lg hover:shadow-xl flex items-center gap-3 w-full justify-center text-lg"
               >
                 Select Election Type
                 <svg
@@ -285,7 +285,7 @@ const ElectionHome = () => {
                                 onClick={() =>
                                   handleSelectElectionType(category, type)
                                 }
-                                className="w-full px-4 py-3 text-left hover:bg-blue-50 transition-colors duration-200 text-sm text-slate-700 hover:text-blue-700 flex items-center gap-2"
+                                className="w-full cursor-pointer px-4 py-3 text-left hover:bg-blue-50 transition-colors duration-200 text-sm text-slate-700 hover:text-blue-700 flex items-center gap-2"
                                 role="menuitem"
                               >
                                 <span className="text-blue-500">•</span>
@@ -434,7 +434,7 @@ const ElectionHome = () => {
                             handleDeleteElection(election.documentId);
                           }}
                           title="Delete election"
-                          className="p-2 rounded-xl text-slate-400 hover:text-rose-500
+                          className="p-2 rounded-xl cursor-pointer text-slate-400 hover:text-rose-500
                          bg-gradient-to-b from-slate-50 to-white
                          border border-slate-200/60
                          hover:border-rose-200 hover:bg-gradient-to-b hover:from-rose-50 hover:to-white
@@ -591,7 +591,7 @@ const ElectionHome = () => {
                        transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/20 to-transparent"
                     />
 
-                    <div className="relative flex items-center justify-center space-x-2">
+                    <div className="relative cursor-pointer flex items-center justify-center space-x-2">
                       <span>Open Dashboard</span>
                       <svg
                         className="w-4 h-4 group-hover/btn:translate-x-1 transition-transform duration-300"
@@ -754,7 +754,7 @@ const ElectionHome = () => {
                 </button>
                 <button
                   onClick={handleStartSelectedElection}
-                  className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors duration-200 font-semibold text-base"
+                  className="flex-1 cursor-pointer px-4 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors duration-200 font-semibold text-base"
                 >
                   Start Election
                 </button>

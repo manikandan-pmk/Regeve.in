@@ -900,7 +900,7 @@ async function checkDuplicateUser(email, phone, whatsapp, idCard) {
                   <button
                     type="submit"
                     disabled={loading}
-                    className={`w-full py-4 px-6 rounded-xl font-semibold text-white text-base transition-all duration-300 shadow-md hover:shadow-lg ${
+                    className={`w-full cursor-pointer py-4 px-6 rounded-xl font-semibold text-white text-base transition-all duration-300 shadow-md hover:shadow-lg ${
                       loading
                         ? "bg-gradient-to-r from-gray-400 to-gray-500 cursor-not-allowed opacity-90"
                         : "bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800"
