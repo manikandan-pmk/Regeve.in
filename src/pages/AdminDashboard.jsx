@@ -347,7 +347,7 @@ export default function AdminDashboard() {
       title: "Lucky Draw",
       description: "Raffles, giveaways, and prize distribution management",
       color: "bg-gradient-to-r from-pink-500 to-rose-600",
-      route: "/luckydraw-dashboard",
+      route: "/LuckyDrawHome",
       dataKey: "Lucky Draw",
     },
     Dashboard: {

@@ -40,6 +40,7 @@ import AdminProtectedRoute from "./routes/AdminProtectedRoute";
 import LuckyDrawDashboard from "./pages/LuckyDraw/LuckyDrawDashboard";
 import RegistrationFormLuckydraw from "./pages/LuckyDraw/RegistrationFormLuckydraw";
 import EventGallery from "./pages/EventGallery";
+import LuckyDrawHome from "./pages/LuckyDraw/LuckyDrawHome";
 
 export default function App() {
   const location = useLocation();
@@ -67,7 +68,9 @@ export default function App() {
     location.pathname.startsWith("/member-details/") ||
     // admin dashboard
     location.pathname.endsWith("/admindashboard") ||
-    location.pathname.includes("/votingpage/");
+    location.pathname.includes("/votingpage/") ||
+    location.pathname.includes("/LuckyDrawHome");
+
 
   return (
     <div className="max-w-full overflow-x-hidden">
@@ -146,6 +149,10 @@ export default function App() {
         <Route
           path="/:adminId/votingpage/:electionDocumentId"
           element={<VotingPage />}
+        />
+        <Route
+          path="/:adminId/LuckyDrawHome"
+          element={<LuckyDrawHome />}
         />
 
         {/* ================= ADMIN DASHBOARD ================= */}

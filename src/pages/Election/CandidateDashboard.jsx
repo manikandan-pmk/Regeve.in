@@ -274,7 +274,7 @@ const CandidateDashboard = () => {
       }
 
       if (now >= end) {
-        setTimeLeft("Election Ended");
+
 
         if (!sessionStorage.getItem(END_KEY)) {
           sessionStorage.setItem(END_KEY, "true");
