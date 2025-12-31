@@ -37,10 +37,11 @@ import AdminDashboard from "./pages/AdminDashboard";
 import AdminProtectedRoute from "./routes/AdminProtectedRoute";
 
 //Luckydraw
-import LuckyDrawDashboard from "./pages/LuckyDraw/LuckyDrawDashboard";
+import LuckyDrawParticipantDashboard from "./pages/LuckyDraw/LuckyDrawParticipantDashboard";
 import RegistrationFormLuckydraw from "./pages/LuckyDraw/RegistrationFormLuckydraw";
 import EventGallery from "./pages/EventGallery";
 import LuckyDrawHome from "./pages/LuckyDraw/LuckyDrawHome";
+import LuckyDrawDashboard from "./pages/LuckyDraw/LuckyDrawDashboard";
 
 export default function App() {
   const location = useLocation();
@@ -70,7 +71,6 @@ export default function App() {
     location.pathname.endsWith("/admindashboard") ||
     location.pathname.includes("/votingpage/") ||
     location.pathname.includes("/LuckyDrawHome");
-
 
   return (
     <div className="max-w-full overflow-x-hidden">
@@ -119,11 +119,15 @@ export default function App() {
           }
         />
         <Route
-          path="/:adminId/luckydraw-dashboard"
+          path="/:adminId/luckydraw-dashboard/:luckydrawDocumentId"
           element={<LuckyDrawDashboard />}
         />
+         <Route
+          path="/:adminId/luckydraw-participant-dashboard/:luckydrawDocumentId"
+          element={<LuckyDrawParticipantDashboard />}
+        />
         <Route
-          path="/:adminId/luckydraw-form"
+          path="/:adminId/luckydraw-form/:luckydrawDocumentId"
           element={<RegistrationFormLuckydraw />}
         />
         <Route
@@ -150,10 +154,7 @@ export default function App() {
           path="/:adminId/votingpage/:electionDocumentId"
           element={<VotingPage />}
         />
-        <Route
-          path="/:adminId/LuckyDrawHome"
-          element={<LuckyDrawHome />}
-        />
+        <Route path="/:adminId/LuckyDrawHome" element={<LuckyDrawHome />} />
 
         {/* ================= ADMIN DASHBOARD ================= */}
         <Route path="/:adminId/admindashboard" element={<AdminDashboard />} />

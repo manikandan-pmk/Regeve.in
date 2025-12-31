@@ -733,7 +733,7 @@ const DrawDetailsModal = ({ isOpen, onClose, draw, onDelete, API_BASE }) => {
 
 // Main Component
 export default function LuckyDrawHome() {
-  const { adminId } = useParams();
+  const { adminId, luckydrawDocumentId  } = useParams();
   const navigate = useNavigate();
 
   const [draws, setDraws] = useState([]);
@@ -1469,7 +1469,7 @@ export default function LuckyDrawHome() {
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      navigate(`/dashboard/${draw.id}`);
+                      navigate(`/${adminId}/luckydraw-dashboard/${draw.documentId}`)
                     }}
                     className="group/btn w-full py-3.5 rounded-xl
                    bg-gradient-to-r from-blue-500 via-blue-600 to-indigo-600

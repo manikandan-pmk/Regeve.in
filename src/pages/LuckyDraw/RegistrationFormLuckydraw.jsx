@@ -21,7 +21,8 @@ import {
 } from "lucide-react";
 
 const RegistrationFormLuckydraw = () => {
-  const { adminId } = useParams();
+  const { adminId, luckydrawDocumentId } = useParams();
+
   const [formData, setFormData] = useState({
     ID_card: "",
     Name: "",
@@ -226,7 +227,8 @@ const RegistrationFormLuckydraw = () => {
 
       const submitData = {
         data: {
-          admin: Number(adminId),
+          adminId: Number(adminId),                  // ✅ REQUIRED
+    luckyDrawNameDocumentId: luckydrawDocumentId,
           ID_card: formData.ID_card,
           Name: formData.Name,
           Email: formData.Email,
