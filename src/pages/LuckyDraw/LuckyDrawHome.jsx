@@ -733,7 +733,7 @@ const DrawDetailsModal = ({ isOpen, onClose, draw, onDelete, API_BASE }) => {
 
 // Main Component
 export default function LuckyDrawHome() {
-  const { adminId, luckydrawDocumentId  } = useParams();
+  const { adminId, documentId  } = useParams();
   const navigate = useNavigate();
 
   const [draws, setDraws] = useState([]);

@@ -3,7 +3,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useParams } from "react-router-dom";
 import axios from "axios";
-import ElectionDashboard from "./ElectionDashboard ";
+import ElectionDashboard from "./ElectionDashboard";
 import { adminNavigate } from "../../utils/adminNavigation";
 import { motion, AnimatePresence } from "framer-motion";
 

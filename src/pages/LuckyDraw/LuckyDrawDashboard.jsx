@@ -75,27 +75,29 @@ const LuckyDrawDashboard = () => {
     activeDraws: 0,
   });
 
-  useEffect(() => {
-    if (!documentId) {
-      setError("Document ID missing in URL");
-      setLoading(false);
-      return;
-    }
-    fetchLuckyDrawData();
-  }, [documentId]);
+useEffect(() => {
+  if (!luckydrawDocumentId) {
+    setError("Lucky Draw ID missing in URL");
+    setLoading(false);
+    return;
+  }
+  fetchLuckyDrawData();
+}, [luckydrawDocumentId]);
+
 
   const fetchLuckyDrawData = async () => {
     try {
       setLoading(true);
       setError(null);
 
-      if (!documentId || documentId === "undefined") {
-        throw new Error("Invalid document ID");
-      }
+      if (!luckydrawDocumentId || luckydrawDocumentId === "undefined") {
+  throw new Error("Invalid lucky draw ID");
+}
 
-      const response = await axiosWithAuth.get(
-        `/lucky-draw-names/${documentId}`
-      );
+const response = await axiosWithAuth.get(
+  `/lucky-draw-names/${luckydrawDocumentId}`
+);
+
       const data = response.data;
 
       if (!data || typeof data !== "object") {
@@ -234,7 +236,10 @@ const LuckyDrawDashboard = () => {
   <div className="flex items-center gap-2">
     <button
   onClick={() =>
-    navigate(`/${adminId}/luckydraw-participant-dashboard/${documentId}`)
+    navigate(
+  `/${adminId}/luckydraw-participant-dashboard/${luckydrawDocumentId}`
+)
+
   }
   className="hidden md:flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg transition-colors"
 >
@@ -245,7 +250,7 @@ const LuckyDrawDashboard = () => {
     
     {/* Mobile version */}
     <button
-      onClick={() => navigate(`/participants/${documentId}`)}
+      onClick={() => navigate(`/participants/${luckydrawDocumentId}`)}
       className="md:hidden p-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
       title="Participants"
     >

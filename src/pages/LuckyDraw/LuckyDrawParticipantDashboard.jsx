@@ -16,7 +16,7 @@ import {
 } from "react-icons/fa";
 
 const LuckyDrawParticipantDashboard = () => {
-  const { adminId, luckydrawDocumentId  } = useParams();
+  const { adminId, luckydrawDocumentId } = useParams();
   const navigate = useNavigate();
 
   // ----------------------------- STATES -----------------------------
@@ -56,58 +56,54 @@ const LuckyDrawParticipantDashboard = () => {
     ID_card: "",
   });
 
-  const API_URL = "https://api.regeve.in/api/lucky-draws";
+  const API_URL = "https://api.regeve.in/api/lucky-draw-names";
 
   // Fetch specific lucky draw with participants
- const fetchLuckyDrawData = async (silent = false) => {
-  try {
-    if (!silent) setLoading(true);
+  const fetchLuckyDrawData = async (silent = false) => {
+    try {
+      if (!silent) setLoading(true);
 
-    const token = localStorage.getItem("jwt");
+      const token = localStorage.getItem("jwt");
 
-    const response = await axios.get(
-      `${API_URL}?filters[documentId][$eq]=${documentId}&populate[lucky_draw_forms][populate]=*&populate[lucky_draw_winners]=*`,
-      {
-        headers: { Authorization: `Bearer ${token}` },
-      }
-    );
+      const response = await axios.get(`${API_URL}/${luckydrawDocumentId}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
 
-    const data = response.data.data[0];
+      const data = response.data;
 
-    if (!data) {
-      console.error("Lucky Draw not found for documentId:", documentId);
-      return;
+      setLuckyDrawData(data);
+
+      const users = (data.lucky_draw_forms || []).map((item) => ({
+        id: item.id,
+        documentId: item.documentId,
+        luckyDrawId: item.LuckyDraw_ID,
+        name: item.Name,
+        email: item.Email,
+        phone: item.Phone_Number,
+        gender: item.Gender,
+        age: item.Age,
+        userId: item.ID_card,
+        isVerified: item.isVerified ?? false,
+        isWinner: item.IsWinnedParticipant ?? false,
+        createdAt: item.createdAt,
+        updatedAt: item.updatedAt,
+      }));
+
+      setAllUsers(users);
+      setWinnersList(data.lucky_draw_winners || []);
+    } catch (err) {
+      console.error("Error fetching lucky draw:", err);
+    } finally {
+      if (!silent) setLoading(false);
     }
-
-    setLuckyDrawData(data);
-
-    const users = data.lucky_draw_forms.map((item) => ({
-      id: item.id,
-      documentId: item.documentId,
-      luckyDrawId: item.LuckyDraw_ID,
-      name: item.Name,
-      userId: item.ID_card,
-      email: item.Email,
-      phone: item.Phone_Number,
-      gender: item.Gender,
-      age: item.Age,
-      isVerified: item.isVerified ?? false,
-      isWinner: item.IsWinnedParticipant || false,
-      createdAt: item.createdAt,
-      updatedAt: item.updatedAt,
-    }));
-
-    setAllUsers(users);
-    setWinnersList(data.lucky_draw_winners || []);
-  } catch (err) {
-    console.error("Error fetching lucky draw data:", err);
-  } finally {
-    if (!silent) setLoading(false);
-  }
-};
+  };
 
   // Fetch lucky draw data
   useEffect(() => {
+    if (!luckydrawDocumentId) return;
+
     fetchLuckyDrawData();
 
     const interval = setInterval(() => {
@@ -115,7 +111,7 @@ const LuckyDrawParticipantDashboard = () => {
     }, 15000);
 
     return () => clearInterval(interval);
-  }, [documentId]);
+  }, [luckydrawDocumentId]);
 
   // Update dashboard data whenever allUsers changes
   useEffect(() => {
@@ -176,7 +172,6 @@ const LuckyDrawParticipantDashboard = () => {
           u.id === participantId ? { ...u, isVerified: newStatus } : u
         )
       );
-
     } catch (error) {
       console.error("Error updating verification:", error);
       alert("Verification update failed");
@@ -186,7 +181,7 @@ const LuckyDrawParticipantDashboard = () => {
   // ----------------------------- LUCKY DRAW SELECTION -----------------------------
   const runLuckyDraw = () => {
     setIsDrawing(true);
-    
+
     // Get eligible participants (verified and not winners)
     const eligibleParticipants = allUsers.filter(
       (u) => u.isVerified && !u.isWinner
@@ -202,32 +197,36 @@ const LuckyDrawParticipantDashboard = () => {
     let count = 0;
     const maxCount = 20;
     const interval = setInterval(() => {
-      const randomIndex = Math.floor(Math.random() * eligibleParticipants.length);
+      const randomIndex = Math.floor(
+        Math.random() * eligibleParticipants.length
+      );
       setSelectedWinner(eligibleParticipants[randomIndex]);
       count++;
 
       if (count >= maxCount) {
         clearInterval(interval);
-        
+
         // Final selection
-        const finalIndex = Math.floor(Math.random() * eligibleParticipants.length);
+        const finalIndex = Math.floor(
+          Math.random() * eligibleParticipants.length
+        );
         const finalWinner = eligibleParticipants[finalIndex];
-        
+
         setSelectedWinner(finalWinner);
-        
+
         // Add to winners list
         const newWinner = {
           ...finalWinner,
           winDate: new Date().toISOString(),
-          luckyDrawName: luckyDrawData?.Name || "Unknown"
+          luckyDrawName: luckyDrawData?.Name || "Unknown",
         };
 
         const updatedWinners = [...winnersList, newWinner];
         setWinnersList(updatedWinners);
-        
+
         // Update user winner status
-        setAllUsers(prev =>
-          prev.map(u =>
+        setAllUsers((prev) =>
+          prev.map((u) =>
             u.id === finalWinner.id ? { ...u, isWinner: true } : u
           )
         );
@@ -249,7 +248,7 @@ const LuckyDrawParticipantDashboard = () => {
   const updateParticipantAsWinner = async (participantId) => {
     try {
       const token = localStorage.getItem("jwt");
-      
+
       // Update participant's IsWinnedParticipant field
       await axios.put(
         `https://api.regeve.in/api/lucky-draw-forms/${participantId}`,
@@ -266,17 +265,18 @@ const LuckyDrawParticipantDashboard = () => {
         `https://api.regeve.in/api/lucky-draw-winners`,
         {
           data: {
-            LuckyDraw_ID: allUsers.find(u => u.id === participantId)?.luckyDrawId,
-            Participant_Name: allUsers.find(u => u.id === participantId)?.name,
+            LuckyDraw_ID: allUsers.find((u) => u.id === participantId)
+              ?.luckyDrawId,
+            Participant_Name: allUsers.find((u) => u.id === participantId)
+              ?.name,
             LuckyDraw: documentId,
             Win_Date: new Date().toISOString(),
-          }
+          },
         },
         {
           headers: { Authorization: `Bearer ${token}` },
         }
       );
-
     } catch (error) {
       console.error("Error updating winner status:", error);
     }
@@ -289,8 +289,10 @@ const LuckyDrawParticipantDashboard = () => {
     try {
       // Remove from winners list
       const updatedWinners = winnersList.filter(
-  (w) => w.LuckyDraw_ID !== allUsers.find(u => u.id === participantId)?.luckyDrawId
-);
+        (w) =>
+          w.LuckyDraw_ID !==
+          allUsers.find((u) => u.id === participantId)?.luckyDrawId
+      );
 
       setWinnersList(updatedWinners);
       localStorage.setItem(
@@ -300,7 +302,9 @@ const LuckyDrawParticipantDashboard = () => {
 
       // Reset winner status in local state
       setAllUsers((prev) =>
-        prev.map((u) => (u.id === participantId ? { ...u, isWinner: false } : u))
+        prev.map((u) =>
+          u.id === participantId ? { ...u, isWinner: false } : u
+        )
       );
 
       // Update API
@@ -314,7 +318,6 @@ const LuckyDrawParticipantDashboard = () => {
           headers: { Authorization: `Bearer ${token}` },
         }
       );
-
     } catch (error) {
       console.error("Error resetting winner:", error);
     }
@@ -339,7 +342,7 @@ const LuckyDrawParticipantDashboard = () => {
 
       // Update all participants in API
       const token = localStorage.getItem("jwt");
-      const updatePromises = allUsers.map(user =>
+      const updatePromises = allUsers.map((user) =>
         axios.put(
           `https://api.regeve.in/api/lucky-draw-forms/${user.id}`,
           {
@@ -352,7 +355,6 @@ const LuckyDrawParticipantDashboard = () => {
       );
 
       await Promise.all(updatePromises);
-
     } catch (error) {
       console.error("Error clearing winners:", error);
     }
@@ -422,7 +424,11 @@ const LuckyDrawParticipantDashboard = () => {
           <div>
             {/* Back to Lucky Draw Dashboard Button */}
             <button
-              onClick={() => navigate(`/${adminId}/luckydraw-dashboard/${documentId}`)}
+              onClick={() =>
+                navigate(
+                  `/${adminId}/luckydraw-dashboard/${luckydrawDocumentId}`
+                )
+              }
               className="flex items-center gap-2 text-gray-600 hover:text-blue-600 mb-2"
             >
               <FaArrowLeft />
@@ -441,8 +447,18 @@ const LuckyDrawParticipantDashboard = () => {
             {showCopySuccess && (
               <div className="fixed bottom-4 right-4 animate-fade-in-up z-50">
                 <div className="bg-green-500 text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-2 animate-bounce-in">
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                  <svg
+                    className="w-5 h-5"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                      d="M5 13l4 4L19 7"
+                    />
                   </svg>
                   <span>Participant form link copied to clipboard!</span>
                 </div>
@@ -452,30 +468,46 @@ const LuckyDrawParticipantDashboard = () => {
             {/* Lucky Draw Register Form Button */}
             <button
               onClick={async (event) => {
+                const button = event.currentTarget; // ✅ store first
+
                 const baseUrl = window.location.origin;
-                const participantFormLink = `${baseUrl}/#/${adminId}/luckydraw-form/${documentId}`;
+                const participantFormLink = `${baseUrl}/#/${adminId}/luckydraw-form/${luckydrawDocumentId}`;
 
                 try {
                   await navigator.clipboard.writeText(participantFormLink);
+
                   setShowCopySuccess(true);
                   setTimeout(() => setShowCopySuccess(false), 3000);
-                  
-                  event.currentTarget.classList.add("animate-pulse");
+
+                  button.classList.add("animate-pulse");
                   setTimeout(() => {
-                    event.currentTarget.classList.remove("animate-pulse");
+                    button.classList.remove("animate-pulse");
                   }, 500);
                 } catch (err) {
-                  console.error("Failed to copy: ", err);
-                  event.currentTarget.classList.add("animate-shake");
-                  setTimeout(() => {
-                    event.currentTarget.classList.remove("animate-shake");
-                  }, 500);
+                  console.error("Failed to copy:", err);
+
+                  if (button) {
+                    button.classList.add("animate-shake");
+                    setTimeout(() => {
+                      button.classList.remove("animate-shake");
+                    }, 500);
+                  }
                 }
               }}
               className="px-4 md:px-6 py-2.5 md:py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl md:rounded-2xl shadow-md flex items-center gap-2 group"
             >
-              <svg className="w-4 h-4 md:w-5 md:h-5 transition-transform duration-200 group-hover:rotate-90" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+              <svg
+                className="w-4 h-4 md:w-5 md:h-5 transition-transform duration-200 group-hover:rotate-90"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+                />
               </svg>
               Copy Registration Link
             </button>
@@ -492,12 +524,18 @@ const LuckyDrawParticipantDashboard = () => {
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full animate-pulse"></div>
-                  <p className="text-blue-700/90 font-semibold text-sm md:text-base tracking-wide uppercase">Total Participants</p>
+                  <p className="text-blue-700/90 font-semibold text-sm md:text-base tracking-wide uppercase">
+                    Total Participants
+                  </p>
                 </div>
                 <div className="relative">
-                  <h3 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mt-1">{dashboardData.totalRegistered}</h3>
+                  <h3 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mt-1">
+                    {dashboardData.totalRegistered}
+                  </h3>
                 </div>
-                <p className="text-xs text-gray-600/80 mt-2">All registered participants</p>
+                <p className="text-xs text-gray-600/80 mt-2">
+                  All registered participants
+                </p>
               </div>
               <div className="p-4 bg-gradient-to-br from-blue-500 via-blue-600 to-purple-600 rounded-2xl md:rounded-3xl shadow-2xl">
                 <FaUsers className="text-white text-xl md:text-2xl" />
@@ -513,13 +551,22 @@ const LuckyDrawParticipantDashboard = () => {
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full animate-pulse"></div>
-                  <p className="text-emerald-700/90 font-semibold text-sm md:text-base tracking-wide uppercase">Verified</p>
+                  <p className="text-emerald-700/90 font-semibold text-sm md:text-base tracking-wide uppercase">
+                    Verified
+                  </p>
                 </div>
                 <div className="relative">
-                  <h3 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent mt-1">{dashboardData.totalVerified}</h3>
+                  <h3 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent mt-1">
+                    {dashboardData.totalVerified}
+                  </h3>
                 </div>
                 <p className="text-xs text-gray-600/80 mt-2">
-                  {((dashboardData.totalVerified / dashboardData.totalRegistered) * 100 || 0).toFixed(1)}% verified
+                  {(
+                    (dashboardData.totalVerified /
+                      dashboardData.totalRegistered) *
+                      100 || 0
+                  ).toFixed(1)}
+                  % verified
                 </p>
               </div>
               <div className="p-4 bg-gradient-to-br from-emerald-500 via-emerald-600 to-teal-600 rounded-2xl md:rounded-3xl shadow-2xl">
@@ -536,13 +583,21 @@ const LuckyDrawParticipantDashboard = () => {
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 bg-gradient-to-r from-amber-500 to-orange-500 rounded-full"></div>
-                  <p className="text-amber-700/90 font-semibold text-sm md:text-base tracking-wide uppercase">Winners</p>
+                  <p className="text-amber-700/90 font-semibold text-sm md:text-base tracking-wide uppercase">
+                    Winners
+                  </p>
                 </div>
                 <div className="relative">
-                  <h3 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-amber-600 to-orange-600 bg-clip-text text-transparent mt-1">{dashboardData.totalWinners}</h3>
+                  <h3 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-amber-600 to-orange-600 bg-clip-text text-transparent mt-1">
+                    {dashboardData.totalWinners}
+                  </h3>
                 </div>
                 <p className="text-xs text-gray-600/80 mt-2">
-                  {((dashboardData.totalWinners / dashboardData.totalVerified) * 100 || 0).toFixed(1)}% win rate
+                  {(
+                    (dashboardData.totalWinners / dashboardData.totalVerified) *
+                      100 || 0
+                  ).toFixed(1)}
+                  % win rate
                 </p>
               </div>
               <div className="p-4 bg-gradient-to-br from-yellow-400 via-amber-500 to-orange-500 rounded-2xl md:rounded-3xl shadow-2xl">
@@ -559,13 +614,22 @@ const LuckyDrawParticipantDashboard = () => {
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 bg-gradient-to-r from-rose-500 to-pink-500 rounded-full animate-pulse"></div>
-                  <p className="text-rose-700/90 font-semibold text-sm md:text-base tracking-wide uppercase">Pending</p>
+                  <p className="text-rose-700/90 font-semibold text-sm md:text-base tracking-wide uppercase">
+                    Pending
+                  </p>
                 </div>
                 <div className="relative">
-                  <h3 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-rose-600 to-pink-600 bg-clip-text text-transparent mt-1">{dashboardData.notVerified}</h3>
+                  <h3 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-rose-600 to-pink-600 bg-clip-text text-transparent mt-1">
+                    {dashboardData.notVerified}
+                  </h3>
                 </div>
                 <p className="text-xs text-gray-600/80 mt-2">
-                  {((dashboardData.notVerified / dashboardData.totalRegistered) * 100 || 0).toFixed(1)}% pending
+                  {(
+                    (dashboardData.notVerified /
+                      dashboardData.totalRegistered) *
+                      100 || 0
+                  ).toFixed(1)}
+                  % pending
                 </p>
               </div>
               <div className="p-4 bg-gradient-to-br from-rose-500 via-rose-600 to-pink-600 rounded-2xl md:rounded-3xl shadow-2xl">
@@ -585,7 +649,8 @@ const LuckyDrawParticipantDashboard = () => {
               🎲 Lucky Draw Controls
             </h2>
             <p className="text-gray-600 text-sm md:text-base">
-              Select random winners from verified participants. Only verified users can win.
+              Select random winners from verified participants. Only verified
+              users can win.
             </p>
           </div>
 
@@ -677,9 +742,14 @@ const LuckyDrawParticipantDashboard = () => {
               </div>
               <div>
                 <h2 className="text-xl md:text-2xl font-bold text-gray-800">
-                  Winners List <span className="text-violet-600">({winnersList.length})</span>
+                  Winners List{" "}
+                  <span className="text-violet-600">
+                    ({winnersList.length})
+                  </span>
                 </h2>
-                <p className="text-gray-600 text-sm mt-1">Celebrating our lucky participants! 🎊</p>
+                <p className="text-gray-600 text-sm mt-1">
+                  Celebrating our lucky participants! 🎊
+                </p>
               </div>
             </div>
             <button
@@ -688,13 +758,25 @@ const LuckyDrawParticipantDashboard = () => {
                 link.href = `data:text/json;charset=utf-8,${encodeURIComponent(
                   JSON.stringify(winnersList, null, 2)
                 )}`;
-                link.download = `winners-${new Date().toISOString().split("T")[0]}.json`;
+                link.download = `winners-${
+                  new Date().toISOString().split("T")[0]
+                }.json`;
                 link.click();
               }}
               className="px-4 md:px-6 py-2.5 bg-gradient-to-r from-teal-500 to-emerald-600 hover:from-teal-600 hover:to-emerald-700 text-white font-medium rounded-xl shadow-sm hover:shadow-md transition-all duration-200 flex items-center gap-2"
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                />
               </svg>
               Export Winners
             </button>
@@ -702,24 +784,37 @@ const LuckyDrawParticipantDashboard = () => {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {winnersList.slice(0, 8).map((winner, index) => (
-              <div key={winner.id} className="bg-white rounded-xl border border-gray-100 hover:border-violet-200 hover:shadow-md transition-all duration-300 p-4 group">
+              <div
+                key={winner.id}
+                className="bg-white rounded-xl border border-gray-100 hover:border-violet-200 hover:shadow-md transition-all duration-300 p-4 group"
+              >
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex items-center gap-3">
                     <div className="relative">
                       <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-white shadow-sm bg-gray-200 flex items-center justify-center">
                         <div className="text-lg">👤</div>
                       </div>
-                      <div className={`absolute -top-1 -right-1 w-7 h-7 rounded-full flex items-center justify-center shadow-sm ${
-                        index < 3 ? "bg-gradient-to-br from-violet-500 to-purple-600" : "bg-gradient-to-br from-sky-500 to-blue-600"
-                      }`}>
+                      <div
+                        className={`absolute -top-1 -right-1 w-7 h-7 rounded-full flex items-center justify-center shadow-sm ${
+                          index < 3
+                            ? "bg-gradient-to-br from-violet-500 to-purple-600"
+                            : "bg-gradient-to-br from-sky-500 to-blue-600"
+                        }`}
+                      >
                         <span className="text-xs font-bold text-white">
-                          {index < 3 ? ["🥇", "🥈", "🥉"][index] : `#${index + 1}`}
+                          {index < 3
+                            ? ["🥇", "🥈", "🥉"][index]
+                            : `#${index + 1}`}
                         </span>
                       </div>
                     </div>
                     <div>
-                      <h3 className="font-semibold text-gray-900 truncate max-w-[140px]">{winner.name || winner.Participant_Name}</h3>
-                      <p className="text-xs text-gray-500 truncate max-w-[140px]">ID: {winner.luckyDrawId || winner.LuckyDraw_ID}</p>
+                      <h3 className="font-semibold text-gray-900 truncate max-w-[140px]">
+                        {winner.name || winner.Participant_Name}
+                      </h3>
+                      <p className="text-xs text-gray-500 truncate max-w-[140px]">
+                        ID: {winner.luckyDrawId || winner.LuckyDraw_ID}
+                      </p>
                     </div>
                   </div>
                   <button
@@ -731,7 +826,10 @@ const LuckyDrawParticipantDashboard = () => {
                   </button>
                 </div>
                 <div className="text-xs text-gray-500">
-                  Won on: {new Date(winner.winDate || winner.Win_Date).toLocaleDateString()}
+                  Won on:{" "}
+                  {new Date(
+                    winner.winDate || winner.Win_Date
+                  ).toLocaleDateString()}
                 </div>
               </div>
             ))}
@@ -783,14 +881,22 @@ const LuckyDrawParticipantDashboard = () => {
 
                 {showFilters && (
                   <>
-                    <div className="fixed inset-0 z-40" onClick={() => setShowFilters(false)}></div>
+                    <div
+                      className="fixed inset-0 z-40"
+                      onClick={() => setShowFilters(false)}
+                    ></div>
                     <div className="absolute right-0 mt-2 w-64 bg-white border border-gray-200 rounded-xl shadow-xl z-50 p-4">
                       <div className="space-y-3">
                         <label className="flex items-center cursor-pointer">
                           <input
                             type="checkbox"
                             checked={filters.verifiedOnly}
-                            onChange={(e) => setFilters(prev => ({ ...prev, verifiedOnly: e.target.checked }))}
+                            onChange={(e) =>
+                              setFilters((prev) => ({
+                                ...prev,
+                                verifiedOnly: e.target.checked,
+                              }))
+                            }
                             className="mr-3 w-4 h-4 text-blue-600"
                           />
                           <span className="text-sm">Verified Only</span>
@@ -799,13 +905,23 @@ const LuckyDrawParticipantDashboard = () => {
                           <input
                             type="checkbox"
                             checked={filters.hasNotWon}
-                            onChange={(e) => setFilters(prev => ({ ...prev, hasNotWon: e.target.checked }))}
+                            onChange={(e) =>
+                              setFilters((prev) => ({
+                                ...prev,
+                                hasNotWon: e.target.checked,
+                              }))
+                            }
                             className="mr-3 w-4 h-4 text-blue-600"
                           />
                           <span className="text-sm">Has Not Won</span>
                         </label>
                         <button
-                          onClick={() => setFilters({ verifiedOnly: false, hasNotWon: false })}
+                          onClick={() =>
+                            setFilters({
+                              verifiedOnly: false,
+                              hasNotWon: false,
+                            })
+                          }
                           className="w-full mt-2 px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors"
                         >
                           Clear Filters
@@ -823,12 +939,24 @@ const LuckyDrawParticipantDashboard = () => {
             <table className="w-full min-w-[900px]">
               <thead>
                 <tr className="border-b border-gray-200 bg-gradient-to-r from-gray-50 to-slate-50">
-                  <th className="px-6 py-4 text-center text-sm font-medium text-gray-700 uppercase">S.No</th>
-                  <th className="px-6 py-4 text-center text-sm font-medium text-gray-700 uppercase">Participant</th>
-                  <th className="px-6 py-4 text-center text-sm font-medium text-gray-700 uppercase">Lucky Draw ID</th>
-                  <th className="px-6 py-4 text-center text-sm font-medium text-gray-700 uppercase">Verification</th>
-                  <th className="px-6 py-4 text-center text-sm font-medium text-gray-700 uppercase">Winner Status</th>
-                  <th className="px-6 py-4 text-center text-sm font-medium text-gray-700 uppercase">Actions</th>
+                  <th className="px-6 py-4 text-center text-sm font-medium text-gray-700 uppercase">
+                    S.No
+                  </th>
+                  <th className="px-6 py-4 text-center text-sm font-medium text-gray-700 uppercase">
+                    Participant
+                  </th>
+                  <th className="px-6 py-4 text-center text-sm font-medium text-gray-700 uppercase">
+                    Lucky Draw ID
+                  </th>
+                  <th className="px-6 py-4 text-center text-sm font-medium text-gray-700 uppercase">
+                    Verification
+                  </th>
+                  <th className="px-6 py-4 text-center text-sm font-medium text-gray-700 uppercase">
+                    Winner Status
+                  </th>
+                  <th className="px-6 py-4 text-center text-sm font-medium text-gray-700 uppercase">
+                    Actions
+                  </th>
                 </tr>
               </thead>
 
@@ -838,7 +966,9 @@ const LuckyDrawParticipantDashboard = () => {
                     <td colSpan="6" className="py-12 text-center">
                       <div className="flex flex-col items-center">
                         <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-3" />
-                        <p className="text-gray-700 font-medium">Loading participants...</p>
+                        <p className="text-gray-700 font-medium">
+                          Loading participants...
+                        </p>
                       </div>
                     </td>
                   </tr>
@@ -859,9 +989,15 @@ const LuckyDrawParticipantDashboard = () => {
                             <div className="text-2xl">👤</div>
                           </div>
                           <div>
-                            <p className="font-semibold text-gray-900">{user.name}</p>
-                            <p className="text-sm text-gray-500">{user.email}</p>
-                            <p className="text-xs text-gray-400">{user.phone}</p>
+                            <p className="font-semibold text-gray-900">
+                              {user.name}
+                            </p>
+                            <p className="text-sm text-gray-500">
+                              {user.email}
+                            </p>
+                            <p className="text-xs text-gray-400">
+                              {user.phone}
+                            </p>
                           </div>
                         </div>
                       </td>
@@ -879,13 +1015,29 @@ const LuckyDrawParticipantDashboard = () => {
                           <input
                             type="checkbox"
                             checked={user.isVerified}
-                            onChange={() => handleVerificationToggle(user.id, user.isVerified)}
+                            onChange={() =>
+                              handleVerificationToggle(user.id, user.isVerified)
+                            }
                             className="hidden"
                           />
-                          <div className={`w-12 h-6 rounded-full transition ${user.isVerified ? "bg-green-500" : "bg-gray-300"}`}>
-                            <div className={`w-4 h-4 bg-white rounded-full mt-1 ml-1 transition ${user.isVerified ? "translate-x-6" : ""}`} />
+                          <div
+                            className={`w-12 h-6 rounded-full transition ${
+                              user.isVerified ? "bg-green-500" : "bg-gray-300"
+                            }`}
+                          >
+                            <div
+                              className={`w-4 h-4 bg-white rounded-full mt-1 ml-1 transition ${
+                                user.isVerified ? "translate-x-6" : ""
+                              }`}
+                            />
                           </div>
-                          <span className={`ml-3 text-sm font-medium ${user.isVerified ? "text-green-600" : "text-gray-600"}`}>
+                          <span
+                            className={`ml-3 text-sm font-medium ${
+                              user.isVerified
+                                ? "text-green-600"
+                                : "text-gray-600"
+                            }`}
+                          >
                             {user.isVerified ? "Verified" : "Unverified"}
                           </span>
                         </label>
@@ -899,7 +1051,9 @@ const LuckyDrawParticipantDashboard = () => {
                             Winner
                           </span>
                         ) : (
-                          <span className="text-gray-500 font-medium text-sm">Not Winner</span>
+                          <span className="text-gray-500 font-medium text-sm">
+                            Not Winner
+                          </span>
                         )}
                       </td>
 
@@ -941,27 +1095,67 @@ const LuckyDrawParticipantDashboard = () => {
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-auto">
             <div className="px-8 py-6 border-b border-gray-100">
               <div className="flex items-center justify-between">
-                <h2 className="text-2xl font-semibold text-gray-800">Edit Participant</h2>
-                <button onClick={() => setShowEditModal(false)} className="p-2 hover:bg-gray-100 rounded-lg">✕</button>
+                <h2 className="text-2xl font-semibold text-gray-800">
+                  Edit Participant
+                </h2>
+                <button
+                  onClick={() => setShowEditModal(false)}
+                  className="p-2 hover:bg-gray-100 rounded-lg"
+                >
+                  ✕
+                </button>
               </div>
             </div>
 
             <div className="p-8 space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {[
-                  { label: "Full Name", key: "Name", placeholder: "John Smith" },
-                  { label: "Email Address", key: "Email", placeholder: "john@example.com", type: "email" },
-                  { label: "Phone Number", key: "Phone_Number", placeholder: "+1 (555) 000-0000" },
-                  { label: "Gender", key: "Gender", placeholder: "Select gender" },
-                  { label: "Age", key: "Age", placeholder: "25", type: "number" },
-                  { label: "ID Card Number", key: "ID_card", placeholder: "AB123456" },
+                  {
+                    label: "Full Name",
+                    key: "Name",
+                    placeholder: "John Smith",
+                  },
+                  {
+                    label: "Email Address",
+                    key: "Email",
+                    placeholder: "john@example.com",
+                    type: "email",
+                  },
+                  {
+                    label: "Phone Number",
+                    key: "Phone_Number",
+                    placeholder: "+1 (555) 000-0000",
+                  },
+                  {
+                    label: "Gender",
+                    key: "Gender",
+                    placeholder: "Select gender",
+                  },
+                  {
+                    label: "Age",
+                    key: "Age",
+                    placeholder: "25",
+                    type: "number",
+                  },
+                  {
+                    label: "ID Card Number",
+                    key: "ID_card",
+                    placeholder: "AB123456",
+                  },
                 ].map(({ label, key, placeholder, type = "text" }) => (
                   <div key={key} className="space-y-2">
-                    <label className="block text-sm font-medium text-gray-700">{label}</label>
+                    <label className="block text-sm font-medium text-gray-700">
+                      {label}
+                    </label>
                     <input
                       type={type}
                       value={editForm[key]}
-                      onChange={(e) => setEditForm(prev => ({ ...prev, [key]: e.target.value }))}
+                      onChange={(e) =>
+                        setEditForm((prev) => ({
+                          ...prev,
+                          [key]: e.target.value,
+                        }))
+                      }
                       placeholder={placeholder}
                       className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     />
@@ -971,10 +1165,16 @@ const LuckyDrawParticipantDashboard = () => {
             </div>
 
             <div className="px-8 py-6 border-t border-gray-100 bg-gray-50 flex justify-end gap-3">
-              <button onClick={() => setShowEditModal(false)} className="px-6 py-2.5 border border-gray-300 rounded-lg font-medium hover:bg-gray-50">
+              <button
+                onClick={() => setShowEditModal(false)}
+                className="px-6 py-2.5 border border-gray-300 rounded-lg font-medium hover:bg-gray-50"
+              >
                 Cancel
               </button>
-              <button onClick={handleEditSave} className="px-6 py-2.5 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700">
+              <button
+                onClick={handleEditSave}
+                className="px-6 py-2.5 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700"
+              >
                 Save Changes
               </button>
             </div>
@@ -988,8 +1188,15 @@ const LuckyDrawParticipantDashboard = () => {
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-xl max-h-[90vh] overflow-auto">
             <div className="px-8 py-6 border-b border-gray-100">
               <div className="flex items-center justify-between">
-                <h2 className="text-2xl font-semibold text-gray-800">Participant Details</h2>
-                <button onClick={() => setShowViewModal(false)} className="p-2 hover:bg-gray-100 rounded-lg">✕</button>
+                <h2 className="text-2xl font-semibold text-gray-800">
+                  Participant Details
+                </h2>
+                <button
+                  onClick={() => setShowViewModal(false)}
+                  className="p-2 hover:bg-gray-100 rounded-lg"
+                >
+                  ✕
+                </button>
               </div>
             </div>
 
@@ -998,8 +1205,12 @@ const LuckyDrawParticipantDashboard = () => {
                 <div className="w-32 h-32 rounded-full bg-gray-200 flex items-center justify-center mb-4">
                   <div className="text-4xl">👤</div>
                 </div>
-                <h3 className="text-2xl font-bold text-gray-900">{activeParticipant.name}</h3>
-                <p className="text-gray-500 mt-2">Lucky Draw ID: {activeParticipant.luckyDrawId}</p>
+                <h3 className="text-2xl font-bold text-gray-900">
+                  {activeParticipant.name}
+                </h3>
+                <p className="text-gray-500 mt-2">
+                  Lucky Draw ID: {activeParticipant.luckyDrawId}
+                </p>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -1008,9 +1219,22 @@ const LuckyDrawParticipantDashboard = () => {
                 <InfoRow label="Gender" value={activeParticipant.gender} />
                 <InfoRow label="Age" value={activeParticipant.age} />
                 <InfoRow label="ID Card" value={activeParticipant.userId} />
-                <InfoRow label="Registered On" value={new Date(activeParticipant.createdAt).toLocaleDateString()} />
-                <InfoRow label="Verification Status" value={activeParticipant.isVerified ? "Verified" : "Not Verified"} />
-                <InfoRow label="Winner Status" value={activeParticipant.isWinner ? "Winner" : "Not Winner"} />
+                <InfoRow
+                  label="Registered On"
+                  value={new Date(
+                    activeParticipant.createdAt
+                  ).toLocaleDateString()}
+                />
+                <InfoRow
+                  label="Verification Status"
+                  value={
+                    activeParticipant.isVerified ? "Verified" : "Not Verified"
+                  }
+                />
+                <InfoRow
+                  label="Winner Status"
+                  value={activeParticipant.isWinner ? "Winner" : "Not Winner"}
+                />
               </div>
             </div>
           </div>
