@@ -184,56 +184,52 @@ const LuckyDraw = () => {
   const [participants, setParticipants] = useState([]);
   const [loading, setLoading] = useState(false);
 
- useEffect(() => {
-  console.log("adminId:", adminId);
-  console.log("luckydrawDocumentId:", luckydrawDocumentId);
-}, [adminId, luckydrawDocumentId]);
+  useEffect(() => {
+    console.log("adminId:", adminId);
+    console.log("luckydrawDocumentId:", luckydrawDocumentId);
+  }, [adminId, luckydrawDocumentId]);
 
+  useEffect(() => {
+    const fetchParticipants = async () => {
+      try {
+        setLoading(true);
 
- useEffect(() => {
-  const fetchParticipants = async () => {
-    try {
-      setLoading(true);
+        const token = localStorage.getItem("jwt");
 
-      const token = localStorage.getItem("jwt");
+        const res = await axios.get(
+          `https://api.regeve.in/api/lucky-draw-names/${luckydrawDocumentId}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
 
-      const res = await axios.get(
-        `https://api.regeve.in/api/lucky-draw-names/${luckydrawDocumentId}`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+        // ✅ users are inside lucky_draw_forms
+        const users = res.data?.lucky_draw_forms || [];
+
+        // ✅ only verified users
+        const verifiedUsers = users.filter(
+          (user) =>
+            user.isVerified === true && user.IsWinnedParticipant !== true
+        );
+
+        setParticipants(verifiedUsers);
+      } catch (err) {
+        console.error("Fetch error:", err);
+
+        if (err.response?.status === 403) {
+          alert("Session expired. Please login again.");
         }
-      );
-
-      // ✅ users are inside lucky_draw_forms
-      const users = res.data?.lucky_draw_forms || [];
-
-      // ✅ only verified users
-      const verifiedUsers = users.filter(
-  (user) =>
-    user.isVerified === true &&
-    user.IsWinnedParticipant !== true
-);
-
-
-      setParticipants(verifiedUsers);
-    } catch (err) {
-      console.error("Fetch error:", err);
-
-      if (err.response?.status === 403) {
-        alert("Session expired. Please login again.");
+      } finally {
+        setLoading(false);
       }
-    } finally {
-      setLoading(false);
+    };
+
+    if (luckydrawDocumentId) {
+      fetchParticipants();
     }
-  };
-
-  if (luckydrawDocumentId) {
-    fetchParticipants();
-  }
-}, [luckydrawDocumentId]);
-
+  }, [luckydrawDocumentId]);
 
   const startSpinning = () => {
     if (participants.length === 0) {
@@ -248,32 +244,67 @@ const LuckyDraw = () => {
     setShowProfile(false);
   };
 
-  const stopSpinning = () => {
+  const stopSpinning = async () => {
     setIsSpinning(false);
     setBlastAnimation(true);
 
-    if (participants.length > 0) {
-      const randomIndex = Math.floor(Math.random() * participants.length);
+    if (participants.length === 0) return;
 
-      const winner = participants[randomIndex];
+    const randomIndex = Math.floor(Math.random() * participants.length);
+    const winner = participants[randomIndex];
 
-      // LuckyDraw_ID → number boxes
-      const luckyId = winner.LuckyDraw_ID || "B000";
-      const digits = luckyId.replace(/\D/g, "").padStart(3, "0");
+    const luckyId = winner.LuckyDraw_ID || "B000";
+    const digits = luckyId.replace(/\D/g, "").padStart(3, "0");
+    setFinalValues(["B", digits[0], digits[1], digits[2]]);
 
-      setFinalValues(["B", digits[0], digits[1], digits[2]]);
+    let updateSuccess = true;
 
-      setResult({
-        message: "Congratulations! You are the lucky winner!",
-        memberId: luckyId,
-        winner: winner,
-        updateSuccess: true,
-      });
+    try {
+      const token = localStorage.getItem("jwt");
+
+      await axios.put(
+        `https://api.regeve.in/api/lucky-draw-names/${luckydrawDocumentId}`,
+        {
+          data: {
+            lucky_draw_forms: {
+              update: [
+                {
+                  where: {
+                    documentId: winner.documentId, // 👈 from your JSON
+                  },
+                  data: {
+                    IsWinnedParticipant: true,
+                    WinnedDate: new Date().toISOString(),
+                  },
+                },
+              ],
+            },
+          },
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      // remove winner from current spin
+      setParticipants((prev) => prev.filter((p) => p.id !== winner.id));
+    } catch (err) {
+      console.error("Winner update failed:", err);
+      updateSuccess = false;
     }
 
-    setTimeout(() => {
-      setShowResult(true);
-    }, 2500);
+    setResult({
+      message: updateSuccess
+        ? "Congratulations! You are the lucky winner!"
+        : "Winner selected but update failed",
+      memberId: luckyId,
+      winner,
+      updateSuccess,
+    });
+
+    setTimeout(() => setShowResult(true), 2500);
   };
 
   const resetLuckyDraw = () => {

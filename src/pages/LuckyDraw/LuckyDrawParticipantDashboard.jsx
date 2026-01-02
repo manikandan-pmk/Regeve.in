@@ -792,12 +792,7 @@ const LuckyDrawParticipantDashboard = () => {
             iconBg:
               "bg-gradient-to-br from-emerald-500 via-emerald-600 to-teal-600",
           }}
-          percent={
-            Math.round(
-              (dashboardData.totalVerified / dashboardData.totalRegistered) *
-                100
-            ) || 0
-          }
+         
           description="Verified participants"
         />
 
@@ -827,11 +822,7 @@ const LuckyDrawParticipantDashboard = () => {
             dot: "bg-gradient-to-r from-rose-500 to-pink-500",
             iconBg: "bg-gradient-to-br from-rose-500 via-rose-600 to-pink-600",
           }}
-          percent={
-            Math.round(
-              (dashboardData.notVerified / dashboardData.totalRegistered) * 100
-            ) || 0
-          }
+          
           description="Awaiting verification"
         />
       </div>

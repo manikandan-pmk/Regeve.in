@@ -1221,7 +1221,7 @@ export default function LuckyDrawHome() {
               Back to Dashboard
             </button>
             <h1 className="text-4xl md:text-6xl font-extrabold text-slate-900 mb-8 tracking-tight">
-              🎯 Lucky Draw Manager
+               Lucky Draw Manager
             </h1>
             <p className="text-xl text-slate-600 max-w-3xl mx-auto leading-relaxed">
               Create and manage exciting lucky draws with prizes, QR code
