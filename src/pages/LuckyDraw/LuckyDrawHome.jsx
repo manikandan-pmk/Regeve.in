@@ -733,7 +733,7 @@ const DrawDetailsModal = ({ isOpen, onClose, draw, onDelete, API_BASE }) => {
 
 // Main Component
 export default function LuckyDrawHome() {
-  const { adminId, documentId  } = useParams();
+  const { adminId, documentId } = useParams();
   const navigate = useNavigate();
 
   const [draws, setDraws] = useState([]);
@@ -780,8 +780,6 @@ export default function LuckyDrawHome() {
   }, [adminId]);
 
   const fetchDraws = useCallback(async () => {
-    console.log("Starting fetchDraws for admin:", adminId);
-
     if (!checkAuth()) {
       console.log("Authentication failed");
       setAuthError(true);
@@ -1147,7 +1145,8 @@ export default function LuckyDrawHome() {
         No lucky draws yet
       </h3>
       <p className="mb-8 text-slate-500 max-w-md mx-auto">
-        Create your first lucky draw to start accepting entries and selecting winners
+        Create your first lucky draw to start accepting entries and selecting
+        winners
       </p>
     </div>
   );
@@ -1225,7 +1224,8 @@ export default function LuckyDrawHome() {
               🎯 Lucky Draw Manager
             </h1>
             <p className="text-xl text-slate-600 max-w-3xl mx-auto leading-relaxed">
-              Create and manage exciting lucky draws with prizes, QR code support, and real-time tracking for your events and campaigns.
+              Create and manage exciting lucky draws with prizes, QR code
+              support, and real-time tracking for your events and campaigns.
             </p>
           </header>
 
@@ -1329,13 +1329,15 @@ export default function LuckyDrawHome() {
                   <div className="relative">
                     <div className="absolute inset-0 bg-white rounded-full blur-sm"></div>
                     <div className="relative bg-gradient-to-r from-slate-50 to-white rounded-full p-1.5 shadow-lg shadow-slate-200/50">
-                      <div className={`w-2 h-2 rounded-full animate-pulse ${
-                        draw.LuckyDraw_Status === "Running" 
-                          ? "bg-emerald-500" 
-                          : draw.LuckyDraw_Status === "Created" 
-                          ? "bg-yellow-500" 
-                          : "bg-blue-500"
-                      }`} />
+                      <div
+                        className={`w-2 h-2 rounded-full animate-pulse ${
+                          draw.LuckyDraw_Status === "Running"
+                            ? "bg-emerald-500"
+                            : draw.LuckyDraw_Status === "Created"
+                            ? "bg-yellow-500"
+                            : "bg-blue-500"
+                        }`}
+                      />
                     </div>
                   </div>
                 </div>
@@ -1417,9 +1419,6 @@ export default function LuckyDrawHome() {
                         {draw.Number_of_Peoples || 0}
                       </p>
                       <div className="flex items-center justify-center space-x-1">
-                        <div className="p-0.5 rounded bg-blue-100/60">
-                          <span className="text-blue-600 text-sm">👥</span>
-                        </div>
                         <p className="text-xs font-semibold uppercase tracking-wider text-slate-600">
                           Participants
                         </p>
@@ -1435,12 +1434,9 @@ export default function LuckyDrawHome() {
                     >
                       <div className="absolute -right-4 -top-4 w-16 h-16 bg-indigo-100/20 rounded-full blur-xl"></div>
                       <p className="text-3xl font-black text-slate-900 mb-1">
-                        {formatAmount(draw.Amount).replace('₹', '')}
+                        {formatAmount(draw.Amount).replace("₹", "")}
                       </p>
                       <div className="flex items-center justify-center space-x-1">
-                        <div className="p-0.5 rounded bg-indigo-100/60">
-                          <span className="text-indigo-600 text-sm">💰</span>
-                        </div>
                         <p className="text-xs font-semibold uppercase tracking-wider text-slate-600">
                           Prize
                         </p>
@@ -1460,7 +1456,8 @@ export default function LuckyDrawHome() {
                         </span>
                       </div>
                       <span className="text-slate-500 font-medium">
-                        {draw.Duration_Value || "1"} {draw.Duration_Unit || "Week"}
+                        {draw.Duration_Value || "1"}{" "}
+                        {draw.Duration_Unit || "Week"}
                       </span>
                     </div>
                   </div>
@@ -1469,7 +1466,9 @@ export default function LuckyDrawHome() {
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      navigate(`/${adminId}/luckydraw-dashboard/${draw.documentId}`)
+                      navigate(
+                        `/${adminId}/luckydraw-dashboard/${draw.documentId}`
+                      );
                     }}
                     className="group/btn w-full py-3.5 rounded-xl
                    bg-gradient-to-r from-blue-500 via-blue-600 to-indigo-600
@@ -1552,7 +1551,7 @@ export default function LuckyDrawHome() {
       />
 
       {/* Add custom animations to global styles */}
-      <style jsx>{`
+      <style>{`
         @keyframes fadeIn {
           from {
             opacity: 0;

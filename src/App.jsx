@@ -90,7 +90,7 @@ export default function App() {
         {/* ================= SERVICES ================= */}
         <Route path="/:adminId/dashboard" element={<Dashboard />} />
         <Route path="/event-form" element={<EventForm />} />
-        <Route path="/:adminId/luckydraw" element={<LuckyDraw />} />
+        <Route path="/:adminId/luckydraw/:luckydrawDocumentId" element={<LuckyDraw />} />
         <Route path="/service/registration" element={<EventRegistration />} />
         <Route
           path="/service/luckydraw-system-page"

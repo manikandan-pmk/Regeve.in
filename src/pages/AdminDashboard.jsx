@@ -485,7 +485,6 @@ export default function AdminDashboard() {
 
     // Parse current URL to see what adminId is in the URL
     const pathParts = window.location.pathname.split("/").filter(Boolean);
-    console.log("Path parts:", pathParts);
 
     if (pathParts.length > 0) {
       console.log("AdminId from URL:", pathParts[0]);

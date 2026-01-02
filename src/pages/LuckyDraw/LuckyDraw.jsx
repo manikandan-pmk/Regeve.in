@@ -14,7 +14,7 @@ import {
   GiCardRandom,
 } from "react-icons/gi";
 import { IoRocket } from "react-icons/io5";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import axios from "axios";
 import React, { useState, useEffect } from "react";
 
@@ -169,6 +169,8 @@ const floatingParticles = {
 };
 
 const LuckyDraw = () => {
+  const { adminId, luckydrawDocumentId } = useParams();
+
   const [isSpinning, setIsSpinning] = useState(false);
   const [result, setResult] = useState(null);
   const [showResult, setShowResult] = useState(false);
@@ -178,82 +180,42 @@ const LuckyDraw = () => {
   const [showProfile, setShowProfile] = useState(false);
 
   const navigate = useNavigate();
-  const adminId = localStorage.getItem("adminId");
 
-const [participants, setParticipants] = useState([]);
+  const [participants, setParticipants] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  // Static demo members data
-  // const staticMembers = [
-  //   {
-  //     id: 1,
-  //     name: "John Doe",
-  //     memberId: "B123",
-  //     phone: "+1 234-567-8901",
-  //     email: "john@example.com",
-  //     companyId: "COMP001",
-  //     age: 28,
-  //     familyMembers: 3,
-  //     address: "123 Main St, New York",
-  //     foodPreference: "Vegetarian",
-  //     gender: "Male",
-  //     isWinnned: false,
-  //     photo: "https://randomuser.me/api/portraits/men/1.jpg"
-  //   },
-  //   {
-  //     id: 2,
-  //     name: "Jane Smith",
-  //     memberId: "B045",
-  //     phone: "+1 345-678-9012",
-  //     email: "jane@example.com",
-  //     companyId: "COMP002",
-  //     age: 32,
-  //     familyMembers: 4,
-  //     address: "456 Oak Ave, Los Angeles",
-  //     foodPreference: "Non-Vegetarian",
-  //     gender: "Female",
-  //     isWinnned: false,
-  //     photo: "https://randomuser.me/api/portraits/women/2.jpg"
-  //   },
-  //   {
-  //     id: 3,
-  //     name: "Robert Johnson",
-  //     memberId: "B267",
-  //     phone: "+1 456-789-0123",
-  //     email: "robert@example.com",
-  //     companyId: "COMP003",
-  //     age: 45,
-  //     familyMembers: 2,
-  //     address: "789 Pine Rd, Chicago",
-  //     foodPreference: "Vegan",
-  //     gender: "Male",
-  //     isWinnned: false,
-  //     photo: "https://randomuser.me/api/portraits/men/3.jpg"
-  //   }
-  // ];
+ useEffect(() => {
+  console.log("adminId:", adminId);
+  console.log("luckydrawDocumentId:", luckydrawDocumentId);
+}, [adminId, luckydrawDocumentId]);
 
-useEffect(() => {
+
+ useEffect(() => {
   const fetchParticipants = async () => {
     try {
       setLoading(true);
 
-      const token = localStorage.getItem("jwt"); // 🔑 get token
+      const token = localStorage.getItem("jwt");
 
       const res = await axios.get(
-        "https://api.regeve.in/api/lucky-draw-forms",
+        `https://api.regeve.in/api/lucky-draw-names/${luckydrawDocumentId}`,
         {
           headers: {
-            Authorization: `Bearer ${token}`, // ✅ REQUIRED
+            Authorization: `Bearer ${token}`,
           },
         }
       );
 
-      const data = res.data?.data || res.data;
+      // ✅ users are inside lucky_draw_forms
+      const users = res.data?.lucky_draw_forms || [];
 
-      // ✅ Only verified users
-      const verifiedUsers = data.filter(
-        (user) => user.isVerified === true
-      );
+      // ✅ only verified users
+      const verifiedUsers = users.filter(
+  (user) =>
+    user.isVerified === true &&
+    user.IsWinnedParticipant !== true
+);
+
 
       setParticipants(verifiedUsers);
     } catch (err) {
@@ -267,8 +229,10 @@ useEffect(() => {
     }
   };
 
-  fetchParticipants();
-}, []);
+  if (luckydrawDocumentId) {
+    fetchParticipants();
+  }
+}, [luckydrawDocumentId]);
 
 
   const startSpinning = () => {
@@ -334,40 +298,33 @@ useEffect(() => {
 
   // Update current values during spinning
   useEffect(() => {
-  let interval;
+    let interval;
 
-  if (isSpinning) {
-    interval = setInterval(() => {
-      const randomNumber = Math.floor(Math.random() * 300) + 1;
-      const numberStr = randomNumber.toString().padStart(3, "0");
-      setCurrentValues(["B", numberStr[0], numberStr[1], numberStr[2]]);
-    }, 60);
-  } else {
-    setCurrentValues(finalValues);
-  }
+    if (isSpinning) {
+      interval = setInterval(() => {
+        const randomNumber = Math.floor(Math.random() * 300) + 1;
+        const numberStr = randomNumber.toString().padStart(3, "0");
+        setCurrentValues(["B", numberStr[0], numberStr[1], numberStr[2]]);
+      }, 60);
+    } else {
+      setCurrentValues(finalValues);
+    }
 
-  return () => clearInterval(interval);
-}, [isSpinning, finalValues]);
-
+    return () => clearInterval(interval);
+  }, [isSpinning, finalValues]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-800 flex items-center justify-center p-4 font-serif relative">
       {/* Profile Popup - Static Version */}
       <motion.button
-        onClick={() => navigate(`/${adminId}/luckydraw-dashboard`)}
-        className={`fixed top-6 right-6 z-50 bg-gradient-to-br from-slate-900 via-purple-900 hover:from-blue-700 hover:to-cyan-800 text-white px-5 py-2.5 rounded-lg shadow-lg cursor-pointer transition-all duration-200 ease-in-out transform hover:scale-105 font-medium text-sm border border-white/30 backdrop-blur-sm ${
-          showProfile ? "blur-sm opacity-70" : "opacity-100"
-        }`}
-        initial={{ x: 100, opacity: 0 }}
-        animate={{ x: 0, opacity: 1 }}
-        transition={{ duration: 0.6, delay: 0.2 }}
-        whileHover={{
-          scale: 1.05,
-          boxShadow: "0 0 20px rgba(59, 130, 246, 0.5)",
-        }}
+        onClick={() =>
+          navigate(`/${adminId}/luckydraw-dashboard/${luckydrawDocumentId}`)
+        }
+        className="fixed top-6 right-6 z-50 bg-gradient-to-br from-slate-900 via-purple-900 hover:from-blue-700 hover:to-cyan-800 text-white px-5 py-2.5 rounded-lg shadow-lg cursor-pointer"
       >
         ← Go Back
       </motion.button>
+
       <AnimatePresence>
         {showProfile && result?.winner && (
           <motion.div
