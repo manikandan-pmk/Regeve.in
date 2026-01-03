@@ -80,6 +80,8 @@ const LuckyDrawDashboard = () => {
   const [stats, setStats] = useState({
     totalParticipants: 0,
     totalAmount: 0,
+    maxParticipants: 0,
+    verifiedParticipants: 0,
     daysRemaining: 0,
     activeDraws: 0,
     winnersCount: 0,
@@ -99,26 +101,25 @@ const LuckyDrawDashboard = () => {
   const fetchLuckyDrawData = async () => {
     try {
       setLoading(true);
-      setError(null);
-
-      if (!luckydrawDocumentId || luckydrawDocumentId === "undefined") {
-        throw new Error("Invalid lucky draw ID");
-      }
 
       const response = await axiosWithAuth.get(
         `/lucky-draw-names/${luckydrawDocumentId}`
       );
 
       const data = response.data;
+      const participants = data.lucky_draw_forms || [];
 
-      if (!data || typeof data !== "object") {
-        throw new Error("Invalid response data");
-      }
+      const verifiedCount = participants.filter(
+        (p) => p.isVerified === true
+      ).length;
 
       setLuckyDrawData(data);
+
       setStats((prev) => ({
         ...prev,
-        totalParticipants: data.Number_of_Peoples || 0,
+        totalParticipants: participants.length,
+        verifiedParticipants: verifiedCount,
+        maxParticipants: data.Number_of_Peoples || 0,
         totalAmount: parseFloat(data.Amount) || 0,
         daysRemaining: calculateDaysRemaining(
           data.Duration_Value,
@@ -126,22 +127,8 @@ const LuckyDrawDashboard = () => {
         ),
         activeDraws: data.LuckyDraw_Status === "Active" ? 1 : 0,
       }));
-    } catch (error) {
-      console.error("Axios Error:", error);
-      if (error.response) {
-        if (error.response.status === 401) {
-          setError("Unauthorized. Please login again.");
-        } else if (error.response.status === 403) {
-          setError("Access forbidden. Permission denied.");
-        } else {
-          setError(
-            error.response.data?.message ||
-              `API Error: ${error.response.status}`
-          );
-        }
-      } else {
-        setError(error.message || "Failed to load data");
-      }
+    } catch (err) {
+      setError(err.message);
     } finally {
       setLoading(false);
     }
@@ -948,14 +935,23 @@ const LuckyDrawDashboard = () => {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           {[
             {
-              key: "participants",
+              key: "verified",
               title: "Total Participants",
-              value: stats.totalParticipants,
+              value: stats.verifiedParticipants,
               icon: Users,
               color: "blue",
-              delay: 0.1,
-              progress: Math.min(stats.totalParticipants * 0.5, 100),
-              growth: "+5.2%",
+              delay: 0.15,
+              progress:
+                stats.totalParticipants > 0
+                  ? (stats.verifiedParticipants / stats.totalParticipants) * 100
+                  : 0,
+              progressPercent:
+                stats.totalParticipants > 0
+                  ? Math.round(
+                      (stats.verifiedParticipants / stats.totalParticipants) *
+                        100
+                    )
+                  : 0,
             },
             {
               key: "amount",

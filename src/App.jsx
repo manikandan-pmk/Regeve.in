@@ -42,6 +42,7 @@ import RegistrationFormLuckydraw from "./pages/LuckyDraw/RegistrationFormLuckydr
 import EventGallery from "./pages/EventGallery";
 import LuckyDrawHome from "./pages/LuckyDraw/LuckyDrawHome";
 import LuckyDrawDashboard from "./pages/LuckyDraw/LuckyDrawDashboard";
+import ParticipantDetailsPage from "./pages/LuckyDraw/ParticipantDetailsPage";
 
 export default function App() {
   const location = useLocation();
@@ -70,7 +71,8 @@ export default function App() {
     // admin dashboard
     location.pathname.endsWith("/admindashboard") ||
     location.pathname.includes("/votingpage/") ||
-    location.pathname.includes("/LuckyDrawHome");
+    location.pathname.includes("/LuckyDrawHome") ||
+    location.pathname.includes("/participant-page/");
 
   return (
     <div className="max-w-full overflow-x-hidden">
@@ -125,6 +127,10 @@ export default function App() {
          <Route
           path="/:adminId/luckydraw-participant-dashboard/:luckydrawDocumentId"
           element={<LuckyDrawParticipantDashboard />}
+        />
+        <Route
+          path="/:adminId/participant-page/:luckydrawDocumentId"
+          element={<ParticipantDetailsPage />}
         />
         <Route
           path="/:adminId/luckydraw-form/:luckydrawDocumentId"
