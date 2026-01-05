@@ -40,6 +40,14 @@ import {
   Shield,
   Bell,
   Settings,
+  CreditCard,
+  Filter,
+  Search,
+  Download,
+  Check,
+  XCircle,
+  Loader,
+  FileText,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -72,11 +80,14 @@ const LuckyDrawDashboard = () => {
   const navigate = useNavigate();
   const [luckyDrawData, setLuckyDrawData] = useState(null);
   const [winners, setWinners] = useState([]);
+  const [payments, setPayments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [winnersLoading, setWinnersLoading] = useState(false);
+  const [paymentsLoading, setPaymentsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [selectedWinner, setSelectedWinner] = useState(null);
   const [showWinnerModal, setShowWinnerModal] = useState(false);
+  const [showPaymentsModal, setShowPaymentsModal] = useState(false);
   const [stats, setStats] = useState({
     totalParticipants: 0,
     totalAmount: 0,
@@ -85,8 +96,22 @@ const LuckyDrawDashboard = () => {
     daysRemaining: 0,
     activeDraws: 0,
     winnersCount: 0,
+    totalPaidAmount: 0,
+    totalPendingAmount: 0,
+    paidCount: 0,
+    pendingCount: 0,
   });
   const [hoveredCard, setHoveredCard] = useState(null);
+
+  // Payment filter states
+  const [paymentFilter, setPaymentFilter] = useState("all"); // all, paid, pending
+  const [searchQuery, setSearchQuery] = useState("");
+  const [verifyingPaymentId, setVerifyingPaymentId] = useState(null);
+  const [paymentStats, setPaymentStats] = useState({
+    totalPaid: 0,
+    totalPending: 0,
+    totalAmount: 0,
+  });
 
   useEffect(() => {
     if (!luckydrawDocumentId) {
@@ -96,6 +121,7 @@ const LuckyDrawDashboard = () => {
     }
     fetchLuckyDrawData();
     fetchWinners();
+    fetchPayments();
   }, [luckydrawDocumentId]);
 
   const fetchLuckyDrawData = async () => {
@@ -170,6 +196,105 @@ const LuckyDrawDashboard = () => {
     }
   };
 
+  const fetchPayments = async () => {
+    try {
+      setPaymentsLoading(true);
+      const response = await axiosWithAuth.get(
+        `/lucky-draw-names/${luckydrawDocumentId}`
+      );
+      const data = response.data;
+      const paymentsData = data.payments || [];
+
+      // Process payments data
+      let paidAmount = 0;
+      let pendingAmount = 0;
+      let paidCount = 0;
+      let pendingCount = 0;
+
+      paymentsData.forEach((payment) => {
+        const amount = parseFloat(payment.Amount) || 0;
+        if (payment.isVerified === true) {
+          paidAmount += amount;
+          paidCount++;
+        } else {
+          pendingAmount += amount;
+          pendingCount++;
+        }
+      });
+
+      setPayments(paymentsData);
+      setStats((prev) => ({
+        ...prev,
+        totalPaidAmount: paidAmount,
+        totalPendingAmount: pendingAmount,
+        paidCount: paidCount,
+        pendingCount: pendingCount,
+      }));
+
+      setPaymentStats({
+        totalPaid: paidCount,
+        totalPending: pendingCount,
+        totalAmount: paidAmount + pendingAmount,
+      });
+    } catch (error) {
+      console.error("Error fetching payments:", error);
+      setError(error.message || "Failed to fetch payments");
+    } finally {
+      setPaymentsLoading(false);
+    }
+  };
+
+const verifyPayment = async (paymentDocumentId, verify) => {
+  try {
+    setVerifyingPaymentId(paymentDocumentId);
+
+await axiosWithAuth.put(
+  `/lucky-draw-names/${luckydrawDocumentId}`,
+  {
+    data: {
+      participant_payments: {
+        update: [
+          {
+            where: {
+              documentId: paymentDocumentId,
+            },
+            data: {
+              isVerified: verify,
+            },
+          },
+        ],
+      },
+    },
+  }
+);
+
+
+    // Optimistic UI update
+    setPayments((prev) =>
+      prev.map((p) =>
+        p.documentId === paymentDocumentId
+          ? {
+              ...p,
+              isVerified: verify,
+              Verified_At: verify ? new Date().toISOString() : null,
+            }
+          : p
+      )
+    );
+  } catch (error) {
+    console.error(
+      "Payment verification failed:",
+      error?.response?.data || error
+    );
+    alert("Failed to update payment");
+  } finally {
+    setVerifyingPaymentId(null);
+  }
+};
+
+
+
+
   const calculateDaysRemaining = (value, unit) => {
     const unitMap = {
       Day: 1,
@@ -207,6 +332,26 @@ const LuckyDrawDashboard = () => {
       year: "numeric",
     });
   };
+
+  // Filter payments based on status and search
+  const filteredPayments = payments.filter((payment) => {
+    const matchesFilter =
+      paymentFilter === "all" ||
+      (paymentFilter === "paid" && payment.isVerified === true) ||
+      (paymentFilter === "pending" && payment.isVerified !== true);
+
+    const matchesSearch =
+      searchQuery === "" ||
+      payment.lucky_draw_form?.Name?.toLowerCase().includes(
+        searchQuery.toLowerCase()
+      ) ||
+      payment.lucky_draw_form?.Email?.toLowerCase().includes(
+        searchQuery.toLowerCase()
+      ) ||
+      payment.Payment_Cycle?.toLowerCase().includes(searchQuery.toLowerCase());
+
+    return matchesFilter && matchesSearch;
+  });
 
   // Loading Animation Component
   const LoadingAnimation = () => (
@@ -612,6 +757,392 @@ const LuckyDrawDashboard = () => {
     );
   };
 
+  // Payment Tracking Modal Component
+  const PaymentTrackingModal = ({ onClose }) => {
+    return (
+      <AnimatePresence>
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+          onClick={onClose}
+        >
+          <motion.div
+            initial={{ scale: 0.95, opacity: 0, y: 20 }}
+            animate={{ scale: 1, opacity: 1, y: 0 }}
+            exit={{ scale: 0.95, opacity: 0, y: 20 }}
+            transition={{ type: "spring", damping: 25, stiffness: 300 }}
+            onClick={(e) => e.stopPropagation()}
+            className="bg-gradient-to-br from-white to-blue-50 rounded-3xl shadow-2xl w-full max-w-7xl max-h-[95vh] overflow-hidden border border-white/20 flex flex-col"
+          >
+            {/* Header */}
+            <div className="shrink-0 relative px-8 py-6 flex items-center justify-between bg-gradient-to-r from-blue-600/10 to-indigo-600/10 border-b border-white/20">
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-xl shadow-lg">
+                  <CreditCard className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+                    Payment Tracking
+                  </h3>
+                  <p className="text-gray-500 text-sm">
+                    Total: {paymentStats.totalPaid + paymentStats.totalPending}{" "}
+                    payments • Paid: {paymentStats.totalPaid} • Pending:{" "}
+                    {paymentStats.totalPending}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-4">
+                <div className="flex gap-2">
+                  <div className="px-3 py-1.5 bg-green-100 text-green-800 rounded-lg font-medium flex items-center gap-2">
+                    <Check className="w-4 h-4" />
+                    Paid: {paymentStats.totalPaid}
+                  </div>
+                  <div className="px-3 py-1.5 bg-amber-100 text-amber-800 rounded-lg font-medium flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4" />
+                    Pending: {paymentStats.totalPending}
+                  </div>
+                </div>
+
+                <motion.button
+                  whileHover={{ scale: 1.1, rotate: 90 }}
+                  whileTap={{ scale: 0.9 }}
+                  onClick={onClose}
+                  className="p-2 cursor-pointer hover:bg-red-600 hover:text-white rounded-xl transition-colors"
+                >
+                  <X className="w-6 h-6 hover:text-white" />
+                </motion.button>
+              </div>
+            </div>
+
+            {/* Filters and Search */}
+            <div className="px-8 py-4 border-b border-gray-100 bg-white/50">
+              <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="flex bg-gray-100 rounded-lg p-1">
+                    {["all", "paid", "pending"].map((filter) => (
+                      <button
+                        key={filter}
+                        onClick={() => setPaymentFilter(filter)}
+                        className={`px-4 py-2 rounded-md text-sm font-medium transition-all cursor-pointer ${
+                          paymentFilter === filter
+                            ? "bg-white text-blue-600 shadow-sm"
+                            : "text-gray-600 hover:text-gray-900"
+                        }`}
+                      >
+                        {filter.charAt(0).toUpperCase() + filter.slice(1)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-4">
+                  <div className="relative w-full md:w-64">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                    <input
+                      type="text"
+                      placeholder="Search by name, email..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={fetchPayments}
+                    className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg shadow hover:shadow-lg transition-all"
+                  >
+                    <RefreshCw className="w-4 h-4" />
+                    Refresh
+                  </motion.button>
+                </div>
+              </div>
+            </div>
+
+            {/* Payments Table */}
+            <div className="flex-1 overflow-hidden">
+              {paymentsLoading ? (
+                <div className="flex flex-col items-center justify-center h-full py-12">
+                  <Loader className="w-12 h-12 text-blue-500 animate-spin mb-4" />
+                  <p className="text-gray-600 text-lg">Loading payments...</p>
+                </div>
+              ) : filteredPayments.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full py-12">
+                  <CreditCard className="w-24 h-24 text-gray-300 mb-4" />
+                  <h4 className="text-xl font-semibold text-gray-700 mb-2">
+                    No payments found
+                  </h4>
+                  <p className="text-gray-500 max-w-md text-center">
+                    {searchQuery || paymentFilter !== "all"
+                      ? "Try changing your search or filter"
+                      : "No payments recorded yet"}
+                  </p>
+                </div>
+              ) : (
+                <div className="h-full overflow-y-auto">
+                  <table className="w-full border-collapse">
+                    {/* Table Header */}
+                    <thead className="sticky top-0 z-10 bg-gradient-to-r from-blue-50 to-indigo-50">
+                      <tr className="border-b border-gray-200">
+                        <th className="text-left py-4 px-6 text-sm font-semibold text-gray-700 uppercase tracking-wider">
+                          <div className="flex items-center gap-2">
+                            <User className="w-4 h-4" />
+                            Participant
+                          </div>
+                        </th>
+                        <th className="text-left py-4 px-6 text-sm font-semibold text-gray-700 uppercase tracking-wider">
+                          <div className="flex items-center gap-2">
+                            <DollarSign className="w-4 h-4" />
+                            Amount
+                          </div>
+                        </th>
+                        <th className="text-left py-4 px-6 text-sm font-semibold text-gray-700 uppercase tracking-wider">
+                          <div className="flex items-center gap-2">
+                            <Calendar className="w-4 h-4" />
+                            Payment Cycle
+                          </div>
+                        </th>
+                        <th className="text-left py-4 px-6 text-sm font-semibold text-gray-700 uppercase tracking-wider">
+                          <div className="flex items-center gap-2">
+                            <CalendarDays className="w-4 h-4" />
+                            Due Date
+                          </div>
+                        </th>
+                        <th className="text-left py-4 px-6 text-sm font-semibold text-gray-700 uppercase tracking-wider">
+                          <div className="flex items-center gap-2">
+                            <CheckCircle className="w-4 h-4" />
+                            Status
+                          </div>
+                        </th>
+                        <th className="text-left py-4 px-6 text-sm font-semibold text-gray-700 uppercase tracking-wider">
+                          <div className="flex items-center gap-2">
+                            <FileText className="w-4 h-4" />
+                            Proof
+                          </div>
+                        </th>
+                        <th className="text-left py-4 px-6 text-sm font-semibold text-gray-700 uppercase tracking-wider">
+                          <div className="flex items-center gap-2">
+                            <Settings className="w-4 h-4" />
+                            Actions
+                          </div>
+                        </th>
+                      </tr>
+                    </thead>
+
+                    {/* Table Body */}
+                    <tbody className="divide-y divide-gray-100">
+                      {filteredPayments.map((payment) => (
+                        <motion.tr
+                          key={payment.documentId}
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          className="hover:bg-blue-50/50 transition-colors duration-200"
+                        >
+                          {/* Participant Column */}
+                          <td className="py-4 px-6">
+                            <div className="flex items-center gap-3">
+                              <div className="relative">
+                                {payment.lucky_draw_form?.Photo?.url ? (
+                                  <img
+                                    src={`${MEDIA_BASE_URL}${payment.lucky_draw_form.Photo.url}`}
+                                    alt={payment.lucky_draw_form.Name}
+                                    className="w-10 h-10 rounded-full object-cover border-2 border-white shadow"
+                                    onError={(e) => {
+                                      e.target.style.display = "none";
+                                      e.target.parentNode.innerHTML = `
+                                      <div class="w-10 h-10 rounded-full bg-gradient-to-br from-blue-100 to-indigo-100 flex items-center justify-center border-2 border-white shadow">
+                                        <User class="w-5 h-5 text-blue-400" />
+                                      </div>
+                                    `;
+                                    }}
+                                  />
+                                ) : (
+                                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-100 to-indigo-100 flex items-center justify-center border-2 border-white shadow">
+                                    <User className="w-5 h-5 text-blue-400" />
+                                  </div>
+                                )}
+                                {payment.lucky_draw_form?.isVerified && (
+                                  <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-white flex items-center justify-center">
+                                    <Check className="w-2 h-2 text-white" />
+                                  </div>
+                                )}
+                              </div>
+                              <div>
+                                <p className="font-medium text-gray-900">
+                                  {payment.lucky_draw_form?.Name || "Unknown"}
+                                </p>
+                                <p className="text-sm text-gray-500 truncate max-w-[150px]">
+                                  {payment.lucky_draw_form?.Email || "No email"}
+                                </p>
+                              </div>
+                            </div>
+                          </td>
+
+                          {/* Amount Column */}
+                          <td className="py-4 px-6">
+                            <div className="font-bold text-lg text-gray-900">
+                              {formatCurrency(payment.Amount)}
+                            </div>
+                          </td>
+
+                          {/* Payment Cycle Column */}
+                          <td className="py-4 px-6">
+                            <div className="flex items-center gap-2">
+                              <span className="px-3 py-1 bg-blue-100 text-blue-800 text-xs font-semibold rounded-full">
+                                {payment.Payment_Cycle || "N/A"}
+                              </span>
+                            </div>
+                          </td>
+
+                          {/* Due Date Column */}
+                          <td className="py-4 px-6">
+                            <div className="text-gray-700">
+                              {formatDate(payment.due_date)}
+                            </div>
+                          </td>
+
+                          {/* Status Column */}
+                          <td className="py-4 px-6">
+                            <div
+                              className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-semibold ${
+                                payment.isVerified
+                                  ? "bg-green-100 text-green-800"
+                                  : "bg-amber-100 text-amber-800"
+                              }`}
+                            >
+                              {payment.isVerified ? (
+                                <>
+                                  <Check className="w-4 h-4" />
+                                  Paid
+                                </>
+                              ) : (
+                                <>
+                                  <AlertCircle className="w-4 h-4" />
+                                  Pending
+                                </>
+                              )}
+                            </div>
+                            {payment.Verified_At && (
+                              <p className="text-xs text-gray-500 mt-1">
+                                {formatDate(payment.Verified_At)}
+                              </p>
+                            )}
+                          </td>
+
+                          {/* Proof Column */}
+                          <td className="py-4 px-6">
+                            {payment.Payment_Photo?.[0]?.url ? (
+                              <div className="relative group">
+                                <button
+                                  onClick={() =>
+                                    window.open(
+                                      `${MEDIA_BASE_URL}${payment.Payment_Photo[0].url}`,
+                                      "_blank"
+                                    )
+                                  }
+                                  className="flex items-center gap-2 px-3 py-1.5 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-lg transition-colors cursor-pointer"
+                                >
+                                  <Eye className="w-4 h-4" />
+                                  View Proof
+                                </button>
+                              </div>
+                            ) : (
+                              <span className="text-gray-400 text-sm">
+                                No proof
+                              </span>
+                            )}
+                          </td>
+
+                          {/* Actions Column */}
+                          <td className="py-4 px-6">
+                            <div className="flex gap-2">
+                              {!payment.isVerified ? (
+                                <motion.button
+                                  whileHover={{ scale: 1.05 }}
+                                  whileTap={{ scale: 0.95 }}
+                                  onClick={() =>
+                                    verifyPayment(payment.documentId, true)
+                                  }
+                                  disabled={
+                                    verifyingPaymentId === payment.documentId
+                                  }
+                                  className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white rounded-lg font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                  {verifyingPaymentId === payment.documentId ? (
+                                    <>
+                                      <Loader className="w-4 h-4 animate-spin" />
+                                      Verifying...
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Check className="w-4 h-4" />
+                                      Mark Paid
+                                    </>
+                                  )}
+                                </motion.button>
+                              ) : (
+                                <motion.button
+                                  whileHover={{ scale: 1.05 }}
+                                  whileTap={{ scale: 0.95 }}
+                                  onClick={() =>
+                                    verifyPayment(payment.documentId, false)
+                                  }
+                                  disabled={
+                                    verifyingPaymentId === payment.documentId
+                                  }
+                                  className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white rounded-lg font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                  {verifyingPaymentId === payment.documentId ? (
+                                    <>
+                                      <Loader className="w-4 h-4 animate-spin" />
+                                      Updating...
+                                    </>
+                                  ) : (
+                                    <>
+                                      <XCircle className="w-4 h-4" />
+                                      Mark Pending
+                                    </>
+                                  )}
+                                </motion.button>
+                              )}
+                            </div>
+                          </td>
+                        </motion.tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="shrink-0 bg-gradient-to-r from-white to-blue-50 border-t border-white/20 px-8 py-4">
+              <div className="flex items-center justify-between">
+                <div className="text-sm text-gray-500">
+                  Showing {filteredPayments.length} of {payments.length}{" "}
+                  payments • Total Amount:{" "}
+                  {formatCurrency(paymentStats.totalAmount)}
+                </div>
+                <div className="flex items-center gap-4">
+                  <button
+                    onClick={onClose}
+                    className="px-6 py-2.5 cursor-pointer bg-gradient-to-r from-gray-100 to-gray-200 hover:from-gray-200 hover:to-gray-300 text-gray-700 hover:text-gray-900 rounded-lg font-medium transition-all flex items-center gap-2"
+                  >
+                    <X className="w-4 h-4" />
+                    Close
+                  </button>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        </motion.div>
+      </AnimatePresence>
+    );
+  };
+
   if (loading) {
     return <LoadingAnimation />;
   }
@@ -729,6 +1260,77 @@ const LuckyDrawDashboard = () => {
     );
   }
 
+  // Stats Cards with Payment Tracking
+  const statsCards = [
+    {
+      key: "verified",
+      title: "Total Participants",
+      value: stats.verifiedParticipants,
+      icon: Users,
+      color: "blue",
+      delay: 0.15,
+      progress:
+        stats.totalParticipants > 0
+          ? (stats.verifiedParticipants / stats.totalParticipants) * 100
+          : 0,
+      progressPercent:
+        stats.totalParticipants > 0
+          ? Math.round(
+              (stats.verifiedParticipants / stats.totalParticipants) * 100
+            )
+          : 0,
+    },
+    {
+      key: "amount",
+      title: "Total Prize Pool",
+      value: formatCurrency(stats.totalAmount),
+      icon: DollarSign,
+      color: "emerald",
+      delay: 0.2,
+      progress: Math.min((stats.totalAmount / 10000) * 10, 100),
+      amountPerWinner:
+        stats.winnersCount > 0
+          ? formatCurrency(stats.totalAmount / stats.winnersCount)
+          : formatCurrency(0),
+    },
+    {
+      key: "payments",
+      title: "Payment Tracking",
+      value: `${stats.paidCount}/${stats.paidCount + stats.pendingCount}`,
+      icon: CreditCard,
+      color: "amber",
+      delay: 0.25,
+      progress:
+        stats.paidCount + stats.pendingCount > 0
+          ? (stats.paidCount / (stats.paidCount + stats.pendingCount)) * 100
+          : 0,
+      progressPercent:
+        stats.paidCount + stats.pendingCount > 0
+          ? Math.round(
+              (stats.paidCount / (stats.paidCount + stats.pendingCount)) * 100
+            )
+          : 0,
+      clickable: true,
+      onClick: () => setShowPaymentsModal(true),
+    },
+    {
+      key: "winners",
+      title: "Winners Count",
+      value: stats.winnersCount,
+      icon: Crown,
+      color: "purple",
+      delay: 0.3,
+      progress:
+        stats.totalParticipants > 0
+          ? (stats.winnersCount / stats.totalParticipants) * 100
+          : 0,
+      winRate:
+        stats.totalParticipants > 0
+          ? ((stats.winnersCount / stats.totalParticipants) * 100).toFixed(1)
+          : 0,
+    },
+  ];
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -799,6 +1401,22 @@ const LuckyDrawDashboard = () => {
             >
               <div className=" backdrop-blur-sm rounded-2xl p-4 ">
                 <div className="flex items-center gap-3">
+                  {/* Payment Tracking Button */}
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => setShowPaymentsModal(true)}
+                    className="cursor-pointer flex items-center gap-3 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white px-5 py-3 rounded-xl shadow-lg hover:shadow-xl group"
+                  >
+                    <CreditCard className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                    <span className="font-semibold hidden md:inline">
+                      Payment Tracking
+                    </span>
+                    <div className="px-2 py-1 bg-white/20 rounded text-xs">
+                      {stats.paidCount}/{stats.paidCount + stats.pendingCount}
+                    </div>
+                  </motion.button>
+
                   <motion.button
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
@@ -820,6 +1438,7 @@ const LuckyDrawDashboard = () => {
                     onClick={() => {
                       fetchLuckyDrawData();
                       fetchWinners();
+                      fetchPayments();
                     }}
                     className="cursor-pointer p-3 rounded-xl border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-all duration-300"
                     title="Refresh Dashboard"
@@ -933,72 +1552,7 @@ const LuckyDrawDashboard = () => {
 
         {/* Stats Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {[
-            {
-              key: "verified",
-              title: "Total Participants",
-              value: stats.verifiedParticipants,
-              icon: Users,
-              color: "blue",
-              delay: 0.15,
-              progress:
-                stats.totalParticipants > 0
-                  ? (stats.verifiedParticipants / stats.totalParticipants) * 100
-                  : 0,
-              progressPercent:
-                stats.totalParticipants > 0
-                  ? Math.round(
-                      (stats.verifiedParticipants / stats.totalParticipants) *
-                        100
-                    )
-                  : 0,
-            },
-            {
-              key: "amount",
-              title: "Total Prize Pool",
-              value: formatCurrency(stats.totalAmount),
-              icon: DollarSign,
-              color: "emerald",
-              delay: 0.2,
-              progress: Math.min((stats.totalAmount / 10000) * 10, 100),
-              amountPerWinner:
-                stats.winnersCount > 0
-                  ? formatCurrency(stats.totalAmount / stats.winnersCount)
-                  : formatCurrency(0),
-            },
-            {
-              key: "winners",
-              title: "Winners Count",
-              value: stats.winnersCount,
-              icon: Crown,
-              color: "amber",
-              delay: 0.3,
-              progress:
-                stats.totalParticipants > 0
-                  ? (stats.winnersCount / stats.totalParticipants) * 100
-                  : 0,
-              winRate:
-                stats.totalParticipants > 0
-                  ? (
-                      (stats.winnersCount / stats.totalParticipants) *
-                      100
-                    ).toFixed(1)
-                  : 0,
-            },
-            {
-              key: "days",
-              title: "Days Remaining",
-              value: stats.daysRemaining,
-              icon: Calendar,
-              color: "purple",
-              delay: 0.4,
-              progress: Math.min((stats.daysRemaining / 365) * 100, 100),
-              progressPercent: Math.min(
-                Math.round((stats.daysRemaining / 365) * 100),
-                100
-              ),
-            },
-          ].map((stat, index) => (
+          {statsCards.map((stat, index) => (
             <motion.div
               key={stat.key}
               initial={{ opacity: 0, y: 50, scale: 0.9 }}
@@ -1010,7 +1564,14 @@ const LuckyDrawDashboard = () => {
               }}
               onMouseEnter={() => setHoveredCard(stat.key)}
               onMouseLeave={() => setHoveredCard(null)}
-              className={`group cursor-pointer bg-white rounded-2xl p-6 border border-${stat.color}-100 hover:border-${stat.color}-300 hover:shadow-2xl transition-all duration-500 relative overflow-hidden`}
+              onClick={stat.clickable ? stat.onClick : undefined}
+              className={`group ${
+                stat.clickable ? "cursor-pointer" : ""
+              } bg-white rounded-2xl p-6 border border-${
+                stat.color
+              }-100 hover:border-${
+                stat.color
+              }-300 hover:shadow-2xl transition-all duration-500 relative overflow-hidden`}
             >
               {/* Animated background on hover */}
               <motion.div
@@ -1069,7 +1630,9 @@ const LuckyDrawDashboard = () => {
                 <div className="space-y-2">
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-gray-600">
-                      {stat.growth
+                      {stat.key === "payments"
+                        ? `Paid: ${stats.paidCount} | Pending: ${stats.pendingCount}`
+                        : stat.growth
                         ? "Daily Growth"
                         : stat.amountPerWinner
                         ? "Amount per winner"
@@ -1393,6 +1956,11 @@ const LuckyDrawDashboard = () => {
             setSelectedWinner(null);
           }}
         />
+      )}
+
+      {/* Payment Tracking Modal */}
+      {showPaymentsModal && (
+        <PaymentTrackingModal onClose={() => setShowPaymentsModal(false)} />
       )}
 
       {/* Global Styles */}
