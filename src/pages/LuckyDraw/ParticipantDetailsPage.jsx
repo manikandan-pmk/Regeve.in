@@ -135,6 +135,12 @@ const MobileVerificationGate = ({ onVerify, documentId }) => {
       )[0];
 
       if (userExists) {
+        if (!userExists.isVerified) {
+          triggerError(
+            "Your account is not verified yet. Please wait for admin approval."
+          );
+          return;
+        }
         localStorage.setItem("participant_documentId", userExists.documentId);
         localStorage.setItem("participant_phone", userExists.Phone_Number);
         localStorage.setItem("participant_name", userExists.Name);
@@ -288,7 +294,7 @@ const StatsCards = ({ participants, luckyDrawAmount, paymentStats }) => {
   ).length;
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
       <div className="bg-gradient-to-br from-white to-slate-50 rounded-2xl p-5 border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
         <div className="flex items-center justify-between">
           <div>
@@ -317,19 +323,7 @@ const StatsCards = ({ participants, luckyDrawAmount, paymentStats }) => {
         </div>
       </div>
 
-      <div className="bg-gradient-to-br from-white to-slate-50 rounded-2xl p-5 border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-slate-500 text-sm font-medium mb-1">Paid</p>
-            <p className="text-3xl font-bold text-slate-800">
-              {paidParticipants}
-            </p>
-          </div>
-          <div className="w-12 h-12 rounded-xl bg-emerald-100 flex items-center justify-center">
-            <BadgeCheck className="text-emerald-600 w-6 h-6" />
-          </div>
-        </div>
-      </div>
+     
 
       <div className="bg-gradient-to-br from-white to-slate-50 rounded-2xl p-5 border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
         <div className="flex items-center justify-between">

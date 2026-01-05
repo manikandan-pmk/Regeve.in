@@ -48,6 +48,8 @@ import {
   XCircle,
   Loader,
   FileText,
+  ChevronDown,
+  Layers,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -112,6 +114,11 @@ const LuckyDrawDashboard = () => {
     totalPending: 0,
     totalAmount: 0,
   });
+
+  // Cycle states
+  const [selectedCycle, setSelectedCycle] = useState("all");
+  const [showCycleDropdown, setShowCycleDropdown] = useState(false);
+  const [cycleStats, setCycleStats] = useState({});
 
   useEffect(() => {
     if (!luckydrawDocumentId) {
@@ -211,14 +218,45 @@ const LuckyDrawDashboard = () => {
       let paidCount = 0;
       let pendingCount = 0;
 
+      // Calculate cycle-wise statistics
+      const cycleData = {};
+      const allCycles = [];
+
       paymentsData.forEach((payment) => {
         const amount = parseFloat(payment.Amount) || 0;
+        const cycle = payment.Payment_Cycle || "Unknown";
+
+        // Add to all cycles list
+        if (!allCycles.includes(cycle)) {
+          allCycles.push(cycle);
+        }
+
+        // Initialize cycle data if not exists
+        if (!cycleData[cycle]) {
+          cycleData[cycle] = {
+            total: 0,
+            paid: 0,
+            pending: 0,
+            totalAmount: 0,
+            paidAmount: 0,
+            pendingAmount: 0,
+          };
+        }
+
+        // Update cycle data
+        cycleData[cycle].total++;
+        cycleData[cycle].totalAmount += amount;
+
         if (payment.isVerified === true) {
           paidAmount += amount;
           paidCount++;
+          cycleData[cycle].paid++;
+          cycleData[cycle].paidAmount += amount;
         } else {
           pendingAmount += amount;
           pendingCount++;
+          cycleData[cycle].pending++;
+          cycleData[cycle].pendingAmount += amount;
         }
       });
 
@@ -236,6 +274,12 @@ const LuckyDrawDashboard = () => {
         totalPending: pendingCount,
         totalAmount: paidAmount + pendingAmount,
       });
+
+      // Store cycle statistics
+      setCycleStats({
+        cycles: allCycles.sort(),
+        data: cycleData,
+      });
     } catch (error) {
       console.error("Error fetching payments:", error);
       setError(error.message || "Failed to fetch payments");
@@ -244,56 +288,52 @@ const LuckyDrawDashboard = () => {
     }
   };
 
-const verifyPayment = async (paymentDocumentId, verify) => {
-  try {
-    setVerifyingPaymentId(paymentDocumentId);
+  const verifyPayment = async (paymentDocumentId, verify) => {
+    try {
+      setVerifyingPaymentId(paymentDocumentId);
 
-await axiosWithAuth.put(
-  `/lucky-draw-names/${luckydrawDocumentId}`,
-  {
-    data: {
-      participant_payments: {
-        update: [
-          {
-            where: {
-              documentId: paymentDocumentId,
-            },
-            data: {
-              isVerified: verify,
-            },
+      await axiosWithAuth.put(`/lucky-draw-names/${luckydrawDocumentId}`, {
+        data: {
+          participant_payments: {
+            update: [
+              {
+                where: {
+                  documentId: paymentDocumentId,
+                },
+                data: {
+                  isVerified: verify,
+                },
+              },
+            ],
           },
-        ],
-      },
-    },
-  }
-);
+        },
+      });
 
+      // Optimistic UI update
+      setPayments((prev) =>
+        prev.map((p) =>
+          p.documentId === paymentDocumentId
+            ? {
+                ...p,
+                isVerified: verify,
+                Verified_At: verify ? new Date().toISOString() : null,
+              }
+            : p
+        )
+      );
 
-    // Optimistic UI update
-    setPayments((prev) =>
-      prev.map((p) =>
-        p.documentId === paymentDocumentId
-          ? {
-              ...p,
-              isVerified: verify,
-              Verified_At: verify ? new Date().toISOString() : null,
-            }
-          : p
-      )
-    );
-  } catch (error) {
-    console.error(
-      "Payment verification failed:",
-      error?.response?.data || error
-    );
-    alert("Failed to update payment");
-  } finally {
-    setVerifyingPaymentId(null);
-  }
-};
-
-
-
+      // Refresh payments data
+      fetchPayments();
+    } catch (error) {
+      console.error(
+        "Payment verification failed:",
+        error?.response?.data || error
+      );
+      alert("Failed to update payment");
+    } finally {
+      setVerifyingPaymentId(null);
+    }
+  };
 
   const calculateDaysRemaining = (value, unit) => {
     const unitMap = {
@@ -333,13 +373,40 @@ await axiosWithAuth.put(
     });
   };
 
-  // Filter payments based on status and search
+  // Calculate payment statistics for selected cycle
+  const getCycleStatistics = (cycle) => {
+    if (cycle === "all") {
+      return {
+        total: payments.length,
+        paid: stats.paidCount,
+        pending: stats.pendingCount,
+        totalAmount: paymentStats.totalAmount,
+      };
+    }
+
+    return (
+      cycleStats.data[cycle] || {
+        total: 0,
+        paid: 0,
+        pending: 0,
+        totalAmount: 0,
+      }
+    );
+  };
+
+  // Filter payments based on status, search, and selected cycle
   const filteredPayments = payments.filter((payment) => {
-    const matchesFilter =
+    // Filter by cycle
+    const matchesCycle =
+      selectedCycle === "all" || payment.Payment_Cycle === selectedCycle;
+
+    // Filter by status
+    const matchesStatus =
       paymentFilter === "all" ||
       (paymentFilter === "paid" && payment.isVerified === true) ||
       (paymentFilter === "pending" && payment.isVerified !== true);
 
+    // Filter by search
     const matchesSearch =
       searchQuery === "" ||
       payment.lucky_draw_form?.Name?.toLowerCase().includes(
@@ -350,7 +417,7 @@ await axiosWithAuth.put(
       ) ||
       payment.Payment_Cycle?.toLowerCase().includes(searchQuery.toLowerCase());
 
-    return matchesFilter && matchesSearch;
+    return matchesCycle && matchesStatus && matchesSearch;
   });
 
   // Loading Animation Component
@@ -449,7 +516,7 @@ await axiosWithAuth.put(
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed  inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+          className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4"
           onClick={onClose}
         >
           <motion.div
@@ -757,285 +824,346 @@ await axiosWithAuth.put(
     );
   };
 
-  // Payment Tracking Modal Component
   const PaymentTrackingModal = ({ onClose }) => {
+    const currentCycleStats = getCycleStatistics(selectedCycle);
+    const [showCycleDropdown, setShowCycleDropdown] = useState(false);
+    const [showPaymentDetails, setShowPaymentDetails] = useState({});
+
+    // Toggle payment details view
+    const togglePaymentDetails = (paymentId) => {
+      setShowPaymentDetails((prev) => ({
+        ...prev,
+        [paymentId]: !prev[paymentId],
+      }));
+    };
+
+    // Toggle payment verification
+    const togglePaymentVerification = async (payment, currentStatus) => {
+      try {
+        setVerifyingPaymentId(payment.documentId);
+        await verifyPayment(payment.documentId, !currentStatus);
+      } catch (error) {
+        console.error("Payment verification failed:", error);
+      }
+    };
+
     return (
       <AnimatePresence>
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto"
           onClick={onClose}
         >
           <motion.div
             initial={{ scale: 0.95, opacity: 0, y: 20 }}
             animate={{ scale: 1, opacity: 1, y: 0 }}
             exit={{ scale: 0.95, opacity: 0, y: 20 }}
-            transition={{ type: "spring", damping: 25, stiffness: 300 }}
+            transition={{ type: "spring", damping: 25, stiffness: 100 }}
             onClick={(e) => e.stopPropagation()}
-            className="bg-gradient-to-br from-white to-blue-50 rounded-3xl shadow-2xl w-full max-w-7xl max-h-[95vh] overflow-hidden border border-white/20 flex flex-col"
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col"
           >
             {/* Header */}
-            <div className="shrink-0 relative px-8 py-6 flex items-center justify-between bg-gradient-to-r from-blue-600/10 to-indigo-600/10 border-b border-white/20">
-              <div className="flex items-center gap-4">
-                <div className="p-3 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-xl shadow-lg">
-                  <CreditCard className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <h3 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-                    Payment Tracking
-                  </h3>
-                  <p className="text-gray-500 text-sm">
-                    Total: {paymentStats.totalPaid + paymentStats.totalPending}{" "}
-                    payments • Paid: {paymentStats.totalPaid} • Pending:{" "}
-                    {paymentStats.totalPending}
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-4">
-                <div className="flex gap-2">
-                  <div className="px-3 py-1.5 bg-green-100 text-green-800 rounded-lg font-medium flex items-center gap-2">
-                    <Check className="w-4 h-4" />
-                    Paid: {paymentStats.totalPaid}
+            <div className="px-6 py-5 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-lg shadow-sm">
+                    <CreditCard className="w-5 h-5 text-white" />
                   </div>
-                  <div className="px-3 py-1.5 bg-amber-100 text-amber-800 rounded-lg font-medium flex items-center gap-2">
-                    <AlertCircle className="w-4 h-4" />
-                    Pending: {paymentStats.totalPending}
+                  <div>
+                    <h2 className="text-xl font-bold text-gray-900">
+                      Payment Manager
+                    </h2>
+                    <p className="text-gray-600 text-sm mt-0.5">
+                      Track and manage all payments
+                    </p>
                   </div>
                 </div>
-
-                <motion.button
-                  whileHover={{ scale: 1.1, rotate: 90 }}
-                  whileTap={{ scale: 0.9 }}
+                <button
                   onClick={onClose}
-                  className="p-2 cursor-pointer hover:bg-red-600 hover:text-white rounded-xl transition-colors"
+                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors duration-200"
                 >
-                  <X className="w-6 h-6 hover:text-white" />
-                </motion.button>
+                  <X className="w-5 h-5 text-gray-500 hover:text-gray-700" />
+                </button>
               </div>
             </div>
 
-            {/* Filters and Search */}
-            <div className="px-8 py-4 border-b border-gray-100 bg-white/50">
-              <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="flex bg-gray-100 rounded-lg p-1">
+            {/* Quick Stats & Controls */}
+            <div className="px-6 py-5 border-b border-gray-100 bg-gray-50/50">
+              <div className="flex flex-col lg:flex-row gap-4 lg:items-center justify-between">
+                {/* Left side: Cycle Selector */}
+                <div className="w-full lg:w-auto">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Payment Cycle
+                  </label>
+                  <div className="relative">
+                    <button
+                      onClick={() => setShowCycleDropdown(!showCycleDropdown)}
+                      className="flex items-center justify-between px-4 py-3 bg-white border border-gray-300 rounded-xl hover:border-blue-400 shadow-sm w-full lg:w-[320px] transition-colors duration-200"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-blue-50 rounded-lg">
+                          <Calendar className="w-4 h-4 text-blue-600" />
+                        </div>
+                        <div className="text-left">
+                          <div className="font-semibold text-gray-900 text-sm">
+                            {selectedCycle === "all"
+                              ? "All Payment Cycles"
+                              : `Cycle ${selectedCycle}`}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {selectedCycle === "all"
+                              ? "View all payments across cycles"
+                              : "View payments for this cycle"}
+                          </div>
+                        </div>
+                      </div>
+                      <ChevronDown
+                        className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${
+                          showCycleDropdown ? "rotate-180" : ""
+                        }`}
+                      />
+                    </button>
+
+                    {showCycleDropdown && (
+                      <div className="absolute top-full mt-1 w-full lg:w-[320px] bg-white border border-gray-200 rounded-xl shadow-lg z-20">
+                        <div className="p-2">
+                          <button
+                            onClick={() => {
+                              setSelectedCycle("all");
+                              setShowCycleDropdown(false);
+                            }}
+                            className={`w-full px-4 py-2.5 rounded-lg text-left hover:bg-blue-50 transition-colors duration-150 ${
+                              selectedCycle === "all"
+                                ? "bg-blue-50 text-blue-700"
+                                : "text-gray-700"
+                            }`}
+                          >
+                            <div className="font-medium text-sm">
+                              All Cycles
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              View all payments
+                            </div>
+                          </button>
+                          {cycleStats.cycles?.map((cycle) => (
+                            <button
+                              key={cycle}
+                              onClick={() => {
+                                setSelectedCycle(cycle);
+                                setShowCycleDropdown(false);
+                              }}
+                              className={`w-full px-4 py-2.5 rounded-lg text-left hover:bg-blue-50 transition-colors duration-150 ${
+                                selectedCycle === cycle
+                                  ? "bg-blue-50 text-blue-700"
+                                  : "text-gray-700"
+                              }`}
+                            >
+                              <div className="font-medium text-sm">
+                                Cycle {cycle}
+                              </div>
+                              <div className="text-xs text-gray-500">
+                                {cycleStats.data[cycle]?.total || 0} payments
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Right side: Filter Tabs */}
+                <div className="flex flex-col">
+                  <label className="block text-sm font-medium text-gray-700 mb-2 invisible lg:visible">
+                    {/* Invisible label for alignment */}
+                    &nbsp;
+                  </label>
+                  <div className="flex flex-wrap gap-2">
                     {["all", "paid", "pending"].map((filter) => (
                       <button
                         key={filter}
                         onClick={() => setPaymentFilter(filter)}
-                        className={`px-4 py-2 rounded-md text-sm font-medium transition-all cursor-pointer ${
+                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-2 ${
                           paymentFilter === filter
-                            ? "bg-white text-blue-600 shadow-sm"
-                            : "text-gray-600 hover:text-gray-900"
+                            ? "bg-white text-blue-600 shadow-sm ring-1 ring-blue-100"
+                            : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
                         }`}
                       >
-                        {filter.charAt(0).toUpperCase() + filter.slice(1)}
+                        {filter === "paid" ? (
+                          <>
+                            <Check className="w-3.5 h-3.5" />
+                            Paid
+                          </>
+                        ) : filter === "pending" ? (
+                          <>
+                            <Clock className="w-3.5 h-3.5" />
+                            Pending
+                          </>
+                        ) : (
+                          <>
+                            <Filter className="w-3.5 h-3.5" />
+                            All
+                          </>
+                        )}
                       </button>
                     ))}
                   </div>
                 </div>
-
-                <div className="flex items-center gap-4">
-                  <div className="relative w-full md:w-64">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                    <input
-                      type="text"
-                      placeholder="Search by name, email..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
-                  </div>
-                  <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={fetchPayments}
-                    className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg shadow hover:shadow-lg transition-all"
-                  >
-                    <RefreshCw className="w-4 h-4" />
-                    Refresh
-                  </motion.button>
-                </div>
               </div>
             </div>
 
-            {/* Payments Table */}
-            <div className="flex-1 overflow-hidden">
+            {/* Payment Cards List */}
+            <div className="flex-1 overflow-y-auto px-6 py-4">
               {paymentsLoading ? (
-                <div className="flex flex-col items-center justify-center h-full py-12">
-                  <Loader className="w-12 h-12 text-blue-500 animate-spin mb-4" />
-                  <p className="text-gray-600 text-lg">Loading payments...</p>
+                <div className="flex flex-col items-center justify-center h-64">
+                  <div className="relative mb-4">
+                    <Loader className="w-10 h-10 text-blue-500 animate-spin" />
+                  </div>
+                  <p className="text-gray-600 text-sm">Loading payments...</p>
                 </div>
               ) : filteredPayments.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-full py-12">
-                  <CreditCard className="w-24 h-24 text-gray-300 mb-4" />
-                  <h4 className="text-xl font-semibold text-gray-700 mb-2">
-                    No payments found
-                  </h4>
-                  <p className="text-gray-500 max-w-md text-center">
-                    {searchQuery || paymentFilter !== "all"
-                      ? "Try changing your search or filter"
-                      : "No payments recorded yet"}
+                <div className="text-center py-12">
+                  <div className="w-20 h-20 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
+                    <CreditCard className="w-10 h-10 text-gray-400" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-700 mb-2">
+                    No Payments Found
+                  </h3>
+                  <p className="text-gray-500 text-sm mb-6">
+                    {searchQuery
+                      ? "No payments match your search criteria"
+                      : "No payments have been recorded yet"}
                   </p>
+                  {(searchQuery || paymentFilter !== "all") && (
+                    <button
+                      onClick={() => {
+                        setSearchQuery("");
+                        setPaymentFilter("all");
+                      }}
+                      className="px-5 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors duration-200"
+                    >
+                      Clear Filters
+                    </button>
+                  )}
                 </div>
               ) : (
-                <div className="h-full overflow-y-auto">
-                  <table className="w-full border-collapse">
-                    {/* Table Header */}
-                    <thead className="sticky top-0 z-10 bg-gradient-to-r from-blue-50 to-indigo-50">
-                      <tr className="border-b border-gray-200">
-                        <th className="text-left py-4 px-6 text-sm font-semibold text-gray-700 uppercase tracking-wider">
-                          <div className="flex items-center gap-2">
-                            <User className="w-4 h-4" />
-                            Participant
-                          </div>
-                        </th>
-                        <th className="text-left py-4 px-6 text-sm font-semibold text-gray-700 uppercase tracking-wider">
-                          <div className="flex items-center gap-2">
-                            <DollarSign className="w-4 h-4" />
-                            Amount
-                          </div>
-                        </th>
-                        <th className="text-left py-4 px-6 text-sm font-semibold text-gray-700 uppercase tracking-wider">
-                          <div className="flex items-center gap-2">
-                            <Calendar className="w-4 h-4" />
-                            Payment Cycle
-                          </div>
-                        </th>
-                        <th className="text-left py-4 px-6 text-sm font-semibold text-gray-700 uppercase tracking-wider">
-                          <div className="flex items-center gap-2">
-                            <CalendarDays className="w-4 h-4" />
-                            Due Date
-                          </div>
-                        </th>
-                        <th className="text-left py-4 px-6 text-sm font-semibold text-gray-700 uppercase tracking-wider">
-                          <div className="flex items-center gap-2">
-                            <CheckCircle className="w-4 h-4" />
-                            Status
-                          </div>
-                        </th>
-                        <th className="text-left py-4 px-6 text-sm font-semibold text-gray-700 uppercase tracking-wider">
-                          <div className="flex items-center gap-2">
-                            <FileText className="w-4 h-4" />
-                            Proof
-                          </div>
-                        </th>
-                        <th className="text-left py-4 px-6 text-sm font-semibold text-gray-700 uppercase tracking-wider">
-                          <div className="flex items-center gap-2">
-                            <Settings className="w-4 h-4" />
-                            Actions
-                          </div>
-                        </th>
-                      </tr>
-                    </thead>
-
-                    {/* Table Body */}
-                    <tbody className="divide-y divide-gray-100">
-                      {filteredPayments.map((payment) => (
-                        <motion.tr
-                          key={payment.documentId}
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          className="hover:bg-blue-50/50 transition-colors duration-200"
-                        >
-                          {/* Participant Column */}
-                          <td className="py-4 px-6">
-                            <div className="flex items-center gap-3">
-                              <div className="relative">
+                <div className="grid gap-3">
+                  {filteredPayments.map((payment) => (
+                    <motion.div
+                      key={payment.documentId}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="bg-white rounded-xl border border-gray-200 hover:border-blue-300 hover:shadow-md transition-all duration-200"
+                    >
+                      {/* Payment Card Header */}
+                      <div className="p-5">
+                        <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+                          {/* Participant Info */}
+                          <div className="flex items-start gap-3 flex-1 min-w-0">
+                            <div className="relative flex-shrink-0">
+                              <div className="w-14 h-14 rounded-lg overflow-hidden bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100">
                                 {payment.lucky_draw_form?.Photo?.url ? (
                                   <img
                                     src={`${MEDIA_BASE_URL}${payment.lucky_draw_form.Photo.url}`}
                                     alt={payment.lucky_draw_form.Name}
-                                    className="w-10 h-10 rounded-full object-cover border-2 border-white shadow"
-                                    onError={(e) => {
-                                      e.target.style.display = "none";
-                                      e.target.parentNode.innerHTML = `
-                                      <div class="w-10 h-10 rounded-full bg-gradient-to-br from-blue-100 to-indigo-100 flex items-center justify-center border-2 border-white shadow">
-                                        <User class="w-5 h-5 text-blue-400" />
-                                      </div>
-                                    `;
-                                    }}
+                                    className="w-full h-full object-cover"
                                   />
                                 ) : (
-                                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-100 to-indigo-100 flex items-center justify-center border-2 border-white shadow">
-                                    <User className="w-5 h-5 text-blue-400" />
-                                  </div>
-                                )}
-                                {payment.lucky_draw_form?.isVerified && (
-                                  <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-white flex items-center justify-center">
-                                    <Check className="w-2 h-2 text-white" />
+                                  <div className="w-full h-full flex items-center justify-center">
+                                    <User className="w-6 h-6 text-blue-300" />
                                   </div>
                                 )}
                               </div>
-                              <div>
-                                <p className="font-medium text-gray-900">
-                                  {payment.lucky_draw_form?.Name || "Unknown"}
-                                </p>
-                                <p className="text-sm text-gray-500 truncate max-w-[150px]">
-                                  {payment.lucky_draw_form?.Email || "No email"}
-                                </p>
-                              </div>
-                            </div>
-                          </td>
-
-                          {/* Amount Column */}
-                          <td className="py-4 px-6">
-                            <div className="font-bold text-lg text-gray-900">
-                              {formatCurrency(payment.Amount)}
-                            </div>
-                          </td>
-
-                          {/* Payment Cycle Column */}
-                          <td className="py-4 px-6">
-                            <div className="flex items-center gap-2">
-                              <span className="px-3 py-1 bg-blue-100 text-blue-800 text-xs font-semibold rounded-full">
-                                {payment.Payment_Cycle || "N/A"}
-                              </span>
-                            </div>
-                          </td>
-
-                          {/* Due Date Column */}
-                          <td className="py-4 px-6">
-                            <div className="text-gray-700">
-                              {formatDate(payment.due_date)}
-                            </div>
-                          </td>
-
-                          {/* Status Column */}
-                          <td className="py-4 px-6">
-                            <div
-                              className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-semibold ${
-                                payment.isVerified
-                                  ? "bg-green-100 text-green-800"
-                                  : "bg-amber-100 text-amber-800"
-                              }`}
-                            >
-                              {payment.isVerified ? (
-                                <>
-                                  <Check className="w-4 h-4" />
-                                  Paid
-                                </>
-                              ) : (
-                                <>
-                                  <AlertCircle className="w-4 h-4" />
-                                  Pending
-                                </>
+                              {payment.lucky_draw_form?.isVerified && (
+                                <div className="absolute -top-1 -right-1 w-5 h-5 bg-green-500 rounded-full border-2 border-white flex items-center justify-center shadow-sm">
+                                  <Check className="w-2.5 h-2.5 text-white" />
+                                </div>
                               )}
                             </div>
-                            {payment.Verified_At && (
-                              <p className="text-xs text-gray-500 mt-1">
-                                {formatDate(payment.Verified_At)}
-                              </p>
-                            )}
-                          </td>
 
-                          {/* Proof Column */}
-                          <td className="py-4 px-6">
-                            {payment.Payment_Photo?.[0]?.url ? (
-                              <div className="relative group">
+                            <div className="flex-1 min-w-0">
+                              <h4 className="text-base font-semibold text-gray-900 truncate">
+                                {payment.lucky_draw_form?.Name || "Unknown"}
+                              </h4>
+                              <p className="text-gray-600 text-sm truncate">
+                                {payment.lucky_draw_form?.Email || "No email"}
+                              </p>
+                              <div className="flex flex-wrap items-center gap-2 mt-2">
+                                <span className="px-2.5 py-1 bg-blue-50 text-blue-700 text-xs font-medium rounded-full">
+                                  {payment.Payment_Cycle || "N/A"}
+                                </span>
+                                <span className="text-gray-500 text-xs">
+                                  Due: {formatDate(payment.due_date)}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Right Side: Amount & Actions */}
+                          <div className="flex flex-col md:items-end gap-3">
+                            <div className="text-right">
+                              <div className="text-xl font-bold text-gray-900">
+                                {formatCurrency(payment.Amount)}
+                              </div>
+                              <div
+                                className={`px-2.5 py-1 rounded-full text-xs font-medium inline-flex items-center gap-1.5 mt-1 ${
+                                  payment.isVerified
+                                    ? "bg-green-50 text-green-700 border border-green-100"
+                                    : "bg-amber-50 text-amber-700 border border-amber-100"
+                                }`}
+                              >
+                                {payment.isVerified ? (
+                                  <>
+                                    <Check className="w-3 h-3" /> Paid
+                                  </>
+                                ) : (
+                                  <>
+                                    <Clock className="w-3 h-3" /> Pending
+                                  </>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                              {/* Toggle Switch */}
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs text-gray-600 whitespace-nowrap">
+                                  {payment.isVerified ? "Verified" : "Pending"}
+                                </span>
+                                <button
+                                  onClick={() =>
+                                    togglePaymentVerification(
+                                      payment,
+                                      payment.isVerified
+                                    )
+                                  }
+                                  disabled={
+                                    verifyingPaymentId === payment.documentId
+                                  }
+                                  className={`relative inline-flex items-center h-6 rounded-full w-12 transition-colors duration-200 ${
+                                    payment.isVerified
+                                      ? "bg-green-500"
+                                      : "bg-gray-300"
+                                  } ${
+                                    verifyingPaymentId === payment.documentId
+                                      ? "opacity-50 cursor-not-allowed"
+                                      : "hover:opacity-90"
+                                  }`}
+                                >
+                                  <span
+                                    className={`inline-block w-4 h-4 transform bg-white rounded-full transition-transform duration-200 shadow-sm ${
+                                      payment.isVerified
+                                        ? "translate-x-7"
+                                        : "translate-x-1"
+                                    }`}
+                                  />
+                                </button>
+                              </div>
+
+                              {/* View Proof Button */}
+                              {payment.Payment_Photo?.[0]?.url && (
                                 <button
                                   onClick={() =>
                                     window.open(
@@ -1043,95 +1171,131 @@ await axiosWithAuth.put(
                                       "_blank"
                                     )
                                   }
-                                  className="flex items-center gap-2 px-3 py-1.5 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-lg transition-colors cursor-pointer"
+                                  className="px-3 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-lg text-sm font-medium flex items-center gap-1.5 transition-colors duration-200"
                                 >
-                                  <Eye className="w-4 h-4" />
-                                  View Proof
+                                  <Eye className="w-3.5 h-3.5" />
+                                  Proof
                                 </button>
-                              </div>
-                            ) : (
-                              <span className="text-gray-400 text-sm">
-                                No proof
-                              </span>
-                            )}
-                          </td>
-
-                          {/* Actions Column */}
-                          <td className="py-4 px-6">
-                            <div className="flex gap-2">
-                              {!payment.isVerified ? (
-                                <motion.button
-                                  whileHover={{ scale: 1.05 }}
-                                  whileTap={{ scale: 0.95 }}
-                                  onClick={() =>
-                                    verifyPayment(payment.documentId, true)
-                                  }
-                                  disabled={
-                                    verifyingPaymentId === payment.documentId
-                                  }
-                                  className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white rounded-lg font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                  {verifyingPaymentId === payment.documentId ? (
-                                    <>
-                                      <Loader className="w-4 h-4 animate-spin" />
-                                      Verifying...
-                                    </>
-                                  ) : (
-                                    <>
-                                      <Check className="w-4 h-4" />
-                                      Mark Paid
-                                    </>
-                                  )}
-                                </motion.button>
-                              ) : (
-                                <motion.button
-                                  whileHover={{ scale: 1.05 }}
-                                  whileTap={{ scale: 0.95 }}
-                                  onClick={() =>
-                                    verifyPayment(payment.documentId, false)
-                                  }
-                                  disabled={
-                                    verifyingPaymentId === payment.documentId
-                                  }
-                                  className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white rounded-lg font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                  {verifyingPaymentId === payment.documentId ? (
-                                    <>
-                                      <Loader className="w-4 h-4 animate-spin" />
-                                      Updating...
-                                    </>
-                                  ) : (
-                                    <>
-                                      <XCircle className="w-4 h-4" />
-                                      Mark Pending
-                                    </>
-                                  )}
-                                </motion.button>
                               )}
+
+                              {/* Details Toggle */}
+                              <button
+                                onClick={() =>
+                                  togglePaymentDetails(payment.documentId)
+                                }
+                                className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors duration-200"
+                              >
+                                <ChevronDown
+                                  className={`w-4 h-4 text-gray-500 transition-transform duration-200 ${
+                                    showPaymentDetails[payment.documentId]
+                                      ? "rotate-180"
+                                      : ""
+                                  }`}
+                                />
+                              </button>
                             </div>
-                          </td>
-                        </motion.tr>
-                      ))}
-                    </tbody>
-                  </table>
+                          </div>
+                        </div>
+
+                        {/* Expanded Details */}
+                        {showPaymentDetails[payment.documentId] && (
+                          <motion.div
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: "auto" }}
+                            exit={{ opacity: 0, height: 0 }}
+                            className="mt-4 pt-4 border-t border-gray-100"
+                          >
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <div>
+                                <h5 className="text-sm font-medium text-gray-700 mb-2">
+                                  Payment Details
+                                </h5>
+                                <div className="space-y-2 text-sm">
+                                  <div className="flex justify-between">
+                                    <span className="text-gray-600">
+                                      Payment ID:
+                                    </span>
+                                    <span className="font-mono text-gray-900">
+                                      {payment.documentId?.slice(0, 8)}...
+                                    </span>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <span className="text-gray-600">
+                                      Transaction Date:
+                                    </span>
+                                    <span className="font-medium">
+                                      {formatDate(payment.createdAt)}
+                                    </span>
+                                  </div>
+                                  {payment.Verified_At && (
+                                    <div className="flex justify-between">
+                                      <span className="text-gray-600">
+                                        Verified On:
+                                      </span>
+                                      <span className="font-medium">
+                                        {formatDate(payment.Verified_At)}
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                              <div>
+                                <h5 className="text-sm font-medium text-gray-700 mb-2">
+                                  Contact Information
+                                </h5>
+                                <div className="space-y-2 text-sm">
+                                  <div className="flex items-center gap-2">
+                                    <Phone className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+                                    <span className="text-gray-600 truncate">
+                                      {payment.lucky_draw_form?.Phone_Number ||
+                                        "Not provided"}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <Calendar className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+                                    <span className="text-gray-600">
+                                      Age:{" "}
+                                      {payment.lucky_draw_form?.Age || "N/A"}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </motion.div>
+                        )}
+                      </div>
+                    </motion.div>
+                  ))}
                 </div>
               )}
             </div>
 
             {/* Footer */}
-            <div className="shrink-0 bg-gradient-to-r from-white to-blue-50 border-t border-white/20 px-8 py-4">
-              <div className="flex items-center justify-between">
-                <div className="text-sm text-gray-500">
-                  Showing {filteredPayments.length} of {payments.length}{" "}
-                  payments • Total Amount:{" "}
-                  {formatCurrency(paymentStats.totalAmount)}
+            <div className="px-6 py-4 border-t border-gray-100 bg-gray-50">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+                <div className="text-sm text-gray-600">
+                  Showing{" "}
+                  <span className="font-semibold text-gray-900">
+                    {filteredPayments.length}
+                  </span>{" "}
+                  of{" "}
+                  <span className="font-semibold text-gray-900">
+                    {payments.length}
+                  </span>{" "}
+                  payments
                 </div>
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={fetchPayments}
+                    className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors duration-200"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    Refresh
+                  </button>
                   <button
                     onClick={onClose}
-                    className="px-6 py-2.5 cursor-pointer bg-gradient-to-r from-gray-100 to-gray-200 hover:from-gray-200 hover:to-gray-300 text-gray-700 hover:text-gray-900 rounded-lg font-medium transition-all flex items-center gap-2"
+                    className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 hover:text-gray-900 text-sm rounded-lg font-medium transition-colors duration-200"
                   >
-                    <X className="w-4 h-4" />
                     Close
                   </button>
                 </div>
@@ -1142,7 +1306,6 @@ await axiosWithAuth.put(
       </AnimatePresence>
     );
   };
-
   if (loading) {
     return <LoadingAnimation />;
   }
@@ -1260,76 +1423,73 @@ await axiosWithAuth.put(
     );
   }
 
-  // Stats Cards with Payment Tracking
-  const statsCards = [
-    {
-      key: "verified",
-      title: "Total Participants",
-      value: stats.verifiedParticipants,
-      icon: Users,
-      color: "blue",
-      delay: 0.15,
-      progress:
-        stats.totalParticipants > 0
-          ? (stats.verifiedParticipants / stats.totalParticipants) * 100
-          : 0,
-      progressPercent:
-        stats.totalParticipants > 0
-          ? Math.round(
-              (stats.verifiedParticipants / stats.totalParticipants) * 100
-            )
-          : 0,
-    },
-    {
-      key: "amount",
-      title: "Total Prize Pool",
-      value: formatCurrency(stats.totalAmount),
-      icon: DollarSign,
-      color: "emerald",
-      delay: 0.2,
-      progress: Math.min((stats.totalAmount / 10000) * 10, 100),
-      amountPerWinner:
-        stats.winnersCount > 0
-          ? formatCurrency(stats.totalAmount / stats.winnersCount)
-          : formatCurrency(0),
-    },
-    {
-      key: "payments",
-      title: "Payment Tracking",
-      value: `${stats.paidCount}/${stats.paidCount + stats.pendingCount}`,
-      icon: CreditCard,
-      color: "amber",
-      delay: 0.25,
-      progress:
-        stats.paidCount + stats.pendingCount > 0
-          ? (stats.paidCount / (stats.paidCount + stats.pendingCount)) * 100
-          : 0,
-      progressPercent:
-        stats.paidCount + stats.pendingCount > 0
-          ? Math.round(
-              (stats.paidCount / (stats.paidCount + stats.pendingCount)) * 100
-            )
-          : 0,
-      clickable: true,
-      onClick: () => setShowPaymentsModal(true),
-    },
-    {
-      key: "winners",
-      title: "Winners Count",
-      value: stats.winnersCount,
-      icon: Crown,
-      color: "purple",
-      delay: 0.3,
-      progress:
-        stats.totalParticipants > 0
-          ? (stats.winnersCount / stats.totalParticipants) * 100
-          : 0,
-      winRate:
-        stats.totalParticipants > 0
-          ? ((stats.winnersCount / stats.totalParticipants) * 100).toFixed(1)
-          : 0,
-    },
-  ];
+  // Stats Cards with Win Statistics
+const statsCards = [
+  {
+    key: "totalAmount",
+    title: "Total Amount",
+    value: formatCurrency(stats.totalAmount),
+    icon: DollarSign,
+    color: "green",
+    delay: 0.15,
+    progress: Math.min((stats.totalAmount / 50000) * 100, 100),
+    progressPercent: Math.min(
+      Math.round((stats.totalAmount / 50000) * 100),
+      100
+    ),
+    subTitle: `Target: ${formatCurrency(50000)}`,
+  },
+  {
+    key: "verifiedParticipants",
+    title: "Verified Participants",
+    value: stats.verifiedParticipants,
+    icon: CheckCircle,
+    color: "emerald",
+    delay: 0.2,
+    progress:
+      stats.totalParticipants > 0
+        ? (stats.verifiedParticipants / stats.totalParticipants) * 100
+        : 0,
+    progressPercent:
+      stats.totalParticipants > 0
+        ? Math.round(
+            (stats.verifiedParticipants / stats.totalParticipants) * 100
+          )
+        : 0,
+    subTitle: `of ${stats.totalParticipants} total`,
+  },
+  {
+    key: "winners",
+    title: "Total Winners",
+    value: stats.winnersCount,
+    icon: Trophy,
+    color: "purple",
+    delay: 0.25,
+    progress:
+      stats.totalParticipants > 0
+        ? (stats.winnersCount / stats.totalParticipants) * 100
+        : 0,
+    progressPercent:
+      stats.totalParticipants > 0
+        ? Math.round((stats.winnersCount / stats.totalParticipants) * 100)
+        : 0,
+    subTitle: `Win Rate: ${stats.totalParticipants > 0 ? ((stats.winnersCount / stats.totalParticipants) * 100).toFixed(1) + '%' : '0%'}`,
+  },
+  {
+    key: "remainingDays",
+    title: "Days Remaining",
+    value: stats.daysRemaining,
+    icon: Calendar,
+    color: "amber",
+    delay: 0.3,
+    progress: Math.max(100 - (stats.daysRemaining / 30) * 100, 0),
+    progressPercent: Math.max(
+      100 - Math.round((stats.daysRemaining / 30) * 100),
+      0
+    ),
+    subTitle: `Ending soon`,
+  },
+];
 
   return (
     <motion.div
@@ -1372,7 +1532,7 @@ await axiosWithAuth.put(
           <div className="flex flex-col lg:flex-row gap-4">
             {/* Left Navigation */}
             <motion.div whileHover={{ scale: 1.02 }} className="flex-1">
-              <div className=" backdrop-blur-sm rounded-2xl p-4">
+              <div className="backdrop-blur-sm rounded-2xl p-4">
                 <div className="flex items-center justify-between">
                   <motion.button
                     whileHover={{ x: -5 }}
@@ -1399,21 +1559,29 @@ await axiosWithAuth.put(
               transition={{ delay: 0.1 }}
               className="flex gap-4"
             >
-              <div className=" backdrop-blur-sm rounded-2xl p-4 ">
+              <div className="backdrop-blur-sm rounded-2xl p-4">
                 <div className="flex items-center gap-3">
                   {/* Payment Tracking Button */}
                   <motion.button
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                     onClick={() => setShowPaymentsModal(true)}
-                    className="cursor-pointer flex items-center gap-3 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white px-5 py-3 rounded-xl shadow-lg hover:shadow-xl group"
+                    className="cursor-pointer flex items-center gap-3 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white px-5 py-3 rounded-xl shadow-lg hover:shadow-xl group relative"
                   >
-                    <CreditCard className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                    <div className="relative">
+                      <CreditCard className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                      <div className="absolute -top-1 -right-1 w-2 h-2 bg-green-300 rounded-full animate-pulse"></div>
+                    </div>
                     <span className="font-semibold hidden md:inline">
-                      Payment Tracking
+                      Payment Cycles
                     </span>
-                    <div className="px-2 py-1 bg-white/20 rounded text-xs">
-                      {stats.paidCount}/{stats.paidCount + stats.pendingCount}
+                    <div className="flex items-center gap-1">
+                      <div className="px-2 py-1 bg-white/20 rounded text-xs">
+                        {cycleStats.cycles?.length || 0} Cycles
+                      </div>
+                      <div className="px-2 py-1 bg-green-500/30 rounded text-xs">
+                        {stats.paidCount} Paid
+                      </div>
                     </div>
                   </motion.button>
 
@@ -1564,14 +1732,7 @@ await axiosWithAuth.put(
               }}
               onMouseEnter={() => setHoveredCard(stat.key)}
               onMouseLeave={() => setHoveredCard(null)}
-              onClick={stat.clickable ? stat.onClick : undefined}
-              className={`group ${
-                stat.clickable ? "cursor-pointer" : ""
-              } bg-white rounded-2xl p-6 border border-${
-                stat.color
-              }-100 hover:border-${
-                stat.color
-              }-300 hover:shadow-2xl transition-all duration-500 relative overflow-hidden`}
+              className={`group bg-white rounded-2xl p-6 border border-${stat.color}-100 hover:border-${stat.color}-300 hover:shadow-2xl transition-all duration-500 relative overflow-hidden`}
             >
               {/* Animated background on hover */}
               <motion.div
@@ -1630,25 +1791,12 @@ await axiosWithAuth.put(
                 <div className="space-y-2">
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-gray-600">
-                      {stat.key === "payments"
-                        ? `Paid: ${stats.paidCount} | Pending: ${stats.pendingCount}`
-                        : stat.growth
-                        ? "Daily Growth"
-                        : stat.amountPerWinner
-                        ? "Amount per winner"
-                        : stat.winRate
-                        ? "Win Rate"
-                        : "Progress"}
+                      {stat.subTitle || "Progress"}
                     </span>
                     <span
                       className={`flex items-center gap-1 text-${stat.color}-600 font-semibold`}
                     >
-                      {stat.growth && <TrendingUp className="w-4 h-4" />}
-                      {stat.growth ||
-                        stat.amountPerWinner ||
-                        (stat.winRate
-                          ? `${stat.winRate}%`
-                          : `${stat.progressPercent}%`)}
+                      {stat.progressPercent}%
                     </span>
                   </div>
 
