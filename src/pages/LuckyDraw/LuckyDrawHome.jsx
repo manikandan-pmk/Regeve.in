@@ -466,6 +466,365 @@ const CreateDetailsModal = ({
   );
 };
 
+// Edit Details Modal Component
+const EditDrawModal = ({
+  isOpen,
+  onClose,
+  onSubmit,
+  drawData,
+  onInputChange,
+  qrCodePreview,
+  onFileChange,
+  onRemoveFile,
+  updatingDraw,
+  fileInputRef,
+  existingQRCode,
+}) => {
+  if (!isOpen) return null;
+
+  const handleBackdropClick = (e) => {
+    if (e.target === e.currentTarget) {
+      onClose();
+    }
+  };
+
+  const formatAmount = (amount) => {
+    if (!amount) return "₹0";
+    const num = Number(amount);
+    return new Intl.NumberFormat("en-IN", {
+      style: "currency",
+      currency: "INR",
+      minimumFractionDigits: 0,
+    }).format(num);
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      onClick={handleBackdropClick}
+    >
+      <div className="absolute inset-0 bg-gray-900/50 backdrop-blur-sm transition-opacity duration-300" />
+
+      <div
+        className="relative w-full max-w-6xl transform transition-all duration-300 scale-100"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="rounded-2xl bg-gradient-to-br from-white to-gray-50 shadow-2xl border border-gray-200">
+          {/* Modal Header - Compact */}
+          <div className="border-b border-gray-200 p-5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-r from-blue-500 to-blue-600">
+                  <span className="text-lg">✏️</span>
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900">
+                    Edit Draw Details
+                  </h3>
+                  <p className="text-xs text-gray-500">
+                    Update details for "{drawData.Name}"
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={onClose}
+                className="rounded-lg p-2 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 active:scale-95"
+                type="button"
+              >
+                <svg
+                  className="h-4 w-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          {/* Modal Body - Compact Grid */}
+          <div className="p-5">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+              {/* Left Column - Basic Info - Takes 2/3 space */}
+              <div className="lg:col-span-2 space-y-4">
+                <div className="rounded-xl bg-white p-4 border border-gray-200">
+                  <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+                    Draw Information
+                  </h4>
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <label className="text-xs font-medium text-gray-700">
+                        Draw Name *
+                      </label>
+                      <input
+                        type="text"
+                        name="Name"
+                        value={drawData.Name}
+                        onChange={onInputChange}
+                        placeholder="Enter draw name"
+                        className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 transition-colors duration-200 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        required
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-xs font-medium text-gray-700">
+                        Number of People
+                      </label>
+                      <input
+                        type="number"
+                        name="Number_of_Peoples"
+                        value={drawData.Number_of_Peoples}
+                        onChange={onInputChange}
+                        placeholder="Enter number"
+                        min="1"
+                        className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 transition-colors duration-200 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-xs font-medium text-gray-700">
+                        Prize Amount (₹)
+                      </label>
+                      <input
+                        type="number"
+                        name="Amount"
+                        value={drawData.Amount}
+                        onChange={onInputChange}
+                        placeholder="Enter amount"
+                        min="0"
+                        step="100"
+                        className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 transition-colors duration-200 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-xs font-medium text-gray-700">
+                        Duration Value
+                      </label>
+                      <input
+                        type="number"
+                        name="Duration_Value"
+                        value={drawData.Duration_Value}
+                        onChange={onInputChange}
+                        placeholder="e.g., 2"
+                        min="1"
+                        className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 transition-colors duration-200 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-xs font-medium text-gray-700">
+                        Duration Unit
+                      </label>
+                      <select
+                        name="Duration_Unit"
+                        value={drawData.Duration_Unit}
+                        onChange={onInputChange}
+                        className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 transition-colors duration-200 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      >
+                        <option value="Week">Week</option>
+                        <option value="Month">Month</option>
+                      </select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-xs font-medium text-gray-700">
+                        UPI ID (Optional)
+                      </label>
+                      <input
+                        type="text"
+                        name="Upi_Id"
+                        value={drawData.Upi_Id}
+                        onChange={onInputChange}
+                        placeholder="Enter UPI ID"
+                        className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 transition-colors duration-200 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Column - QR Code & Preview - Takes 1/3 space */}
+              <div className="space-y-4">
+                {/* QR Code Section */}
+                <div className="rounded-xl bg-white p-4 border border-gray-200">
+                  <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+                    QR Code
+                  </h4>
+
+                  <div
+                    onClick={() => fileInputRef.current?.click()}
+                    className="border-2 border-dashed border-gray-300 rounded-lg p-4 cursor-pointer hover:border-blue-500 transition-colors duration-200"
+                  >
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={onFileChange}
+                      className="hidden"
+                    />
+
+                    {qrCodePreview ? (
+                      <div className="flex flex-col items-center">
+                        <img
+                          src={qrCodePreview}
+                          alt="QR Code Preview"
+                          className="w-40 h-40 object-contain rounded-lg mb-3 border border-gray-200"
+                        />
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onRemoveFile();
+                            }}
+                            className="text-xs text-red-600 hover:text-red-800 px-2 py-1 rounded hover:bg-red-50"
+                          >
+                            Remove
+                          </button>
+                          {existingQRCode && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onRemoveFile();
+                              }}
+                              className="text-xs text-blue-600 hover:text-blue-800 px-2 py-1 rounded hover:bg-blue-50"
+                            >
+                              Keep Existing
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ) : existingQRCode ? (
+                      <div className="flex flex-col items-center">
+                        <img
+                          src={
+                            existingQRCode.url.startsWith("http")
+                              ? existingQRCode.url
+                              : `${API_BASE}${existingQRCode.url}`
+                          }
+                          alt="Current QR Code"
+                          className="w-40 h-40 object-contain rounded-lg mb-3 border border-gray-200"
+                        />
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onRemoveFile();
+                          }}
+                          className="text-xs text-red-600 hover:text-red-800"
+                        >
+                          Remove QR
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center py-2">
+                        <div className="w-12 h-12 mb-3 rounded-full bg-blue-100 flex items-center justify-center">
+                          <svg
+                            className="w-6 h-6 text-blue-600"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+                            />
+                          </svg>
+                        </div>
+                        <p className="text-sm text-gray-600 mb-1">
+                          Upload QR Code
+                        </p>
+                        <p className="text-xs text-gray-400">
+                          Optional
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Preview Section */}
+                <div className="rounded-xl bg-gray-50 p-4 border border-gray-200">
+                  <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+                    Preview
+                  </h4>
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-gray-600">Name:</span>
+                      <span className="font-medium text-gray-900 truncate ml-2 max-w-[120px]">
+                        {drawData.Name}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-gray-600">People:</span>
+                      <span className="font-medium text-gray-900">
+                        {drawData.Number_of_Peoples || "0"}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-gray-600">Prize:</span>
+                      <span className="font-bold text-gray-900">
+                        {formatAmount(drawData.Amount)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-gray-600">Duration:</span>
+                      <span className="font-medium text-gray-900">
+                        {drawData.Duration_Value || "1"}{" "}
+                        {drawData.Duration_Unit}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Modal Footer - Compact */}
+          <div className="border-t border-gray-200 p-5">
+            <div className="flex justify-between items-center">
+              <button
+                onClick={onClose}
+                className="px-4 py-2 text-sm font-medium text-gray-700 rounded-lg transition-colors duration-200 hover:bg-gray-100"
+                type="button"
+              >
+                Cancel
+              </button>
+
+              <button
+                onClick={onSubmit}
+                disabled={updatingDraw || !drawData.Name.trim()}
+                className="px-4 py-2 text-sm font-medium text-white rounded-lg bg-gradient-to-r from-green-600 to-green-700 transition-all duration-200 hover:from-green-700 hover:to-green-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                type="button"
+              >
+                {updatingDraw ? (
+                  <span className="flex items-center gap-2">
+                    <div className="h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                    Updating...
+                  </span>
+                ) : (
+                  "Update Draw"
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const DrawDetailsModal = ({ isOpen, onClose, draw, onDelete, API_BASE }) => {
   if (!isOpen || !draw) return null;
 
@@ -744,6 +1103,7 @@ export default function LuckyDrawHome() {
   const [showNameModal, setShowNameModal] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [showDrawDetailsModal, setShowDrawDetailsModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [newDrawData, setNewDrawData] = useState({
     Name: "",
     Number_of_Peoples: "",
@@ -753,14 +1113,18 @@ export default function LuckyDrawHome() {
     Duration_Unit: "Week",
     LuckyDraw_Status: "Created",
   });
+  const [editingDraw, setEditingDraw] = useState(null);
+  const [editDrawData, setEditDrawData] = useState({});
   const [qrCodeFile, setQrCodeFile] = useState(null);
   const [qrCodePreview, setQrCodePreview] = useState(null);
   const [creatingDraw, setCreatingDraw] = useState(false);
+  const [updatingDraw, setUpdatingDraw] = useState(false);
   const [selectedDraw, setSelectedDraw] = useState(null);
 
   // Refs
   const fileInputRef = useRef(null);
   const nameInputRef = useRef(null);
+  const editFileInputRef = useRef(null);
 
   const checkAuth = useCallback(() => {
     const token = localStorage.getItem("jwt") || sessionStorage.getItem("jwt");
@@ -842,7 +1206,28 @@ export default function LuckyDrawHome() {
     }));
   }, []);
 
+  const handleEditInputChange = useCallback((e) => {
+    const { name, value } = e.target;
+    setEditDrawData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  }, []);
+
   const handleFileChange = useCallback((e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setQrCodeFile(file);
+
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setQrCodePreview(reader.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  }, []);
+
+  const handleEditFileChange = useCallback((e) => {
     const file = e.target.files[0];
     if (file) {
       setQrCodeFile(file);
@@ -860,6 +1245,14 @@ export default function LuckyDrawHome() {
     setQrCodePreview(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
+    }
+  }, []);
+
+  const handleRemoveEditFile = useCallback(() => {
+    setQrCodeFile(null);
+    setQrCodePreview(null);
+    if (editFileInputRef.current) {
+      editFileInputRef.current.value = "";
     }
   }, []);
 
@@ -939,6 +1332,85 @@ export default function LuckyDrawHome() {
     }
   };
 
+  // PUT Method for updating draw details
+  const handleUpdateDraw = async () => {
+    if (!checkAuth()) {
+      alert("Please login to update a lucky draw");
+      return;
+    }
+
+    if (!editingDraw || !editingDraw.documentId) {
+      alert("No draw selected for update");
+      return;
+    }
+
+    if (!editDrawData.Name || !editDrawData.Name.trim()) {
+      alert("Please enter a draw name");
+      return;
+    }
+
+    setUpdatingDraw(true);
+    try {
+      let qrCodeId = null;
+
+      // Handle QR code update
+      if (qrCodeFile) {
+        qrCodeId = await uploadQRCode();
+      } else if (qrCodePreview === null && editingDraw.QRcode) {
+        // If QR code was removed
+        qrCodeId = null; // This will remove the QR code
+      }
+
+      const drawPayload = {
+        data: {
+          ...editDrawData,
+          Number_of_Peoples: parseInt(editDrawData.Number_of_Peoples) || 0,
+          Amount: parseInt(editDrawData.Amount) || 0,
+          Duration_Value: parseInt(editDrawData.Duration_Value) || 1,
+          // Keep the original status
+          LuckyDraw_Status: editingDraw.LuckyDraw_Status || "Created",
+        },
+      };
+
+      if (qrCodeId !== null) {
+        drawPayload.data.QRcode = qrCodeId;
+      }
+
+      console.log("Updating draw with payload:", drawPayload);
+
+      const response = await api.put(
+        `/lucky-draw-names/${editingDraw.documentId}`,
+        drawPayload
+      );
+
+      if (response.status === 200) {
+        alert("Lucky draw updated successfully!");
+        await fetchDraws();
+        resetEditForm();
+        setShowEditModal(false);
+      } else {
+        throw new Error(`Unexpected status: ${response.status}`);
+      }
+    } catch (err) {
+      console.error("Failed to update draw:", err);
+
+      if (err.response?.status === 401 || err.response?.status === 403) {
+        alert("Session expired. Please login again.");
+      } else if (err.response?.data?.error?.message) {
+        alert(`Error: ${err.response.data.error.message}`);
+      } else if (err.response?.status === 404) {
+        alert("Draw not found. It may have been deleted.");
+        await fetchDraws();
+      } else if (err.response?.status === 409) {
+        alert("A draw with this name already exists.");
+      } else {
+        alert("Failed to update lucky draw. Please try again.");
+      }
+    } finally {
+      setUpdatingDraw(false);
+    }
+  };
+
   const resetCreateForm = useCallback(() => {
     setNewDrawData({
       Name: "",
@@ -951,6 +1423,29 @@ export default function LuckyDrawHome() {
     });
     setQrCodeFile(null);
     setQrCodePreview(null);
+  }, []);
+
+  const resetEditForm = useCallback(() => {
+    setEditingDraw(null);
+    setEditDrawData({});
+    setQrCodeFile(null);
+    setQrCodePreview(null);
+  }, []);
+
+  const handleEditDraw = useCallback((draw) => {
+    setEditingDraw(draw);
+    setEditDrawData({
+      Name: draw.Name || "",
+      Number_of_Peoples: draw.Number_of_Peoples || "",
+      Amount: draw.Amount || "",
+      Upi_Id: draw.Upi_Id || "",
+      Duration_Value: draw.Duration_Value || "",
+      Duration_Unit: draw.Duration_Unit || "Week",
+      LuckyDraw_Status: draw.LuckyDraw_Status || "Created",
+    });
+    setQrCodeFile(null);
+    setQrCodePreview(null);
+    setShowEditModal(true);
   }, []);
 
   const handleDeleteDraw = useCallback(
@@ -993,73 +1488,6 @@ export default function LuckyDrawHome() {
     },
     [checkAuth, fetchDraws]
   );
-
-  const handleUpdateStatus = useCallback(
-    async (draw, newStatus) => {
-      if (!checkAuth()) {
-        alert("Please login to update draw status");
-        return;
-      }
-
-      if (draw.LuckyDraw_Status === "Completed") {
-        alert("Completed draws cannot be updated");
-        return;
-      }
-
-      if (
-        !window.confirm(
-          `Change draw status from "${draw.LuckyDraw_Status}" to "${newStatus}"?`
-        )
-      ) {
-        return;
-      }
-
-      try {
-        const response = await api.put(`/lucky-draw-names/${draw.documentId}`, {
-          data: { LuckyDraw_Status: newStatus },
-        });
-
-        if (response.status === 200) {
-          await fetchDraws();
-          alert(`Draw status updated to ${newStatus}`);
-        } else {
-          throw new Error(`Unexpected status: ${response.status}`);
-        }
-      } catch (err) {
-        console.error("Failed to update status:", err);
-        if (err.response?.status === 401 || err.response?.status === 403) {
-          alert("Session expired. Please login again.");
-        } else if (err.response?.status === 404) {
-          alert("Draw not found.");
-          await fetchDraws();
-        } else {
-          alert("Failed to update status. Please try again.");
-        }
-      }
-    },
-    [checkAuth, fetchDraws]
-  );
-
-  const handleViewDetails = useCallback(async (draw) => {
-    try {
-      const res = await api.get(`/lucky-draw-names/${draw.documentId}`, {
-        params: {
-          populate: {
-            QRcode: true,
-            lucky_draw_forms: { count: true },
-            lucky_draw_winners: { count: true },
-          },
-        },
-      });
-      console.log("Clicked draw:", draw);
-
-      setSelectedDraw(res.data);
-      setShowDrawDetailsModal(true);
-    } catch (err) {
-      console.error("Failed to fetch draw details", err);
-      alert("Failed to load draw details");
-    }
-  }, []);
 
   const handleNameSubmit = useCallback(() => {
     if (!newDrawData.Name.trim()) {
@@ -1221,7 +1649,7 @@ export default function LuckyDrawHome() {
               Back to Dashboard
             </button>
             <h1 className="text-4xl md:text-6xl font-extrabold text-slate-900 mb-8 tracking-tight">
-               Lucky Draw Manager
+              Lucky Draw Manager
             </h1>
             <p className="text-xl text-slate-600 max-w-3xl mx-auto leading-relaxed">
               Create and manage exciting lucky draws with prizes, QR code
@@ -1311,10 +1739,9 @@ export default function LuckyDrawHome() {
                  rounded-2xl border border-slate-200/80 p-6
                  hover:border-blue-300/50 hover:shadow-2xl hover:shadow-blue-100/50
                  transition-all duration-500 ease-out
-                 hover:-translate-y-2 hover:scale-[1.02] cursor-pointer
+                 hover:-translate-y-2 hover:scale-[1.02] 
                  animate-fade-in-up"
                 style={{ animationDelay: `${index * 100}ms` }}
-                onClick={() => handleViewDetails(draw)}
               >
                 {/* Accent Bar */}
                 <div
@@ -1368,19 +1795,20 @@ export default function LuckyDrawHome() {
                       </p>
                     </div>
 
-                    {/* Delete Button with tooltip */}
-                    {draw.LuckyDraw_Status !== "Completed" && (
-                      <div className="relative group/delete">
+                    {/* Action Buttons */}
+                    <div className="flex items-center gap-2">
+                      {/* Edit Button */}
+                      <div className="relative group/edit">
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleDeleteDraw(draw);
+                            handleEditDraw(draw);
                           }}
-                          title="Delete draw"
-                          className="p-2 rounded-xl text-slate-400 hover:text-rose-500
+                          title="Edit draw details"
+                          className="p-2 rounded-xl text-slate-400 hover:text-blue-600
                            bg-gradient-to-b from-slate-50 to-white
                            border border-slate-200/60
-                           hover:border-rose-200 hover:bg-gradient-to-b hover:from-rose-50 hover:to-white
+                           hover:border-blue-200 hover:bg-gradient-to-b hover:from-blue-50 hover:to-white
                            hover:scale-110 active:scale-95
                            transition-all duration-300 shadow-sm hover:shadow-md cursor-pointer"
                         >
@@ -1394,15 +1822,51 @@ export default function LuckyDrawHome() {
                             <path
                               strokeLinecap="round"
                               strokeLinejoin="round"
-                              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                              d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
                             />
                           </svg>
                         </button>
-                        <div className="absolute right-0 top-full mt-2 px-2 py-1 text-xs font-medium text-white bg-slate-900 rounded-md opacity-0 group-hover/delete:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-20">
-                          Delete Draw
+                        <div className="absolute right-0 top-full mt-2 px-2 py-1 text-xs font-medium text-white bg-slate-900 rounded-md opacity-0 group-hover/edit:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-20">
+                          Edit Draw
                         </div>
                       </div>
-                    )}
+
+                      {/* Delete Button with tooltip */}
+                      {draw.LuckyDraw_Status !== "Completed" && (
+                        <div className="relative group/delete">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteDraw(draw);
+                            }}
+                            title="Delete draw"
+                            className="p-2 rounded-xl text-slate-400 hover:text-rose-500
+                             bg-gradient-to-b from-slate-50 to-white
+                             border border-slate-200/60
+                             hover:border-rose-200 hover:bg-gradient-to-b hover:from-rose-50 hover:to-white
+                             hover:scale-110 active:scale-95
+                             transition-all duration-300 shadow-sm hover:shadow-md cursor-pointer"
+                          >
+                            <svg
+                              className="w-4.5 h-4.5"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                              />
+                            </svg>
+                          </button>
+                          <div className="absolute right-0 top-full mt-2 px-2 py-1 text-xs font-medium text-white bg-slate-900 rounded-md opacity-0 group-hover/delete:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-20">
+                            Delete Draw
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   {/* Stats Cards */}
@@ -1537,6 +2001,23 @@ export default function LuckyDrawHome() {
         onRemoveFile={handleRemoveFile}
         creatingDraw={creatingDraw}
         fileInputRef={fileInputRef}
+      />
+
+      <EditDrawModal
+        isOpen={showEditModal}
+        onClose={() => {
+          setShowEditModal(false);
+          resetEditForm();
+        }}
+        onSubmit={handleUpdateDraw}
+        drawData={editDrawData}
+        onInputChange={handleEditInputChange}
+        qrCodePreview={qrCodePreview}
+        onFileChange={handleEditFileChange}
+        onRemoveFile={handleRemoveEditFile}
+        updatingDraw={updatingDraw}
+        fileInputRef={editFileInputRef}
+        existingQRCode={editingDraw?.QRcode}
       />
 
       <DrawDetailsModal
