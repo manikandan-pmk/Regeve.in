@@ -3,6 +3,7 @@ import axios from "axios";
 import { useParams, useNavigate } from "react-router-dom";
 
 const API_BASE = "https://api.regeve.in/api";
+const API_BASE_URL = "https://api.regeve.in";
 
 const api = axios.create({
   baseURL: API_BASE,
@@ -134,7 +135,7 @@ const NameModal = ({
           <div className="mt-6 flex justify-end space-x-3 pt-6 border-t border-gray-200 p-6">
             <button
               onClick={onClose}
-              className="rounded-xl px-6 py-3 text-sm font-medium text-gray-700 transition-all duration-200 hover:bg-gray-100 hover:scale-[1.02] active:scale-95"
+              className="rounded-xl cursor-pointer px-6 py-3 text-sm font-medium text-gray-700 transition-all duration-200 hover:bg-gray-100 hover:scale-[1.02] active:scale-95"
               type="button"
             >
               Cancel
@@ -142,7 +143,7 @@ const NameModal = ({
             <button
               onClick={onNext}
               disabled={!drawName.trim()}
-              className="rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-3 text-sm font-medium text-white shadow-lg transition-all duration-200 hover:from-blue-700 hover:to-blue-800 hover:scale-[1.02] hover:shadow-xl active:scale-95 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="rounded-xl cursor-pointer bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-3 text-sm font-medium text-white shadow-lg transition-all duration-200 hover:from-blue-700 hover:to-blue-800 hover:scale-[1.02] hover:shadow-xl active:scale-95 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
               type="button"
             >
               Next →
@@ -215,7 +216,7 @@ const CreateDetailsModal = ({
               </div>
               <button
                 onClick={onClose}
-                className="rounded-lg p-2 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 hover:scale-110 active:scale-95"
+                className="rounded-lg p-2 cursor-pointer text-gray-400 transition hover:bg-red-600 hover:text-white hover:scale-110 active:scale-95"
                 type="button"
               >
                 <svg
@@ -438,7 +439,7 @@ const CreateDetailsModal = ({
           <div className="mt-6 flex justify-between space-x-3 pt-6 border-t border-gray-200 p-6">
             <button
               onClick={onBack}
-              className="rounded-xl px-6 py-3 text-sm font-medium text-gray-700 transition-all duration-200 hover:bg-gray-100 hover:scale-[1.02] active:scale-95"
+              className="rounded-xl cursor-pointer px-6 py-3 text-sm font-medium text-gray-700 transition-all duration-200 hover:bg-gray-100 hover:scale-[1.02] active:scale-95"
               type="button"
             >
               ← Back
@@ -447,7 +448,7 @@ const CreateDetailsModal = ({
             <button
               onClick={onSubmit}
               disabled={creatingDraw}
-              className="rounded-xl bg-gradient-to-r from-green-600 to-green-700 px-6 py-3 text-sm font-medium text-white shadow-lg transition-all duration-200 hover:from-green-700 hover:to-green-800 hover:scale-[1.02] hover:shadow-xl active:scale-95 focus:outline-none focus:ring-2 focus:ring-green-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="rounded-xl cursor-pointer bg-gradient-to-r from-green-600 to-green-700 px-6 py-3 text-sm font-medium text-white shadow-lg transition-all duration-200 hover:from-green-700 hover:to-green-800 hover:scale-[1.02] hover:shadow-xl active:scale-95 focus:outline-none focus:ring-2 focus:ring-green-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
               type="button"
             >
               {creatingDraw ? (
@@ -528,7 +529,7 @@ const EditDrawModal = ({
               </div>
               <button
                 onClick={onClose}
-                className="rounded-lg p-2 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 active:scale-95"
+                className="rounded-lg cursor-pointer p-2 text-gray-400 transition hover:bg-red-800 hover:text-white active:scale-95"
                 type="button"
               >
                 <svg
@@ -557,7 +558,7 @@ const EditDrawModal = ({
                   <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
                     Draw Information
                   </h4>
-                  
+
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className="space-y-2">
                       <label className="text-xs font-medium text-gray-700">
@@ -710,7 +711,7 @@ const EditDrawModal = ({
                           src={
                             existingQRCode.url.startsWith("http")
                               ? existingQRCode.url
-                              : `${API_BASE}${existingQRCode.url}`
+                              : `${API_BASE_URL}${existingQRCode.url}`
                           }
                           alt="Current QR Code"
                           className="w-40 h-40 object-contain rounded-lg mb-3 border border-gray-200"
@@ -721,7 +722,7 @@ const EditDrawModal = ({
                             e.stopPropagation();
                             onRemoveFile();
                           }}
-                          className="text-xs text-red-600 hover:text-red-800"
+                          className="text-xs cursor-pointer text-red-600 hover:text-red-800"
                         >
                           Remove QR
                         </button>
@@ -746,9 +747,7 @@ const EditDrawModal = ({
                         <p className="text-sm text-gray-600 mb-1">
                           Upload QR Code
                         </p>
-                        <p className="text-xs text-gray-400">
-                          Optional
-                        </p>
+                        <p className="text-xs text-gray-400">Optional</p>
                       </div>
                     )}
                   </div>
@@ -796,7 +795,7 @@ const EditDrawModal = ({
             <div className="flex justify-between items-center">
               <button
                 onClick={onClose}
-                className="px-4 py-2 text-sm font-medium text-gray-700 rounded-lg transition-colors duration-200 hover:bg-gray-100"
+                className="px-4 cursor-pointer py-2 text-sm font-medium text-gray-700 rounded-lg transition-colors duration-200 hover:bg-gray-100"
                 type="button"
               >
                 Cancel
@@ -805,7 +804,7 @@ const EditDrawModal = ({
               <button
                 onClick={onSubmit}
                 disabled={updatingDraw || !drawData.Name.trim()}
-                className="px-4 py-2 text-sm font-medium text-white rounded-lg bg-gradient-to-r from-green-600 to-green-700 transition-all duration-200 hover:from-green-700 hover:to-green-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-4 cursor-pointer py-2 text-sm font-medium text-white rounded-lg bg-gradient-to-r from-green-600 to-green-700 transition-all duration-200 hover:from-green-700 hover:to-green-800 disabled:opacity-50 disabled:cursor-not-allowed"
                 type="button"
               >
                 {updatingDraw ? (
@@ -1158,7 +1157,10 @@ export default function LuckyDrawHome() {
       const res = await api.get(`/lucky-draw-names`, {
         params: {
           populate: {
-            QRcode: true,
+            QRcode: {
+              fields: ["url"],
+            },
+
             lucky_draw_forms: { count: true },
             lucky_draw_winners: { count: true },
             admin: { fields: ["id"] },

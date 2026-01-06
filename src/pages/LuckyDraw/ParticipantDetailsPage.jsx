@@ -237,9 +237,6 @@ const MobileVerificationGate = ({ onVerify, documentId }) => {
                 autoFocus
                 disabled={isLoading}
               />
-              <div className="absolute inset-x-0 -bottom-5 md:-bottom-6 flex justify-center">
-                <span className="text-xs text-slate-400">No OTP required</span>
-              </div>
             </div>
 
             {error && (
@@ -259,7 +256,7 @@ const MobileVerificationGate = ({ onVerify, documentId }) => {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full py-3 md:py-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl font-bold text-base md:text-lg shadow-lg hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-70 disabled:cursor-not-allowed transition-all duration-300 flex items-center justify-center gap-2 md:gap-3 group"
+              className="w-full cursor-pointer py-3 md:py-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl font-bold text-base md:text-lg shadow-lg hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-70 disabled:cursor-not-allowed transition-all duration-300 flex items-center justify-center gap-2 md:gap-3 group"
             >
               {isLoading ? (
                 <>
@@ -281,9 +278,7 @@ const MobileVerificationGate = ({ onVerify, documentId }) => {
           <div className="mt-6 md:mt-8 pt-4 md:pt-6 border-t border-slate-100">
             <div className="flex items-center justify-center gap-2 text-xs text-slate-400">
               <Lock size={10} />
-              <span className="font-medium text-xs">
-                End-to-end encrypted • No data stored
-              </span>
+              <span className="font-medium text-xs">End-to-end encrypted</span>
             </div>
           </div>
         </div>
@@ -1645,126 +1640,101 @@ export default function ParticipantDetailsPage() {
     setTimeout(() => setToast((prev) => ({ ...prev, visible: false })), 3000);
   };
 
-  const fetchParticipants = useCallback(
-    async (isBackgroundRefresh = false) => {
-      if (!documentId) return;
+ const fetchParticipants = useCallback(
+  async (isBackgroundRefresh = false) => {
+    if (!documentId) return;
 
-      if (!isBackgroundRefresh) {
-        setIsRefreshing(true);
-        if (!isBackgroundRefresh) setIsLoading(true);
-      }
+    if (!isBackgroundRefresh) {
+      setIsRefreshing(true);
+      setIsLoading(true);
+    }
 
-      try {
-        const res = await api.get(`/public/lucky-draw-names/${documentId}`);
-        const data = res.data;
-        const list = data?.lucky_draw_forms || [];
+    try {
+      const res = await api.get(`/public/lucky-draw-names/${documentId}`);
+      const data = res.data;
 
-        // Get participant payments from API response
-        const participantPayments = data?.participant_payments || [];
+      const participantsList = data?.lucky_draw_forms || [];
+      const participantPayments = data?.participant_payments || [];
 
-        setParticipants(
-          list.map((item) => {
-            const photo =
-              item.Photo?.formats?.small?.url ||
-              item.Photo?.formats?.thumbnail?.url ||
-              item.Photo?.url ||
-              null;
-
-            // Find payments for this participant
-            const userPayments = participantPayments.filter(
-              (payment) =>
-                payment.lucky_draw_form?.documentId === item.documentId
-            );
-
-            // Determine payment status based on verified payments
-            const hasVerifiedPayment = userPayments.some(
-              (payment) => payment.isVerified
-            );
-            const hasPendingPayment = userPayments.some(
-              (payment) => !payment.isVerified
-            );
-
-            let paymentStatus = "pending";
-            if (hasVerifiedPayment) {
-              paymentStatus = "paid";
-            } else if (hasPendingPayment) {
-              paymentStatus = "pending_verification";
-            }
-
-            return {
-              id: item.id,
-              documentId: item.documentId,
-              isVerified: item.isVerified,
-              name: item.Name,
-              email: item.Email,
-              phone: item.Phone_Number,
-              isWinner: item.IsWinnedParticipant ?? false,
-              paymentStatus: paymentStatus,
-              winAmount: item.Prize_Amount || 0,
-              joinedDate: new Date(item.createdAt).toLocaleDateString(),
-              photoUrl: photo ? `${API_BASE_URL}${photo}` : null,
-              paymentHistory: userPayments.map((payment) => ({
-                id: payment.id,
-                documentId: payment.documentId,
-                Amount: payment.Amount,
-                Payment_Cycle: payment.Payment_Cycle,
-                due_date: payment.due_date,
-                isVerified: payment.isVerified,
-                Verified_At: payment.Verified_At,
-                createdAt: payment.createdAt,
-                Payment_Photo: payment.Payment_Photo,
-                lucky_draw_form: payment.lucky_draw_form,
-              })),
-            };
-          })
-        );
-
-        // Set general payment history for the lucky draw
-        const myPayments = participantPayments.filter(
-          (payment) =>
-            payment.lucky_draw_form?.documentId === participantDocumentId
-        );
-
-        setUserPaymentHistory(
-          myPayments.map((payment) => ({
-            id: payment.id,
-            documentId: payment.documentId,
-            Amount: payment.Amount,
-            Payment_Cycle: payment.Payment_Cycle,
-            due_date: payment.due_date,
-            isVerified: payment.isVerified,
-            Verified_At: payment.Verified_At,
-            createdAt: payment.createdAt,
-            Payment_Photo: payment.Payment_Photo,
-          }))
-        );
-
-        const qr =
-          data?.QRcode?.formats?.medium?.url ||
-          data?.QRcode?.formats?.small?.url ||
-          data?.QRcode?.formats?.thumbnail?.url ||
-          data?.QRcode?.url ||
+      // ✅ BUILD PARTICIPANTS (ONLY ONCE)
+      const mappedParticipants = participantsList.map((item) => {
+        const photo =
+          item.Photo?.formats?.small?.url ||
+          item.Photo?.formats?.thumbnail?.url ||
+          item.Photo?.url ||
           null;
 
-        setLuckyDrawQR(qr ? `${API_BASE_URL}${qr}` : null);
+        const userPayments = participantPayments.filter(
+          (payment) =>
+            String(payment.lucky_draw_form?.documentId) ===
+            String(item.documentId)
+        );
 
-        const totalAmount = Number(data?.Amount || 0);
-        const totalParticipants = data?.lucky_draw_forms?.length || 0;
-        const perParticipantAmount =
-          totalParticipants > 0
-            ? Math.floor(totalAmount / totalParticipants)
-            : 0;
-        setLuckyDrawAmount(perParticipantAmount);
-      } catch (error) {
-        console.error("Error fetching participants:", error);
-        showToast("Failed to load participants", "error");
-      } finally {
-        setIsRefreshing(false);
-        setIsLoading(false);
-      }
-    },
-    [documentId]
-  );
+        const hasVerified = userPayments.some((p) => p.isVerified);
+        const hasPending = userPayments.some((p) => !p.isVerified);
+
+        let paymentStatus = "pending";
+        if (hasVerified) paymentStatus = "paid";
+        else if (hasPending) paymentStatus = "pending_verification";
+
+        return {
+          id: item.id,
+          documentId: item.documentId,
+          isVerified: item.isVerified,
+          name: item.Name,
+          email: item.Email,
+          phone: item.Phone_Number,
+          isWinner: item.IsWinnedParticipant ?? false,
+          paymentStatus,
+          winAmount: item.Prize_Amount || 0,
+          joinedDate: new Date(item.createdAt).toLocaleDateString(),
+          photoUrl: photo ? `${API_BASE_URL}${photo}` : null,
+          paymentHistory: [...userPayments], // 🔥 IMPORTANT
+        };
+      });
+
+      // 🔥 FORCE UI UPDATE
+      setParticipants([...mappedParticipants]);
+
+      // ✅ CURRENT USER PAYMENT HISTORY
+      const myPayments = participantPayments.filter(
+        (payment) =>
+          String(payment.lucky_draw_form?.documentId) ===
+          String(participantDocumentId)
+      );
+
+      setUserPaymentHistory([...myPayments]); // 🔥 FORCE UPDATE
+
+      // ✅ QR CODE
+      const qr =
+        data?.QRcode?.formats?.medium?.url ||
+        data?.QRcode?.formats?.small?.url ||
+        data?.QRcode?.formats?.thumbnail?.url ||
+        data?.QRcode?.url ||
+        null;
+
+      setLuckyDrawQR(qr ? `${API_BASE_URL}${qr}` : null);
+
+      // ✅ AMOUNT PER PARTICIPANT
+      const totalAmount = Number(data?.Amount || 0);
+      const totalParticipants = participantsList.length || 0;
+      const perParticipantAmount =
+        totalParticipants > 0
+          ? Math.floor(totalAmount / totalParticipants)
+          : 0;
+
+      setLuckyDrawAmount(perParticipantAmount);
+    } catch (error) {
+      console.error("Error fetching participants:", error);
+      showToast("Failed to load participants", "error");
+    } finally {
+      setIsRefreshing(false);
+      setIsLoading(false);
+    }
+  },
+  [documentId, participantDocumentId]
+);
+
 
   useEffect(() => {
     if (isVerified) {
@@ -1830,25 +1800,6 @@ export default function ParticipantDetailsPage() {
         <div className="px-3 sm:px-4 md:px-6 py-3 sm:py-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
             <div className="flex items-center gap-2 sm:gap-4">
-              <div className="flex items-center gap-2 sm:gap-3">
-                <button
-                  onClick={() => navigate(-1)}
-                  className="p-1.5 sm:p-2.5 bg-white border border-slate-200 rounded-lg sm:rounded-xl hover:bg-slate-50 hover:border-slate-300 transition-all duration-300 cursor-pointer shadow-sm hover:shadow-md active:scale-95"
-                  title="Go back"
-                >
-                  <ChevronLeft size={18} className="sm:w-5 sm:h-5" />
-                </button>
-                <button
-                  onClick={handleBackToHome}
-                  className="p-1.5 sm:p-2.5 bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-100 rounded-lg sm:rounded-xl hover:shadow-md transition-all duration-300 cursor-pointer group"
-                  title="Back to home"
-                >
-                  <Home
-                    size={18}
-                    className="text-indigo-600 group-hover:scale-110 transition-transform sm:w-5 sm:h-5"
-                  />
-                </button>
-              </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 sm:gap-3">
                   <div className="relative min-w-0">
@@ -1857,9 +1808,6 @@ export default function ParticipantDetailsPage() {
                     </h1>
                     <div className="absolute -bottom-1 left-0 w-12 sm:w-16 h-0.5 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full"></div>
                   </div>
-                  <span className="px-2 py-0.5 sm:px-3 sm:py-1 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white text-xs font-bold rounded-full shadow-lg flex-shrink-0">
-                    {participants.length} Total
-                  </span>
                 </div>
                 <p className="text-slate-500 text-xs sm:text-sm mt-1 sm:mt-2 flex items-center gap-1 sm:gap-2 truncate">
                   <Users size={12} className="flex-shrink-0" />
@@ -2078,7 +2026,8 @@ export default function ParticipantDetailsPage() {
         onClose={() => setActiveModal(null)}
         participant={selectedUser}
         luckydrawDocumentId={documentId}
-        onUploadComplete={fetchParticipants}
+        onUploadComplete={() => fetchParticipants(false)}
+
         showToast={showToast}
       />
       <PaymentHistoryModal

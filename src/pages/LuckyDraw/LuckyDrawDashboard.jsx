@@ -122,6 +122,10 @@ const LuckyDrawDashboard = () => {
   const [showCycleDropdown, setShowCycleDropdown] = useState(false);
   const [cycleStats, setCycleStats] = useState({});
 
+  const refetchAll = async () => {
+    await Promise.all([fetchLuckyDrawData(), fetchWinners(), fetchPayments()]);
+  };
+
   useEffect(() => {
     if (!luckydrawDocumentId) {
       setError("Lucky Draw ID missing in URL");
@@ -184,9 +188,25 @@ const LuckyDrawDashboard = () => {
         throw new Error("No participants data found");
       }
 
-      const winnersList = data.lucky_draw_forms.filter(
-        (participant) => participant.IsWinnedParticipant === true
-      );
+      const winnersList = data.lucky_draw_forms
+        .filter((participant) => participant.IsWinnedParticipant === true)
+        .map((participant) => {
+          // 🔥 find last verified payment of this participant
+          const participantPayments =
+            data.payments?.filter(
+              (p) =>
+                p.lucky_draw_form?.documentId === participant.documentId &&
+                p.isVerified === true
+            ) || [];
+
+          const latestPayment =
+            participantPayments[participantPayments.length - 1];
+
+          return {
+            ...participant,
+            winPaymentCycle: latestPayment?.Payment_Cycle || "Unknown Cycle",
+          };
+        });
 
       setWinners(winnersList);
       setStats((prev) => ({
@@ -205,8 +225,9 @@ const LuckyDrawDashboard = () => {
     try {
       setPaymentsLoading(true);
       const response = await axiosWithAuth.get(
-        `/lucky-draw-names/${luckydrawDocumentId}`
+        `/lucky-draw-names/${luckydrawDocumentId}?populate[payments][populate][lucky_draw_form][populate]=Photo`
       );
+
       const data = response.data;
       const paymentsData = data.payments || [];
 
@@ -307,21 +328,7 @@ const LuckyDrawDashboard = () => {
         },
       });
 
-      // Optimistic UI update
-      setPayments((prev) =>
-        prev.map((p) =>
-          p.documentId === paymentDocumentId
-            ? {
-                ...p,
-                isVerified: verify,
-                Verified_At: verify ? new Date().toISOString() : null,
-              }
-            : p
-        )
-      );
-
-      // Refresh payments data
-      fetchPayments();
+      await refetchAll();
     } catch (error) {
       console.error(
         "Payment verification failed:",
@@ -332,6 +339,13 @@ const LuckyDrawDashboard = () => {
       setVerifyingPaymentId(null);
     }
   };
+  const getWeekLabel = (cycle) => {
+  if (!cycle) return "Week";
+
+  const match = cycle.match(/Week\s*\d+/i);
+  return match ? match[0] : cycle;
+};
+
 
   const getStatusColor = (status) => {
     const colors = {
@@ -672,7 +686,7 @@ const LuckyDrawDashboard = () => {
                       >
                         <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer"></div>
                         <Crown className="w-4 h-4" />
-                        <span className="font-bold text-sm">WINNER</span>
+                        <span className="font-bold text-sm">  {getWeekLabel(winner.winPaymentCycle)}</span>
                       </motion.div>
                     </div>
                   </div>
@@ -817,14 +831,6 @@ const LuckyDrawDashboard = () => {
     const [showCycleDropdown, setShowCycleDropdown] = useState(false);
     const [showPaymentDetails, setShowPaymentDetails] = useState({});
 
-    // Toggle payment details view
-    const togglePaymentDetails = (paymentId) => {
-      setShowPaymentDetails((prev) => ({
-        ...prev,
-        [paymentId]: !prev[paymentId],
-      }));
-    };
-
     // Toggle payment verification
     const togglePaymentVerification = async (payment, currentStatus) => {
       try {
@@ -870,9 +876,9 @@ const LuckyDrawDashboard = () => {
                 </div>
                 <button
                   onClick={onClose}
-                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors duration-200"
+                  className="p-2 cursor-pointer hover:bg-red-800 hover:text-white rounded-lg transition-colors duration-200"
                 >
-                  <X className="w-5 h-5 text-gray-500 hover:text-gray-700" />
+                  <X className="w-5 h-5 text-gray-500 hover:text-white" />
                 </button>
               </div>
             </div>
@@ -888,7 +894,7 @@ const LuckyDrawDashboard = () => {
                   <div className="relative">
                     <button
                       onClick={() => setShowCycleDropdown(!showCycleDropdown)}
-                      className="flex items-center justify-between px-4 py-3 bg-white border border-gray-300 rounded-xl hover:border-blue-400 shadow-sm w-full lg:w-[320px] transition-colors duration-200"
+                      className="flex cursor-pointer items-center justify-between px-4 py-3 bg-white border border-gray-300 rounded-xl hover:border-blue-400 shadow-sm w-full lg:w-[320px] transition-colors duration-200"
                     >
                       <div className="flex items-center gap-3">
                         <div className="p-2 bg-blue-50 rounded-lg">
@@ -973,7 +979,7 @@ const LuckyDrawDashboard = () => {
                       <button
                         key={filter}
                         onClick={() => setPaymentFilter(filter)}
-                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-2 ${
+                        className={`px-4 py-2 cursor-pointer rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-2 ${
                           paymentFilter === filter
                             ? "bg-white text-blue-600 shadow-sm ring-1 ring-blue-100"
                             : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
@@ -981,7 +987,7 @@ const LuckyDrawDashboard = () => {
                       >
                         {filter === "paid" ? (
                           <>
-                            <Check className="w-3.5 h-3.5" />
+                            <Check className="w-3.5  h-3.5" />
                             Paid
                           </>
                         ) : filter === "pending" ? (
@@ -1130,7 +1136,7 @@ const LuckyDrawDashboard = () => {
                                   disabled={
                                     verifyingPaymentId === payment.documentId
                                   }
-                                  className={`relative inline-flex items-center h-6 rounded-full w-12 transition-colors duration-200 ${
+                                  className={`relative cursor-pointer inline-flex items-center h-6 rounded-full w-12 transition-colors duration-200 ${
                                     payment.isVerified
                                       ? "bg-green-500"
                                       : "bg-gray-300"
@@ -1159,98 +1165,15 @@ const LuckyDrawDashboard = () => {
                                       "_blank"
                                     )
                                   }
-                                  className="px-3 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-lg text-sm font-medium flex items-center gap-1.5 transition-colors duration-200"
+                                  className="px-3 cursor-pointer py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-lg text-sm font-medium flex items-center gap-1.5 transition-colors duration-200"
                                 >
                                   <Eye className="w-3.5 h-3.5" />
                                   Proof
                                 </button>
                               )}
-
-                              {/* Details Toggle */}
-                              <button
-                                onClick={() =>
-                                  togglePaymentDetails(payment.documentId)
-                                }
-                                className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors duration-200"
-                              >
-                                <ChevronDown
-                                  className={`w-4 h-4 text-gray-500 transition-transform duration-200 ${
-                                    showPaymentDetails[payment.documentId]
-                                      ? "rotate-180"
-                                      : ""
-                                  }`}
-                                />
-                              </button>
                             </div>
                           </div>
                         </div>
-
-                        {/* Expanded Details */}
-                        {showPaymentDetails[payment.documentId] && (
-                          <motion.div
-                            initial={{ opacity: 0, height: 0 }}
-                            animate={{ opacity: 1, height: "auto" }}
-                            exit={{ opacity: 0, height: 0 }}
-                            className="mt-4 pt-4 border-t border-gray-100"
-                          >
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                              <div>
-                                <h5 className="text-sm font-medium text-gray-700 mb-2">
-                                  Payment Details
-                                </h5>
-                                <div className="space-y-2 text-sm">
-                                  <div className="flex justify-between">
-                                    <span className="text-gray-600">
-                                      Payment ID:
-                                    </span>
-                                    <span className="font-mono text-gray-900">
-                                      {payment.documentId?.slice(0, 8)}...
-                                    </span>
-                                  </div>
-                                  <div className="flex justify-between">
-                                    <span className="text-gray-600">
-                                      Transaction Date:
-                                    </span>
-                                    <span className="font-medium">
-                                      {formatDate(payment.createdAt)}
-                                    </span>
-                                  </div>
-                                  {payment.Verified_At && (
-                                    <div className="flex justify-between">
-                                      <span className="text-gray-600">
-                                        Verified On:
-                                      </span>
-                                      <span className="font-medium">
-                                        {formatDate(payment.Verified_At)}
-                                      </span>
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                              <div>
-                                <h5 className="text-sm font-medium text-gray-700 mb-2">
-                                  Contact Information
-                                </h5>
-                                <div className="space-y-2 text-sm">
-                                  <div className="flex items-center gap-2">
-                                    <Phone className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
-                                    <span className="text-gray-600 truncate">
-                                      {payment.lucky_draw_form?.Phone_Number ||
-                                        "Not provided"}
-                                    </span>
-                                  </div>
-                                  <div className="flex items-center gap-2">
-                                    <Calendar className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
-                                    <span className="text-gray-600">
-                                      Age:{" "}
-                                      {payment.lucky_draw_form?.Age || "N/A"}
-                                    </span>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          </motion.div>
-                        )}
                       </div>
                     </motion.div>
                   ))}
@@ -1275,14 +1198,14 @@ const LuckyDrawDashboard = () => {
                 <div className="flex items-center gap-2">
                   <button
                     onClick={fetchPayments}
-                    className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors duration-200"
+                    className="flex cursor-pointer items-center gap-1.5 px-3 py-2 text-sm font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors duration-200"
                   >
                     <RefreshCw className="w-3.5 h-3.5" />
                     Refresh
                   </button>
                   <button
                     onClick={onClose}
-                    className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 hover:text-gray-900 text-sm rounded-lg font-medium transition-colors duration-200"
+                    className="px-4 py-2 cursor-pointer bg-gray-200 hover:bg-gray-300 text-gray-700 hover:text-gray-900 text-sm rounded-lg font-medium transition-colors duration-200"
                   >
                     Close
                   </button>
@@ -1411,32 +1334,26 @@ const LuckyDrawDashboard = () => {
     );
   }
 
-const receivedAmount = Number(cycleInfo?.totalAmount || 0);
+  const receivedAmount = Number(cycleInfo?.totalAmount || 0);
 
-// ✅ FIXED PER CYCLE AMOUNT (from backend)
-const expectedAmount = Number(luckyDrawData?.Amount || 0);
+  // ✅ FIXED PER CYCLE AMOUNT (from backend)
+  const expectedAmount = Number(luckyDrawData?.Amount || 0);
 
-const amountProgress =
-  expectedAmount > 0
-    ? (receivedAmount / expectedAmount) * 100
-    : 0;
-
-
+  const amountProgress =
+    expectedAmount > 0 ? (receivedAmount / expectedAmount) * 100 : 0;
 
   // Stats Cards with Win Statistics
   const statsCards = [
     {
-  key: "totalAmount",
-  title: `Amount Collected (${cycleInfo?.currentCycle || ""})`,
-  value: `${formatCurrency(receivedAmount)}`,
-  icon: DollarSign,
-  color: "green",
-  progress: Math.min(amountProgress, 100),
-  progressPercent: Math.round(amountProgress),
-  subTitle: "Target: " + formatCurrency(expectedAmount),
-},
-
-
+      key: "totalAmount",
+      title: `Amount Collected (${cycleInfo?.currentCycle || ""})`,
+      value: `${formatCurrency(receivedAmount)}`,
+      icon: DollarSign,
+      color: "green",
+      progress: Math.min(amountProgress, 100),
+      progressPercent: Math.round(amountProgress),
+      subTitle: "Target: " + formatCurrency(expectedAmount),
+    },
 
     {
       key: "verifiedParticipants",
@@ -1601,11 +1518,7 @@ const amountProgress =
                   <motion.button
                     whileHover={{ scale: 1.1, rotate: 180 }}
                     whileTap={{ scale: 0.9 }}
-                    onClick={() => {
-                      fetchLuckyDrawData();
-                      fetchWinners();
-                      fetchPayments();
-                    }}
+                    onClick={refetchAll}
                     className="cursor-pointer p-3 rounded-xl border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-all duration-300"
                     title="Refresh Dashboard"
                   >
@@ -1974,11 +1887,7 @@ const amountProgress =
                         transition={{ duration: 0.5 }}
                         className="relative"
                       >
-                        <div className="w-10 h-10 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-full flex items-center justify-center shadow-lg">
-                          <span className="text-white font-bold text-sm">
-                            #{index + 1}
-                          </span>
-                        </div>
+
                         <motion.div
                           animate={{ scale: [1, 1.2, 1] }}
                           transition={{ duration: 1.5, repeat: Infinity }}
@@ -2048,15 +1957,11 @@ const amountProgress =
                         {/* Animated Stats */}
                         <div className="flex items-center justify-center gap-2 flex-wrap">
                           {[
-                            { bg: "blue", text: winner.Gender || "N/A" },
+                           
                             {
-                              bg: "indigo",
-                              text: `Age: ${winner.Age || "N/A"}`,
-                            },
-                            {
-                              bg: "emerald",
-                              text: winner.Phone_Number || "No Phone",
-                            },
+                              bg: "yellow",
+                              text: getWeekLabel(winner.winPaymentCycle),
+                            }
                           ].map((tag, tagIndex) => (
                             <motion.span
                               key={tagIndex}
@@ -2106,7 +2011,12 @@ const amountProgress =
 
       {/* Payment Tracking Modal */}
       {showPaymentsModal && (
-        <PaymentTrackingModal onClose={() => setShowPaymentsModal(false)} />
+        <PaymentTrackingModal
+          onClose={() => {
+            setShowPaymentsModal(false);
+            refetchAll();
+          }}
+        />
       )}
 
       {/* Global Styles */}

@@ -413,10 +413,52 @@ const LuckyDrawParticipantDashboard = () => {
     }
   };
 
+  // ----------------------------- PHOTO UPLOAD -----------------------------
+  const uploadPhoto = async (file) => {
+    const token = localStorage.getItem("jwt");
+
+    const formData = new FormData();
+    formData.append("files", file);
+
+    const response = await axios.post(
+      "https://api.regeve.in/api/upload",
+      formData,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+
+    // Strapi returns array of uploaded files
+    return response.data[0].id; // ✅ media ID
+  };
+
   const handleEditSave = async () => {
     const token = localStorage.getItem("jwt");
 
     try {
+      let photoId = null;
+
+      // 🔥 Upload new photo if selected
+      if (newPhotoFile) {
+        photoId = await uploadPhoto(newPhotoFile);
+      }
+
+      const updateData = {
+        Name: editForm.Name,
+        Email: editForm.Email,
+        Phone_Number: editForm.Phone_Number,
+        Gender: editForm.Gender,
+        Age: Number(editForm.Age),
+        ID_card: editForm.ID_card,
+      };
+
+      // 🔥 Attach photo only if uploaded
+      if (photoId) {
+        updateData.Photo = photoId;
+      }
+
       await axios.put(
         `https://api.regeve.in/api/lucky-draw-names/${luckydrawDocumentId}`,
         {
@@ -425,14 +467,7 @@ const LuckyDrawParticipantDashboard = () => {
               update: [
                 {
                   where: { documentId: activeParticipant.documentId },
-                  data: {
-                    Name: editForm.Name,
-                    Email: editForm.Email,
-                    Phone_Number: editForm.Phone_Number,
-                    Gender: editForm.Gender,
-                    Age: Number(editForm.Age),
-                    ID_card: editForm.ID_card,
-                  },
+                  data: updateData,
                 },
               ],
             },
@@ -447,6 +482,7 @@ const LuckyDrawParticipantDashboard = () => {
       setShowEditModal(false);
     } catch (err) {
       console.error("Edit failed", err);
+      alert("Failed to update participant");
     }
   };
 
@@ -508,17 +544,19 @@ const LuckyDrawParticipantDashboard = () => {
       <td className="px-6 py-5">
         <div className="flex items-center gap-4">
           <div className="relative">
-            <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-white shadow-lg bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
+            <div className="w-16 h-16 overflow-hidden rounded-lg shadow-lg bg-gray-100 flex items-center justify-center">
               {user.photo ? (
                 <img
                   src={user.photo}
                   alt={user.name}
-                  className="w-full h-full object-cover"
+                  className="w-full h-full object-cover object-center"
+                  loading="lazy"
                 />
               ) : (
                 <div className="text-2xl text-gray-400">👤</div>
               )}
             </div>
+
             {user.isVerified && (
               <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-emerald-500 rounded-full border-2 border-white flex items-center justify-center">
                 <FaUserCheck className="text-white text-xs" />
@@ -792,7 +830,6 @@ const LuckyDrawParticipantDashboard = () => {
             iconBg:
               "bg-gradient-to-br from-emerald-500 via-emerald-600 to-teal-600",
           }}
-         
           description="Verified participants"
         />
 
@@ -822,7 +859,6 @@ const LuckyDrawParticipantDashboard = () => {
             dot: "bg-gradient-to-r from-rose-500 to-pink-500",
             iconBg: "bg-gradient-to-br from-rose-500 via-rose-600 to-pink-600",
           }}
-          
           description="Awaiting verification"
         />
       </div>
@@ -1139,7 +1175,7 @@ const LuckyDrawParticipantDashboard = () => {
                     {/* Profile Photo */}
                     <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-6 text-center">
                       <div className="relative inline-block mb-4">
-                        <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-white shadow-lg mx-auto">
+                        <div className="w-32 h-32 overflow-hidden shadow-lg mx-auto">
                           {photoPreview ? (
                             <img
                               src={photoPreview}
@@ -1411,7 +1447,7 @@ const LuckyDrawParticipantDashboard = () => {
                   <div className="space-y-6">
                     {/* Profile Card */}
                     <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-6 text-center">
-                      <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-white shadow-lg mx-auto mb-4">
+                      <div className="w-32 h-32 overflow-hidden shadow-lg mx-auto mb-4">
                         {activeParticipant.photo ? (
                           <img
                             src={activeParticipant.photo}
@@ -1607,15 +1643,6 @@ const LuckyDrawParticipantDashboard = () => {
                     className="px-5 cursor-pointer py-2.5 text-sm border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors min-w-[100px]"
                   >
                     Close
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShowViewModal(false);
-                      // Add logic to switch to edit mode
-                    }}
-                    className="px-5 cursor-pointer py-2.5 text-sm bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-lg font-semibold hover:from-blue-600 hover:to-indigo-700 transition-all duration-200 shadow hover:shadow-lg flex items-center gap-2 min-w-[120px] justify-center"
-                  >
-                    <FaEdit className="text-sm" /> Edit
                   </button>
                 </div>
               </div>
