@@ -90,6 +90,8 @@ const LuckyDrawDashboard = () => {
   const [selectedWinner, setSelectedWinner] = useState(null);
   const [showWinnerModal, setShowWinnerModal] = useState(false);
   const [showPaymentsModal, setShowPaymentsModal] = useState(false);
+  const [cycleInfo, setCycleInfo] = useState(null);
+
   const [stats, setStats] = useState({
     totalParticipants: 0,
     totalAmount: 0,
@@ -147,17 +149,13 @@ const LuckyDrawDashboard = () => {
       ).length;
 
       setLuckyDrawData(data);
+      setCycleInfo(data.cycleInfo); // 🔥 ADD THIS
 
       setStats((prev) => ({
         ...prev,
         totalParticipants: participants.length,
         verifiedParticipants: verifiedCount,
         maxParticipants: data.Number_of_Peoples || 0,
-        totalAmount: parseFloat(data.Amount) || 0,
-        daysRemaining: calculateDaysRemaining(
-          data.Duration_Value,
-          data.Duration_Unit
-        ),
         activeDraws: data.LuckyDraw_Status === "Active" ? 1 : 0,
       }));
     } catch (err) {
@@ -333,16 +331,6 @@ const LuckyDrawDashboard = () => {
     } finally {
       setVerifyingPaymentId(null);
     }
-  };
-
-  const calculateDaysRemaining = (value, unit) => {
-    const unitMap = {
-      Day: 1,
-      Week: 7,
-      Month: 30,
-      Year: 365,
-    };
-    return value * (unitMap[unit] || 1);
   };
 
   const getStatusColor = (status) => {
@@ -1423,73 +1411,83 @@ const LuckyDrawDashboard = () => {
     );
   }
 
+const receivedAmount = Number(cycleInfo?.totalAmount || 0);
+
+// ✅ FIXED PER CYCLE AMOUNT (from backend)
+const expectedAmount = Number(luckyDrawData?.Amount || 0);
+
+const amountProgress =
+  expectedAmount > 0
+    ? (receivedAmount / expectedAmount) * 100
+    : 0;
+
+
+
   // Stats Cards with Win Statistics
-const statsCards = [
-  {
-    key: "totalAmount",
-    title: "Total Amount",
-    value: formatCurrency(stats.totalAmount),
-    icon: DollarSign,
-    color: "green",
-    delay: 0.15,
-    progress: Math.min((stats.totalAmount / 50000) * 100, 100),
-    progressPercent: Math.min(
-      Math.round((stats.totalAmount / 50000) * 100),
-      100
-    ),
-    subTitle: `Target: ${formatCurrency(50000)}`,
-  },
-  {
-    key: "verifiedParticipants",
-    title: "Verified Participants",
-    value: stats.verifiedParticipants,
-    icon: CheckCircle,
-    color: "emerald",
-    delay: 0.2,
-    progress:
-      stats.totalParticipants > 0
-        ? (stats.verifiedParticipants / stats.totalParticipants) * 100
-        : 0,
-    progressPercent:
-      stats.totalParticipants > 0
-        ? Math.round(
-            (stats.verifiedParticipants / stats.totalParticipants) * 100
-          )
-        : 0,
-    subTitle: `of ${stats.totalParticipants} total`,
-  },
-  {
-    key: "winners",
-    title: "Total Winners",
-    value: stats.winnersCount,
-    icon: Trophy,
-    color: "purple",
-    delay: 0.25,
-    progress:
-      stats.totalParticipants > 0
-        ? (stats.winnersCount / stats.totalParticipants) * 100
-        : 0,
-    progressPercent:
-      stats.totalParticipants > 0
-        ? Math.round((stats.winnersCount / stats.totalParticipants) * 100)
-        : 0,
-    subTitle: `Win Rate: ${stats.totalParticipants > 0 ? ((stats.winnersCount / stats.totalParticipants) * 100).toFixed(1) + '%' : '0%'}`,
-  },
-  {
-    key: "remainingDays",
-    title: "Days Remaining",
-    value: stats.daysRemaining,
-    icon: Calendar,
-    color: "amber",
-    delay: 0.3,
-    progress: Math.max(100 - (stats.daysRemaining / 30) * 100, 0),
-    progressPercent: Math.max(
-      100 - Math.round((stats.daysRemaining / 30) * 100),
-      0
-    ),
-    subTitle: `Ending soon`,
-  },
-];
+  const statsCards = [
+    {
+  key: "totalAmount",
+  title: `Amount Collected (${cycleInfo?.currentCycle || ""})`,
+  value: `${formatCurrency(receivedAmount)}`,
+  icon: DollarSign,
+  color: "green",
+  progress: Math.min(amountProgress, 100),
+  progressPercent: Math.round(amountProgress),
+  subTitle: "Target: " + formatCurrency(expectedAmount),
+},
+
+
+
+    {
+      key: "verifiedParticipants",
+      title: "Verified Participants",
+      value: stats.verifiedParticipants,
+      icon: CheckCircle,
+      color: "emerald",
+      delay: 0.2,
+      progress:
+        stats.totalParticipants > 0
+          ? (stats.verifiedParticipants / stats.totalParticipants) * 100
+          : 0,
+      progressPercent:
+        stats.totalParticipants > 0
+          ? Math.round(
+              (stats.verifiedParticipants / stats.totalParticipants) * 100
+            )
+          : 0,
+      subTitle: `of ${stats.totalParticipants} total`,
+    },
+    {
+      key: "winners",
+      title: "Total Winners",
+      value: stats.winnersCount,
+      icon: Trophy,
+      color: "purple",
+      delay: 0.25,
+      progress:
+        stats.totalParticipants > 0
+          ? (stats.winnersCount / stats.totalParticipants) * 100
+          : 0,
+      progressPercent:
+        stats.totalParticipants > 0
+          ? Math.round((stats.winnersCount / stats.totalParticipants) * 100)
+          : 0,
+      subTitle: `Win Rate: ${
+        stats.totalParticipants > 0
+          ? ((stats.winnersCount / stats.totalParticipants) * 100).toFixed(1) +
+            "%"
+          : "0%"
+      }`,
+    },
+    {
+      key: "remainingCycle",
+      title: "Current Cycle",
+      value: cycleInfo?.remainingDays || 0,
+      icon: Calendar,
+      color: "amber",
+      subTitle: cycleInfo?.remainingText || "",
+    },
+  ];
 
   return (
     <motion.div

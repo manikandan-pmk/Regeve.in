@@ -36,6 +36,10 @@ import {
   FileText,
   Clock,
   Receipt,
+  TrendingUp,
+  Shield,
+  BarChart3,
+  Home,
 } from "lucide-react";
 
 // --- CONFIGURATION ---
@@ -77,25 +81,27 @@ const Toast = ({ message, type, isVisible, onClose }) => {
   if (!isVisible) return null;
 
   return (
-    <div className="fixed top-6 right-6 z-[100] animate-in slide-in-from-top-5 fade-in duration-300">
+    <div className="fixed top-4 md:top-6 right-2 md:right-6 z-[100] animate-in slide-in-from-top-5 fade-in duration-300 max-w-[calc(100vw-1rem)]">
       <div
-        className={`flex items-center gap-3 px-5 py-3 rounded-2xl shadow-2xl backdrop-blur-md border ${
+        className={`flex items-center gap-3 px-4 py-3 md:px-5 md:py-3 rounded-xl md:rounded-2xl shadow-2xl backdrop-blur-md border ${
           type === "success"
             ? "bg-emerald-900/90 border-emerald-500/30 text-white"
             : "bg-red-900/90 border-red-500/30 text-white"
         }`}
       >
         {type === "success" ? (
-          <CheckCircle2 size={20} className="text-emerald-400" />
+          <CheckCircle2 size={18} className="text-emerald-400 flex-shrink-0" />
         ) : (
-          <AlertCircle size={20} className="text-red-400" />
+          <AlertCircle size={18} className="text-red-400 flex-shrink-0" />
         )}
-        <div>
-          <p className="text-sm font-bold">{message}</p>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-bold truncate md:whitespace-normal">
+            {message}
+          </p>
         </div>
         <button
           onClick={onClose}
-          className="ml-2 hover:bg-white/20 p-1 rounded-full transition-colors cursor-pointer"
+          className="ml-2 hover:bg-white/20 p-1 rounded-full transition-colors cursor-pointer flex-shrink-0"
         >
           <X size={14} />
         </button>
@@ -104,7 +110,7 @@ const Toast = ({ message, type, isVisible, onClose }) => {
   );
 };
 
-// --- 0.5 MOBILE VERIFICATION GATE COMPONENT (UPDATED) ---
+// --- 0.5 MOBILE VERIFICATION GATE COMPONENT (IMPROVED & RESPONSIVE) ---
 const MobileVerificationGate = ({ onVerify, documentId }) => {
   const { adminId } = useParams();
   const navigate = useNavigate();
@@ -112,6 +118,7 @@ const MobileVerificationGate = ({ onVerify, documentId }) => {
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [shaking, setShaking] = useState(false);
+  const [step, setStep] = useState(1);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -144,10 +151,15 @@ const MobileVerificationGate = ({ onVerify, documentId }) => {
         localStorage.setItem("participant_documentId", userExists.documentId);
         localStorage.setItem("participant_phone", userExists.Phone_Number);
         localStorage.setItem("participant_name", userExists.Name);
-        onVerify();
-        navigate(`/${adminId}/participant-page/${documentId}`, {
-          replace: true,
-        });
+
+        // Show success animation before redirect
+        setStep(2);
+        setTimeout(() => {
+          onVerify();
+          navigate(`/${adminId}/participant-page/${documentId}`, {
+            replace: true,
+          });
+        }, 1500);
         return;
       }
       triggerError("Mobile number not registered for this event.");
@@ -166,97 +178,170 @@ const MobileVerificationGate = ({ onVerify, documentId }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-[100] bg-gradient-to-br from-slate-50 to-indigo-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[100] bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute top-0 left-0 w-full h-1/2 bg-gradient-to-b from-white to-transparent"></div>
-        <div className="absolute top-1/4 right-1/4 w-96 h-96 bg-indigo-200 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob"></div>
-        <div className="absolute bottom-1/4 left-1/4 w-96 h-96 bg-purple-200 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-2000"></div>
+        <div className="absolute top-0 left-0 w-full h-1/2 bg-gradient-to-b from-white/80 to-transparent"></div>
+        <div className="absolute top-1/4 right-1/4 w-64 md:w-96 h-64 md:h-96 bg-indigo-200 rounded-full mix-blend-multiply filter blur-2xl md:blur-3xl opacity-20 animate-blob"></div>
+        <div className="absolute bottom-1/4 left-1/4 w-64 md:w-96 h-64 md:h-96 bg-purple-200 rounded-full mix-blend-multiply filter blur-2xl md:blur-3xl opacity-20 animate-blob animation-delay-2000"></div>
+        <div className="absolute top-3/4 right-1/2 w-48 md:w-64 h-48 md:h-64 bg-blue-200 rounded-full mix-blend-multiply filter blur-2xl md:blur-3xl opacity-15 animate-blob animation-delay-4000"></div>
       </div>
 
-      <div
-        className={`relative w-full max-w-md bg-white/90 backdrop-blur-xl border border-white/70 shadow-2xl rounded-3xl p-8 sm:p-10 text-center ${
-          shaking ? "animate-shake" : "animate-in zoom-in-95 duration-500"
-        }`}
-      >
-        <div className="mx-auto w-24 h-24 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-200 mb-8 transform rotate-3">
-          <Smartphone className="text-white w-12 h-12" />
-        </div>
-
-        <h2 className="text-3xl font-bold text-slate-800 mb-3">
-          Participant Access
-        </h2>
-        <p className="text-slate-600 mb-8 text-sm font-medium">
-          Verify your registered mobile number to view the participant list
-        </p>
-
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="relative group">
-            <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
-              <Phone className="w-5 h-5 text-slate-400" />
+      {step === 1 ? (
+        <div
+          className={`relative w-full max-w-sm md:max-w-md bg-white/95 backdrop-blur-xl border border-white/70 shadow-xl md:shadow-2xl rounded-2xl md:rounded-3xl p-6 md:p-8 lg:p-10 text-center ${
+            shaking ? "animate-shake" : "animate-in zoom-in-95 duration-500"
+          }`}
+        >
+          <div className="absolute -top-5 md:-top-6 left-1/2 transform -translate-x-1/2">
+            <div className="w-12 h-12 md:w-14 md:h-14 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl md:rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-200 border-4 border-white transform rotate-3">
+              <Smartphone className="text-white w-5 h-5 md:w-7 md:h-7" />
             </div>
-            <input
-              type="tel"
-              value={phoneNumber}
-              onChange={(e) => {
-                const val = e.target.value.replace(/\D/g, "");
-                setPhoneNumber(val);
-                setError("");
-              }}
-              maxLength={10}
-              className={`w-full pl-12 pr-4 py-4 bg-white border-2 rounded-xl outline-none font-bold text-lg tracking-wider text-center transition-all ${
-                error
-                  ? "border-red-300 text-red-600 focus:border-red-500 bg-red-50"
-                  : "border-slate-300 text-slate-800 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
-              }`}
-              placeholder="9876543210"
-              autoFocus
-              disabled={isLoading}
-            />
           </div>
 
-          {error && (
-            <p className="text-red-500 text-sm font-medium flex items-center justify-center gap-2 animate-in fade-in">
-              <AlertCircle size={16} /> {error}
+          <div className="mb-6 md:mb-8">
+            <h2 className="text-2xl md:text-3xl font-bold text-slate-800 mb-2 md:mb-3 bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+              Participant Portal
+            </h2>
+            <p className="text-slate-600 mb-3 md:mb-4 text-xs md:text-sm font-medium px-2">
+              Enter your registered mobile number to access the participant
+              dashboard
             </p>
-          )}
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2 bg-indigo-50 rounded-full">
+              <Shield size={12} className="text-indigo-500" />
+              <span className="text-xs text-indigo-600 font-medium">
+                Secure Verification
+              </span>
+            </div>
+          </div>
 
-          <button
-            type="submit"
-            disabled={isLoading}
-            className="w-full py-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl font-bold text-lg shadow-lg hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-70 disabled:cursor-not-allowed transition-all duration-300 flex items-center justify-center gap-3"
-          >
-            {isLoading ? (
-              <>
-                <Loader2 size={20} className="animate-spin" />
-                Verifying...
-              </>
-            ) : (
-              <>
-                Verify Number
-                <ArrowRight size={20} />
-              </>
+          <form onSubmit={handleSubmit} className="space-y-4 md:space-y-6">
+            <div className="relative group">
+              <div className="absolute inset-y-0 left-3 md:left-4 flex items-center pointer-events-none">
+                <Phone className="w-4 h-4 md:w-5 md:h-5 text-slate-400 group-hover:text-indigo-400 transition-colors" />
+              </div>
+              <input
+                type="tel"
+                value={phoneNumber}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/\D/g, "");
+                  setPhoneNumber(val);
+                  setError("");
+                }}
+                maxLength={10}
+                className={`w-full pl-10 pr-4 md:pl-12 py-3 md:py-4 bg-white border-2 rounded-xl md:rounded-xl outline-none font-bold text-base md:text-lg tracking-wider text-center transition-all duration-300 ${
+                  error
+                    ? "border-red-300 text-red-600 focus:border-red-500 bg-red-50"
+                    : "border-slate-200 text-slate-800 focus:border-indigo-500 focus:ring-3 focus:ring-indigo-100 hover:border-indigo-300"
+                }`}
+                placeholder="Enter 10-digit number"
+                autoFocus
+                disabled={isLoading}
+              />
+              <div className="absolute inset-x-0 -bottom-5 md:-bottom-6 flex justify-center">
+                <span className="text-xs text-slate-400">No OTP required</span>
+              </div>
+            </div>
+
+            {error && (
+              <div className="animate-in fade-in duration-300">
+                <div className="inline-flex items-center gap-2 px-3 py-2 md:px-4 md:py-2.5 bg-red-50 rounded-lg md:rounded-xl border border-red-100">
+                  <AlertCircle
+                    size={14}
+                    className="text-red-500 flex-shrink-0"
+                  />
+                  <p className="text-red-600 text-xs md:text-sm font-medium text-left">
+                    {error}
+                  </p>
+                </div>
+              </div>
             )}
-          </button>
-        </form>
 
-        <div className="mt-8 pt-6 border-t border-slate-100">
-          <div className="flex items-center justify-center gap-2 text-xs text-slate-400">
-            <Lock size={12} />
-            <span className="font-medium">Secure & Encrypted Verification</span>
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="w-full py-3 md:py-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl font-bold text-base md:text-lg shadow-lg hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-70 disabled:cursor-not-allowed transition-all duration-300 flex items-center justify-center gap-2 md:gap-3 group"
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 size={18} className="animate-spin" />
+                  Verifying...
+                </>
+              ) : (
+                <>
+                  <span>Access Dashboard</span>
+                  <ArrowRight
+                    size={18}
+                    className="group-hover:translate-x-1 transition-transform"
+                  />
+                </>
+              )}
+            </button>
+          </form>
+
+          <div className="mt-6 md:mt-8 pt-4 md:pt-6 border-t border-slate-100">
+            <div className="flex items-center justify-center gap-2 text-xs text-slate-400">
+              <Lock size={10} />
+              <span className="font-medium text-xs">
+                End-to-end encrypted • No data stored
+              </span>
+            </div>
           </div>
         </div>
-      </div>
+      ) : (
+        <div className="relative w-full max-w-sm md:max-w-md bg-white/95 backdrop-blur-xl border border-white/70 shadow-xl md:shadow-2xl rounded-2xl md:rounded-3xl p-6 md:p-8 lg:p-10 text-center animate-in zoom-in-95 duration-500">
+          <div className="mb-6 md:mb-8">
+            <div className="w-16 h-16 md:w-20 md:h-20 bg-gradient-to-br from-emerald-400 to-green-500 rounded-xl md:rounded-2xl flex items-center justify-center mx-auto mb-4 md:mb-6 animate-in zoom-in-100 duration-700">
+              <CheckCircle2 className="text-white w-8 h-8 md:w-10 md:h-10" />
+            </div>
+            <h2 className="text-xl md:text-2xl font-bold text-slate-800 mb-2 md:mb-3">
+              Verification Successful!
+            </h2>
+            <p className="text-slate-600 mb-4 md:mb-6 text-sm">
+              Welcome back,{" "}
+              <span className="font-bold text-indigo-600">{phoneNumber}</span>
+            </p>
+          </div>
+
+          <div className="flex items-center justify-center gap-2 md:gap-3">
+            <div className="w-2 h-2 md:w-3 md:h-3 bg-emerald-400 rounded-full animate-pulse"></div>
+            <div
+              className="w-2 h-2 md:w-3 md:h-3 bg-emerald-400 rounded-full animate-pulse"
+              style={{ animationDelay: "0.2s" }}
+            ></div>
+            <div
+              className="w-2 h-2 md:w-3 md:h-3 bg-emerald-400 rounded-full animate-pulse"
+              style={{ animationDelay: "0.4s" }}
+            ></div>
+            <span className="text-xs text-slate-500 ml-2">Redirecting...</span>
+          </div>
+        </div>
+      )}
 
       <style>{`
-@keyframes shake {
-0%, 100% { transform: translateX(0); }
-25% { transform: translateX(-8px); }
-75% { transform: translateX(8px); }
-}
-.animate-shake {
-animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
-}
-`}</style>
+        @keyframes shake {
+          0%, 100% { transform: translateX(0); }
+          25% { transform: translateX(-6px); }
+          75% { transform: translateX(6px); }
+        }
+        .animate-shake {
+          animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
+        }
+        @keyframes blob {
+          0% { transform: translate(0px, 0px) scale(1); }
+          33% { transform: translate(20px, -30px) scale(1.1); }
+          66% { transform: translate(-15px, 15px) scale(0.9); }
+          100% { transform: translate(0px, 0px) scale(1); }
+        }
+        .animate-blob {
+          animation: blob 7s infinite;
+        }
+        .animation-delay-2000 {
+          animation-delay: 2s;
+        }
+        .animation-delay-4000 {
+          animation-delay: 4s;
+        }
+      `}</style>
     </div>
   );
 };
@@ -269,7 +354,7 @@ const SmoothImage = ({ src, alt, className }) => {
     <div className={`relative overflow-hidden ${className}`}>
       {!isLoaded && (
         <div className="absolute inset-0 bg-gradient-to-br from-slate-100 to-slate-200 animate-pulse flex items-center justify-center">
-          <User className="text-slate-300" size={24} />
+          <User className="text-slate-300" size={20} />
         </div>
       )}
       <img
@@ -285,66 +370,86 @@ const SmoothImage = ({ src, alt, className }) => {
   );
 };
 
-// --- STATS CARDS COMPONENT ---
+// --- STATS CARDS COMPONENT (RESPONSIVE) ---
 const StatsCards = ({ participants, luckyDrawAmount, paymentStats }) => {
   const totalParticipants = participants.length;
   const winners = participants.filter((p) => p.isWinner).length;
   const paidParticipants = participants.filter(
     (p) => p.paymentStatus === "paid"
   ).length;
+  const pendingVerification = participants.filter(
+    (p) => p.paymentStatus === "pending_verification"
+  ).length;
+
+  const stats = [
+    {
+      label: "Total Participants",
+      value: totalParticipants,
+      icon: Users,
+      color: "indigo",
+    },
+    {
+      label: " Winners",
+      value: winners,
+      icon: Crown,
+      color: "amber",
+    },
+    {
+      label: "Amount Per Head",
+      value: `₹${luckyDrawAmount.toLocaleString()}`,
+      icon: IndianRupee,
+      color: "emerald",
+    },
+  ];
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-      <div className="bg-gradient-to-br from-white to-slate-50 rounded-2xl p-5 border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-slate-500 text-sm font-medium mb-1">
-              Total Participants
-            </p>
-            <p className="text-3xl font-bold text-slate-800">
-              {totalParticipants}
-            </p>
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4 mb-6 md:mb-8">
+      {stats.map((stat, index) => (
+        <div
+          key={stat.label}
+          className="bg-white rounded-xl md:rounded-2xl p-4 md:p-5 border border-slate-200 shadow-sm hover:shadow-lg hover:-translate-y-0.5 md:hover:-translate-y-1 transition-all duration-300 group"
+          style={{ animationDelay: `${index * 100}ms` }}
+        >
+          <div className="flex items-start justify-between">
+            <div className="min-w-0 flex-1">
+              <p className="text-slate-500 text-xs md:text-sm font-medium mb-1 md:mb-2 flex items-center gap-2 truncate">
+                <span
+                  className={`w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-${stat.color}-500 flex-shrink-0`}
+                ></span>
+                <span className="truncate">{stat.label}</span>
+              </p>
+              <p className="text-xl md:text-2xl font-bold text-slate-800 mb-1 truncate">
+                {stat.value}
+              </p>
+            </div>
+            <div
+              className={`w-10 h-10 md:w-12 md:h-12 rounded-lg md:rounded-xl bg-${stat.color}-50 flex items-center justify-center group-hover:scale-110 transition-transform flex-shrink-0 ml-2`}
+            >
+              <stat.icon
+                className={`text-${stat.color}-600 w-5 h-5 md:w-6 md:h-6`}
+              />
+            </div>
           </div>
-          <div className="w-12 h-12 rounded-xl bg-indigo-100 flex items-center justify-center">
-            <Users className="text-indigo-600 w-6 h-6" />
-          </div>
-        </div>
-      </div>
-
-      <div className="bg-gradient-to-br from-white to-slate-50 rounded-2xl p-5 border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-slate-500 text-sm font-medium mb-1">Winners</p>
-            <p className="text-3xl font-bold text-slate-800">{winners}</p>
-          </div>
-          <div className="w-12 h-12 rounded-xl bg-amber-100 flex items-center justify-center">
-            <Crown className="text-amber-600 w-6 h-6" />
-          </div>
-        </div>
-      </div>
-
-     
-
-      <div className="bg-gradient-to-br from-white to-slate-50 rounded-2xl p-5 border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-slate-500 text-sm font-medium mb-1">
-              Amount Each
-            </p>
-            <p className="text-3xl font-bold text-slate-800">
-              ₹{luckyDrawAmount.toLocaleString()}
-            </p>
-          </div>
-          <div className="w-12 h-12 rounded-xl bg-violet-100 flex items-center justify-center">
-            <Award className="text-violet-600 w-6 h-6" />
+          <div className="mt-3 md:mt-4 pt-3 md:pt-4 border-t border-slate-100">
+            <div className="w-full bg-slate-100 rounded-full h-1 md:h-1.5">
+              <div
+                className={`bg-${stat.color}-500 h-1 md:h-1.5 rounded-full transition-all duration-1000`}
+                style={{
+                  width: `${Math.min(
+                    (stat.value / (totalParticipants || 1)) * 100,
+                    100
+                  )}%`,
+                }}
+              ></div>
+            </div>
           </div>
         </div>
-      </div>
+      ))}
     </div>
   );
 };
 
-// --- 1. QR CODE MODAL ---
+// --- 1. QR CODE MODAL (RESPONSIVE) ---
 const QRCodeModal = ({
   isOpen,
   onClose,
@@ -354,6 +459,7 @@ const QRCodeModal = ({
   showToast,
 }) => {
   const [copied, setCopied] = useState(false);
+  const [downloading, setDownloading] = useState(false);
 
   if (!isOpen) return null;
 
@@ -368,6 +474,7 @@ const QRCodeModal = ({
       return;
     }
 
+    setDownloading(true);
     try {
       const img = new Image();
       img.crossOrigin = "anonymous";
@@ -386,11 +493,12 @@ const QRCodeModal = ({
           (blob) => {
             const link = document.createElement("a");
             link.href = URL.createObjectURL(blob);
-            link.download = `qr-${participant?.name || "code"}.jpg`;
+            link.download = `payment-qr-${new Date().getTime()}.jpg`;
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
-            showToast("QR Code downloaded as JPG!", "success");
+            showToast("QR Code downloaded successfully!", "success");
+            setDownloading(false);
           },
           "image/jpeg",
           0.95
@@ -398,12 +506,26 @@ const QRCodeModal = ({
       };
     } catch (e) {
       showToast("Download failed. Please try again.", "error");
+      setDownloading(false);
     }
   };
 
   const handleShare = async () => {
     if (navigator.share) {
-      await navigator.share({ title: "Payment QR", url: paymentLink });
+      try {
+        await navigator.share({
+          title: "Payment QR Code",
+          text: `Scan to pay ₹${amount}`,
+          url: paymentLink,
+        });
+      } catch (error) {
+        if (error.name !== "AbortError") {
+          navigator.clipboard.writeText(paymentLink);
+          setCopied(true);
+          showToast("Payment link copied to clipboard!", "success");
+          setTimeout(() => setCopied(false), 2000);
+        }
+      }
     } else {
       navigator.clipboard.writeText(paymentLink);
       setCopied(true);
@@ -413,28 +535,30 @@ const QRCodeModal = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-      <div className="relative w-full max-w-sm bg-white rounded-3xl shadow-2xl overflow-hidden">
-        <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-indigo-500 to-purple-500"></div>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
+      <div className="relative w-full max-w-xs sm:max-w-sm bg-white rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 mx-2">
+        <div className="absolute top-0 left-0 right-0 h-1 sm:h-2 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500"></div>
 
-        <div className="p-6">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h2 className="text-2xl font-bold text-slate-800">Scan to Pay</h2>
-              <p className="text-slate-500 text-sm">
-                Complete your payment securely
+        <div className="p-4 sm:p-6">
+          <div className="flex items-center justify-between mb-4 sm:mb-6">
+            <div className="min-w-0">
+              <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-slate-800 truncate">
+                Scan to Pay
+              </h2>
+              <p className="text-slate-500 text-xs sm:text-sm mt-1 truncate">
+                Secure UPI Payment
               </p>
             </div>
             <button
               onClick={onClose}
-              className="p-2 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+              className="p-1.5 sm:p-2 hover:bg-slate-100 rounded-lg sm:rounded-xl transition-colors cursor-pointer active:scale-95 flex-shrink-0"
             >
-              <X size={20} className="text-slate-400" />
+              <X size={18} className="text-slate-400" />
             </button>
           </div>
 
-          <div className="bg-gradient-to-br from-slate-50 to-white rounded-2xl p-6 border border-slate-200 mb-6 flex flex-col items-center">
-            <div className="w-32 h-32 bg-white rounded-xl p-3 shadow-inner mb-4">
+          <div className="bg-gradient-to-br from-slate-50 to-white rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-slate-200 mb-4 sm:mb-6 flex flex-col items-center group hover:shadow-md transition-shadow">
+            <div className="relative w-32 h-32 sm:w-40 sm:h-40 bg-white rounded-lg sm:rounded-xl p-3 sm:p-4 shadow-lg mb-3 sm:mb-5 group-hover:scale-105 transition-transform duration-300">
               {qrImageUrl ? (
                 <img
                   src={qrImageUrl}
@@ -442,36 +566,71 @@ const QRCodeModal = ({
                   className="w-full h-full object-contain"
                 />
               ) : (
-                <div className="w-full h-full flex items-center justify-center bg-slate-100 rounded-lg">
-                  <QrCode size={40} className="text-slate-300" />
+                <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200 rounded-lg">
+                  <QrCode size={32} className="text-slate-300" />
                 </div>
               )}
+              <div className="absolute -top-1 -right-1 sm:-top-2 sm:-right-2 w-4 h-4 sm:w-6 sm:h-6 bg-indigo-500 rounded-full flex items-center justify-center">
+                <CheckCircle size={10} className="text-white" />
+              </div>
             </div>
             <div className="text-center">
-              <p className="text-sm text-slate-500 font-medium">
+              <p className="text-xs sm:text-sm text-slate-500 font-medium mb-1 sm:mb-2">
                 Amount to pay
               </p>
-              <p className="text-3xl font-bold text-slate-800 mt-1">
-                ₹{amount.toLocaleString("en-IN")}
-              </p>
+              <div className="inline-flex items-center gap-1 sm:gap-2 px-3 py-1.5 sm:px-4 sm:py-2 bg-emerald-50 rounded-full">
+                <IndianRupee size={14} className="text-emerald-600" />
+                <p className="text-xl sm:text-2xl md:text-3xl font-bold text-emerald-700">
+                  {amount.toLocaleString("en-IN")}
+                </p>
+              </div>
             </div>
           </div>
 
-          <div className="flex gap-3">
+          <div className="space-y-2 sm:space-y-3">
             <button
               onClick={handleDownloadQR}
-              className="flex-1 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold flex items-center justify-center gap-2 transition-colors cursor-pointer"
+              disabled={downloading || !qrImageUrl}
+              className="w-full py-2.5 sm:py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg sm:rounded-xl font-semibold flex items-center justify-center gap-2 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed active:scale-95 cursor-pointer text-sm sm:text-base"
             >
-              <Download size={18} />
-              Save
+              {downloading ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" />
+                  Downloading...
+                </>
+              ) : (
+                <>
+                  <Download size={16} />
+                  Save QR Code
+                </>
+              )}
             </button>
             <button
               onClick={handleShare}
-              className="flex-1 py-3.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl font-semibold flex items-center justify-center gap-2 hover:shadow-lg transition-all cursor-pointer"
+              className="w-full py-2.5 sm:py-3.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg sm:rounded-xl font-semibold flex items-center justify-center gap-2 hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0 transition-all duration-300 cursor-pointer group text-sm sm:text-base"
             >
-              {copied ? <CheckCircle size={18} /> : <Share2 size={18} />}
-              {copied ? "Copied" : "Share"}
+              {copied ? (
+                <>
+                  <CheckCircle size={16} className="text-emerald-300" />
+                  Copied!
+                </>
+              ) : (
+                <>
+                  <Share2
+                    size={16}
+                    className="group-hover:rotate-12 transition-transform"
+                  />
+                  Share Payment Link
+                </>
+              )}
             </button>
+          </div>
+
+          <div className="mt-4 sm:mt-6 pt-4 sm:pt-6 border-t border-slate-100">
+            <div className="flex items-center justify-center gap-2 text-xs text-slate-400">
+              <Shield size={10} />
+              <span className="text-xs">Secure • Encrypted • Instant</span>
+            </div>
           </div>
         </div>
       </div>
@@ -479,7 +638,7 @@ const QRCodeModal = ({
   );
 };
 
-// --- 2. UPLOAD MODAL (UPDATED) ---
+// --- 2. UPLOAD MODAL (RESPONSIVE) ---
 const getWeekOfMonth = (date) => Math.ceil(date.getDate() / 7);
 const getMonthLabel = (date) => date.toLocaleString("en-US", { month: "long" });
 
@@ -499,6 +658,7 @@ const UploadScreenshotModal = ({
   const [paymentCycle, setPaymentCycle] = useState("");
   const [paymentCycles, setPaymentCycles] = useState([]);
   const [durationInfo, setDurationInfo] = useState({ value: 1, unit: "week" });
+  const [dragOver, setDragOver] = useState(false);
 
   const fileRef = useRef(null);
   const modalRef = useRef(null);
@@ -610,13 +770,12 @@ const UploadScreenshotModal = ({
 
   if (!isOpen) return null;
 
-  const handleFile = (e) => {
-    const f = e.target.files[0];
+  const handleFile = (f) => {
     if (!f) return;
 
     // Validate file type
     if (!f.type.startsWith("image/")) {
-      showToast("Please select an image file", "error");
+      showToast("Please select an image file (JPG, PNG, etc.)", "error");
       return;
     }
 
@@ -631,6 +790,32 @@ const UploadScreenshotModal = ({
     const reader = new FileReader();
     reader.onload = () => setPreview(reader.result);
     reader.readAsDataURL(f);
+  };
+
+  const handleFileChange = (e) => {
+    const f = e.target.files[0];
+    handleFile(f);
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOver(false);
+
+    const f = e.dataTransfer.files[0];
+    handleFile(f);
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOver(true);
+  };
+
+  const handleDragLeave = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOver(false);
   };
 
   const openConfirmPopup = () => {
@@ -708,65 +893,77 @@ const UploadScreenshotModal = ({
     <>
       {/* Main Modal */}
       <div
-        className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/70 backdrop-blur-sm"
+        className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-black/70 backdrop-blur-sm animate-in fade-in duration-300"
         onClick={handleBackdropClick}
       >
         <div
           ref={modalRef}
-          className="w-full max-w-lg bg-white rounded-3xl shadow-2xl overflow-hidden"
+          className="w-full max-w-md sm:max-w-lg bg-white rounded-xl sm:rounded-2xl md:rounded-3xl shadow-xl sm:shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 mx-2 max-h-[90vh] overflow-y-auto"
         >
-          {/* Content that fits without scrolling */}
-          <div className="p-6">
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 to-purple-500"></div>
+
+          <div className="p-4 sm:p-5 md:p-6">
             {/* Header */}
-            <div className="flex items-start justify-between mb-6">
-              <div>
-                <h2 className="text-xl font-bold text-slate-800">
-                  Upload Payment Proof
+            <div className="flex items-start justify-between mb-4 sm:mb-6">
+              <div className="min-w-0 pr-2">
+                <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-slate-800 truncate">
+                  Submit Payment Proof
                 </h2>
-                <p className="text-slate-500 text-sm mt-1">
-                  Submit your payment details
+                <p className="text-slate-500 text-xs sm:text-sm mt-1 truncate">
+                  Upload screenshot and fill payment details
                 </p>
               </div>
 
               <button
                 onClick={onClose}
                 disabled={uploading}
-                className="p-2 hover:bg-slate-100 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed active:scale-95 flex-shrink-0"
               >
-                <X size={20} className="text-slate-400" />
+                <X size={18} className="text-slate-400" />
               </button>
             </div>
 
             {/* Payment Amount Input */}
-            <div className="mb-5">
-              <label className="block text-sm font-medium text-slate-700 mb-2">
-                Payment Amount (₹)
+            <div className="mb-4 sm:mb-6">
+              <label className="block text-xs sm:text-sm font-medium text-slate-700 mb-2 sm:mb-3 flex items-center gap-2">
+                <IndianRupee
+                  size={14}
+                  className="text-emerald-500 flex-shrink-0"
+                />
+                <span>Payment Amount (₹)</span>
               </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
-                  <IndianRupee size={18} className="text-slate-400" />
-                </div>
+              <div className="relative group">
                 <input
                   type="number"
                   value={paymentAmount}
                   onChange={(e) => setPaymentAmount(e.target.value)}
                   min="1"
-                  className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
+                  className="w-full px-4 py-3 sm:px-5 sm:py-4 bg-slate-50 border-2 border-slate-200 rounded-lg sm:rounded-xl focus:outline-none focus:ring-2 sm:focus:ring-3 focus:ring-indigo-100 focus:border-indigo-500 transition-all duration-300 text-base sm:text-lg font-bold text-slate-800 hover:border-slate-300"
                   placeholder="Enter amount"
                   disabled={uploading}
                 />
+                <div className="absolute inset-y-0 right-3 sm:right-4 flex items-center pointer-events-none">
+                  <span className="text-slate-400 font-medium text-sm">
+                    INR
+                  </span>
+                </div>
               </div>
               {durationInfo.value && (
-                <p className="text-xs text-slate-500 mt-2">
+                <p className="text-xs text-slate-500 mt-1 sm:mt-2 ml-1">
+                  <CalendarDays size={10} className="inline mr-1" />
                   Event duration: {durationInfo.value} {durationInfo.unit}(s)
                 </p>
               )}
             </div>
 
             {/* Payment Cycle Selection */}
-            <div className="mb-5">
-              <label className="block text-sm font-medium text-slate-700 mb-2">
-                Payment Cycle
+            <div className="mb-4 sm:mb-6 relative">
+              <label className="block text-xs sm:text-sm font-medium text-slate-700 mb-2 sm:mb-3 flex items-center gap-2">
+                <CalendarDays
+                  size={14}
+                  className="text-blue-500 flex-shrink-0"
+                />
+                <span>Payment Cycle</span>
               </label>
               <select
                 value={paymentCycle?.value || ""}
@@ -776,7 +973,8 @@ const UploadScreenshotModal = ({
                   );
                   setPaymentCycle(selected);
                 }}
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl"
+                className="w-full px-4 py-3 sm:px-5 sm:py-4 bg-slate-50 border-2 border-slate-200 rounded-lg sm:rounded-xl focus:outline-none focus:ring-2 sm:focus:ring-3 focus:ring-indigo-100 focus:border-indigo-500 transition-all duration-300 appearance-none hover:border-slate-300 cursor-pointer pr-10"
+                disabled={uploading}
               >
                 <option value="">Select a payment cycle</option>
                 {paymentCycles.map((cycle) => (
@@ -785,19 +983,30 @@ const UploadScreenshotModal = ({
                   </option>
                 ))}
               </select>
+              <div className="absolute right-3 sm:right-5 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                <ChevronRight size={16} className="text-slate-400 rotate-90" />
+              </div>
             </div>
 
-            {/* Upload Box - Compact version */}
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-slate-700 mb-2">
-                Payment Screenshot
+            {/* Upload Box - Improved with drag & drop */}
+            <div className="mb-4 sm:mb-6">
+              <label className="block text-xs sm:text-sm font-medium text-slate-700 mb-2 sm:mb-3 flex items-center gap-2">
+                <Upload size={14} className="text-purple-500 flex-shrink-0" />
+                <span>Payment Screenshot</span>
               </label>
               <div
                 onClick={() => !file && !uploading && fileRef.current?.click()}
-                className={`border-2 border-dashed rounded-xl p-6 text-center min-h-[160px] flex flex-col items-center justify-center transition-all ${
+                onDrop={handleDrop}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                className={`border-2 ${
+                  dragOver
+                    ? "border-dashed border-indigo-400 bg-indigo-50"
+                    : "border-dashed border-slate-300"
+                } rounded-xl sm:rounded-2xl p-4 sm:p-6 text-center min-h-[140px] sm:min-h-[160px] md:min-h-[180px] flex flex-col items-center justify-center transition-all duration-300 ${
                   preview
-                    ? "border-indigo-400 bg-indigo-50"
-                    : "border-slate-300 hover:border-indigo-300 hover:bg-slate-50"
+                    ? "border-solid border-indigo-400 bg-indigo-50"
+                    : "hover:border-indigo-300 hover:bg-slate-50"
                 } ${
                   uploading ? "opacity-60 cursor-not-allowed" : "cursor-pointer"
                 }`}
@@ -807,39 +1016,55 @@ const UploadScreenshotModal = ({
                   type="file"
                   hidden
                   accept="image/*"
-                  onChange={handleFile}
+                  onChange={handleFileChange}
                   disabled={uploading}
                 />
 
                 {preview ? (
                   <div className="relative w-full">
-                    <img
-                      src={preview}
-                      alt="Preview"
-                      className="max-h-32 mx-auto rounded-lg object-contain"
-                    />
-                    {!uploading && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setFile(null);
-                          setPreview(null);
-                        }}
-                        className="absolute top-2 right-2 p-1.5 bg-black/50 hover:bg-black/70 text-white rounded-full transition-colors"
-                      >
-                        <X size={14} />
-                      </button>
-                    )}
+                    <div className="flex flex-col items-center">
+                      <img
+                        src={preview}
+                        alt="Preview"
+                        className="max-h-32 sm:max-h-40 rounded-lg sm:rounded-xl shadow-lg mb-3 sm:mb-4"
+                      />
+                      {!uploading && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setFile(null);
+                            setPreview(null);
+                          }}
+                          className="px-3 py-1.5 sm:px-4 sm:py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg font-medium flex items-center gap-1 sm:gap-2 transition-colors text-sm"
+                        >
+                          <X size={12} />
+                          Change Image
+                        </button>
+                      )}
+                    </div>
                   </div>
                 ) : (
                   <>
-                    <div className="w-14 h-14 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mb-3">
+                    <div
+                      className={`w-12 h-12 sm:w-16 sm:h-16 ${
+                        dragOver
+                          ? "bg-indigo-100 text-indigo-600"
+                          : "bg-slate-100 text-slate-400"
+                      } rounded-full flex items-center justify-center mb-3 sm:mb-4 transition-colors`}
+                    >
                       <Upload size={20} />
                     </div>
-                    <p className="font-medium text-slate-600 mb-1 text-sm">
-                      Click to select file
+                    <p className="font-medium text-slate-700 mb-1 sm:mb-2 text-xs sm:text-sm">
+                      {dragOver
+                        ? "Drop image here"
+                        : "Click to upload or drag & drop"}
                     </p>
-                    <p className="text-xs text-slate-400">PNG, JPG up to 5MB</p>
+                    <p className="text-xs text-slate-500">PNG, JPG up to 5MB</p>
+                    {dragOver && (
+                      <div className="mt-2 text-xs text-indigo-600 font-medium animate-pulse">
+                        Release to upload
+                      </div>
+                    )}
                   </>
                 )}
               </div>
@@ -849,7 +1074,7 @@ const UploadScreenshotModal = ({
             <button
               onClick={openConfirmPopup}
               disabled={!file || !paymentAmount || !paymentCycle || uploading}
-              className="w-full py-3.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl font-semibold disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg transition-all shadow-md"
+              className="w-full py-3 sm:py-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg sm:rounded-xl font-semibold disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0 transition-all duration-300 shadow-md cursor-pointer group text-sm sm:text-base"
             >
               {uploading ? (
                 <span className="flex items-center justify-center gap-2">
@@ -857,7 +1082,13 @@ const UploadScreenshotModal = ({
                   Processing...
                 </span>
               ) : (
-                "Continue"
+                <span className="flex items-center justify-center gap-2">
+                  Continue to Review
+                  <ArrowRight
+                    size={16}
+                    className="group-hover:translate-x-1 transition-transform"
+                  />
+                </span>
               )}
             </button>
           </div>
@@ -867,72 +1098,112 @@ const UploadScreenshotModal = ({
       {/* Confirmation Modal */}
       {confirmOpen && (
         <div
-          className="fixed inset-0 z-[60] flex items-center justify-center p-6 bg-black/70 backdrop-blur-sm"
-          onClick={(e) => e.target === e.currentTarget && setConfirmOpen(false)}
+          className="fixed inset-0 z-[60] flex items-center justify-center p-2 sm:p-4 md:p-6 bg-black/70 backdrop-blur-sm animate-in fade-in duration-300"
+          onClick={(e) =>
+            e.target === e.currentTarget && !uploading && setConfirmOpen(false)
+          }
         >
-          <div className="w-full max-w-lg bg-white rounded-3xl shadow-2xl overflow-hidden">
-            <div className="p-6">
-              <h2 className="text-xl font-bold mb-6 text-slate-800">
-                Confirm Payment Details
-              </h2>
+          <div className="w-full max-w-md sm:max-w-lg bg-white rounded-xl sm:rounded-2xl md:rounded-3xl shadow-xl sm:shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 mx-2 max-h-[90vh] overflow-y-auto">
+            <div className="p-4 sm:p-5 md:p-6">
+              <div className="flex items-center justify-between mb-4 sm:mb-6">
+                <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-slate-800 truncate">
+                  Confirm Payment Details
+                </h2>
+                <button
+                  onClick={() => !uploading && setConfirmOpen(false)}
+                  disabled={uploading}
+                  className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors disabled:opacity-50 flex-shrink-0"
+                >
+                  <X size={18} className="text-slate-400" />
+                </button>
+              </div>
 
-              <div className="space-y-4 mb-8">
-                <div className="p-4 bg-slate-50 rounded-xl">
-                  <p className="text-xs text-slate-500 mb-1">Payment Amount</p>
-                  <p className="font-bold text-2xl text-slate-800">
+              <div className="space-y-3 sm:space-y-4 mb-6 sm:mb-8">
+                <div className="p-4 sm:p-5 bg-gradient-to-r from-slate-50 to-white rounded-xl sm:rounded-2xl border border-slate-200 shadow-sm">
+                  <p className="text-xs text-slate-500 mb-1 sm:mb-2 flex items-center gap-2">
+                    <IndianRupee size={12} className="flex-shrink-0" />
+                    Payment Amount
+                  </p>
+                  <p className="font-bold text-xl sm:text-2xl md:text-3xl text-slate-800">
                     ₹{Number(paymentAmount).toLocaleString("en-IN")}
                   </p>
                 </div>
 
-                <div className="p-4 bg-slate-50 rounded-xl">
-                  <p className="text-xs text-slate-500 mb-1">Payment Cycle</p>
-                  <p className="font-semibold text-slate-800">
-                    <p className="font-semibold text-slate-800">
-                      {paymentCycle?.label}
-                    </p>
+                <div className="p-4 sm:p-5 bg-gradient-to-r from-slate-50 to-white rounded-xl sm:rounded-2xl border border-slate-200 shadow-sm">
+                  <p className="text-xs text-slate-500 mb-1 sm:mb-2 flex items-center gap-2">
+                    <CalendarDays size={12} className="flex-shrink-0" />
+                    Payment Cycle
+                  </p>
+                  <p className="font-semibold text-slate-800 text-base sm:text-lg truncate">
+                    {paymentCycle?.label}
                   </p>
                 </div>
 
-                <div className="p-4 bg-indigo-50 rounded-xl border border-indigo-100">
-                  <p className="text-xs text-indigo-600 font-semibold mb-1">
+                <div className="p-4 sm:p-5 bg-gradient-to-r from-indigo-50 to-white rounded-xl sm:rounded-2xl border border-indigo-100 shadow-sm">
+                  <p className="text-xs text-indigo-600 font-semibold mb-1 sm:mb-2 flex items-center gap-2">
+                    <BadgeCheck size={12} className="flex-shrink-0" />
                     Payment Cycle Code
                   </p>
-                  <p className="font-bold text-indigo-700">
+                  <p className="font-bold text-indigo-700 text-base sm:text-lg truncate">
                     {paymentCycle?.value}
                   </p>
                 </div>
 
-                <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-100">
-                  <p className="text-xs text-emerald-600 font-semibold mb-1">
-                    Note
+                {preview && (
+                  <div className="p-4 sm:p-5 bg-gradient-to-r from-emerald-50 to-white rounded-xl sm:rounded-2xl border border-emerald-100 shadow-sm">
+                    <p className="text-xs text-emerald-600 font-semibold mb-2 sm:mb-3 flex items-center gap-2">
+                      <CheckCircle size={12} className="flex-shrink-0" />
+                      Screenshot Preview
+                    </p>
+                    <img
+                      src={preview}
+                      alt="Payment proof"
+                      className="rounded-lg max-h-32 sm:max-h-40 mx-auto shadow"
+                    />
+                  </div>
+                )}
+
+                <div className="p-4 sm:p-5 bg-gradient-to-r from-blue-50 to-white rounded-xl sm:rounded-2xl border border-blue-100 shadow-sm">
+                  <p className="text-xs text-blue-600 font-semibold mb-1 sm:mb-2">
+                    <span className="flex items-center gap-2">
+                      <AlertCircle size={12} className="flex-shrink-0" />
+                      Important Note
+                    </span>
                   </p>
-                  <p className="text-sm text-emerald-700">
+                  <p className="text-xs sm:text-sm text-blue-700">
                     Your payment will be verified by the admin within 24 hours.
+                    You'll receive a notification once verified.
                   </p>
                 </div>
               </div>
 
-              <div className="flex gap-3">
+              <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
                 <button
-                  onClick={() => setConfirmOpen(false)}
+                  onClick={() => !uploading && setConfirmOpen(false)}
                   disabled={uploading}
-                  className="flex-1 py-3.5 rounded-xl bg-slate-200 hover:bg-slate-300 transition-colors font-medium cursor-pointer disabled:opacity-50"
+                  className="flex-1 py-2.5 sm:py-3.5 rounded-lg sm:rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold transition-all duration-300 disabled:opacity-50 cursor-pointer active:scale-95 text-sm sm:text-base"
                 >
-                  Cancel
+                  Back to Edit
                 </button>
 
                 <button
                   onClick={submitPayment}
                   disabled={uploading}
-                  className="flex-1 py-3.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold hover:shadow-lg transition-all shadow-md cursor-pointer flex items-center justify-center gap-2"
+                  className="flex-1 py-2.5 sm:py-3.5 rounded-lg sm:rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0 transition-all duration-300 shadow-md cursor-pointer disabled:opacity-50 group text-sm sm:text-base"
                 >
                   {uploading ? (
-                    <>
+                    <span className="flex items-center justify-center gap-2">
                       <Loader2 size={18} className="animate-spin" />
                       Submitting...
-                    </>
+                    </span>
                   ) : (
-                    "Confirm & Submit"
+                    <span className="flex items-center justify-center gap-2">
+                      Confirm & Submit
+                      <CheckCircle
+                        size={16}
+                        className="group-hover:scale-110 transition-transform"
+                      />
+                    </span>
                   )}
                 </button>
               </div>
@@ -944,258 +1215,94 @@ const UploadScreenshotModal = ({
   );
 };
 
-// --- 3. IMAGE PREVIEW MODAL ---
+// --- 3. IMAGE PREVIEW MODAL (RESPONSIVE) ---
 const ImagePreviewModal = ({ isOpen, onClose, imageUrl, name }) => {
+  const [zoom, setZoom] = useState(1);
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [startPos, setStartPos] = useState({ x: 0, y: 0 });
+
   if (!isOpen || !imageUrl) return null;
+
+  const handleMouseDown = (e) => {
+    setIsDragging(true);
+    setStartPos({
+      x: e.clientX - position.x,
+      y: e.clientY - position.y,
+    });
+  };
+
+  const handleMouseMove = (e) => {
+    if (!isDragging) return;
+
+    setPosition({
+      x: e.clientX - startPos.x,
+      y: e.clientY - startPos.y,
+    });
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+
+  const handleWheel = (e) => {
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? -0.1 : 0.1;
+    setZoom((prev) => Math.max(0.5, Math.min(3, prev + delta)));
+  };
+
+  const resetView = () => {
+    setZoom(1);
+    setPosition({ x: 0, y: 0 });
+  };
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/95 backdrop-blur-md p-4"
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/95 backdrop-blur-md p-2 sm:p-4 animate-in fade-in duration-300"
       onClick={onClose}
+      onMouseMove={handleMouseMove}
+      onMouseUp={handleMouseUp}
+      onMouseLeave={handleMouseUp}
+      onWheel={handleWheel}
     >
-      <button
-        onClick={onClose}
-        className="absolute top-6 right-6 p-3 bg-white/10 hover:bg-white/20 text-white rounded-full backdrop-blur-md transition-colors z-50 cursor-pointer"
-      >
-        <X size={24} />
-      </button>
+      <div className="absolute top-4 right-4 sm:top-6 sm:right-6 flex items-center gap-2 sm:gap-3 z-50">
+        <button
+          onClick={resetView}
+          className="p-2 sm:p-3 bg-white/10 hover:bg-white/20 text-white rounded-full backdrop-blur-md transition-colors cursor-pointer"
+          title="Reset Zoom"
+        >
+          <RefreshCw size={16} className="sm:w-5 sm:h-5" />
+        </button>
+        <button
+          onClick={onClose}
+          className="p-2 sm:p-3 bg-white/10 hover:bg-white/20 text-white rounded-full backdrop-blur-md transition-colors cursor-pointer"
+        >
+          <X size={20} className="sm:w-6 sm:h-6" />
+        </button>
+      </div>
 
       <div
-        className="relative max-w-4xl w-full"
+        className="relative w-full h-full flex items-center justify-center p-2"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="relative rounded-2xl overflow-hidden bg-black">
+        <div className="relative rounded-lg sm:rounded-xl md:rounded-2xl overflow-hidden bg-black/30 backdrop-blur-sm border border-white/10 max-w-full max-h-[80vh]">
           <img
             src={imageUrl}
             alt={name}
-            className="w-full h-auto max-h-[70vh] object-contain"
+            className="w-full h-auto max-h-[60vh] sm:max-h-[70vh] object-contain cursor-grab active:cursor-grabbing"
+            style={{
+              transform: `translate(${position.x}px, ${position.y}px) scale(${zoom})`,
+              transition: isDragging ? "none" : "transform 0.2s ease",
+            }}
+            onMouseDown={handleMouseDown}
           />
         </div>
-        <div className="mt-4 text-center">
-          <h3 className="text-white text-xl font-bold">{name}</h3>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// --- 4. PROFILE MODAL ---
-const ProfileModal = ({
-  isOpen,
-  onClose,
-  participant,
-  onImageClick,
-  paymentHistory,
-  showToast,
-}) => {
-  if (!isOpen || !participant) return null;
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-      <div className="w-full max-w-4xl bg-white rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
-        <div className="relative h-40 bg-gradient-to-r from-indigo-500 to-purple-600">
-          <div className="absolute inset-0 bg-black/10"></div>
-          <button
-            onClick={onClose}
-            className="absolute top-4 right-4 p-2 bg-white/20 hover:bg-white/30 text-white rounded-full backdrop-blur-md transition-colors cursor-pointer"
-          >
-            <X size={20} />
-          </button>
-        </div>
-
-        <div className="flex-1 overflow-y-auto">
-          <div className="relative px-6 pb-8 -mt-16">
-            <div className="flex justify-center mb-6">
-              <div
-                className="relative group cursor-pointer"
-                onClick={() =>
-                  onImageClick(participant.photoUrl, participant.name)
-                }
-              >
-                <div className="w-32 h-32 rounded-2xl bg-white p-2 shadow-2xl border-4 border-white">
-                  <div className="w-full h-full rounded-xl overflow-hidden bg-slate-100">
-                    {participant.photoUrl ? (
-                      <SmoothImage
-                        src={participant.photoUrl}
-                        alt={participant.name}
-                        className="w-full h-full"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <User size={48} className="text-slate-300" />
-                      </div>
-                    )}
-                  </div>
-                </div>
-                {participant.isWinner && (
-                  <div className="absolute -top-2 -right-2">
-                    <div className="bg-gradient-to-r from-amber-400 to-orange-400 text-white text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1 shadow-lg">
-                      <Crown size={12} />
-                      WINNER
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="text-center mb-8">
-              <h2 className="text-2xl font-bold text-slate-800 mb-2">
-                {participant.name}
-              </h2>
-              <p className="text-slate-500 text-sm">{participant.email}</p>
-            </div>
-
-            <div className="grid grid-cols-3 gap-3 mb-8">
-              <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 text-center">
-                <div className="text-xl font-bold text-slate-800 mb-1">
-                  {participant.wins || 0}
-                </div>
-                <div className="text-xs text-slate-500 font-medium">Wins</div>
-              </div>
-              <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-100 text-center">
-                <div className="text-xl font-bold text-emerald-600 mb-1">
-                  ₹{participant.totalWon || 0}
-                </div>
-                <div className="text-xs text-emerald-500 font-medium">
-                  Amount Won
-                </div>
-              </div>
-              <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 text-center">
-                <div className="text-xl font-bold text-blue-600 mb-1">
-                  {participant.participations || 1}
-                </div>
-                <div className="text-xs text-blue-500 font-medium">Entries</div>
-              </div>
-            </div>
-
-            <div className="space-y-4 mb-8">
-              <div className="flex items-center gap-4 p-3 bg-slate-50 rounded-xl">
-                <div className="w-10 h-10 rounded-lg bg-white flex items-center justify-center shadow-sm">
-                  <Phone size={18} className="text-slate-500" />
-                </div>
-                <div>
-                  <p className="text-sm text-slate-500">Phone Number</p>
-                  <p className="font-medium text-slate-800">
-                    {participant.phone}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-4 p-3 bg-slate-50 rounded-xl">
-                <div className="w-10 h-10 rounded-lg bg-white flex items-center justify-center shadow-sm">
-                  <CalendarDays size={18} className="text-slate-500" />
-                </div>
-                <div>
-                  <p className="text-sm text-slate-500">Joined Date</p>
-                  <p className="font-medium text-slate-800">
-                    {participant.joinedDate}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Payment History Section */}
-            <div className="mb-8">
-              <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
-                <History size={20} className="text-indigo-600" />
-                Payment History
-              </h3>
-
-              {paymentHistory && paymentHistory.length > 0 ? (
-                <div className="space-y-3">
-                  {paymentHistory.map((payment, index) => {
-                    const paymentProofImage = getPaymentProofImage(payment);
-                    const paymentDate = new Date(
-                      payment.createdAt
-                    ).toLocaleDateString("en-IN", {
-                      day: "numeric",
-                      month: "short",
-                      year: "numeric",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    });
-
-                    return (
-                      <div
-                        key={payment.id || index}
-                        className="bg-gradient-to-r from-slate-50 to-white p-4 rounded-xl border border-slate-200"
-                      >
-                        <div className="flex justify-between items-start mb-2">
-                          <div>
-                            <p className="font-medium text-slate-800">
-                              {payment.Payment_Cycle}
-                            </p>
-                            <p className="text-xs text-slate-500 mt-1">
-                              Submitted: {paymentDate}
-                            </p>
-                            {payment.due_date && (
-                              <p className="text-xs text-slate-500">
-                                Due:{" "}
-                                {new Date(payment.due_date).toLocaleDateString(
-                                  "en-IN"
-                                )}
-                              </p>
-                            )}
-                          </div>
-                          <div className="text-right">
-                            <p className="text-2xl font-bold text-emerald-600">
-                              ₹{Number(payment.Amount).toLocaleString("en-IN")}
-                            </p>
-                            <div
-                              className={`inline-flex items-center gap-1 mt-1 px-2 py-1 rounded-full text-xs ${
-                                payment.isVerified
-                                  ? "bg-emerald-100 text-emerald-700"
-                                  : "bg-amber-100 text-amber-700"
-                              }`}
-                            >
-                              {payment.isVerified ? (
-                                <>
-                                  <CheckCircle size={12} />
-                                  Verified
-                                </>
-                              ) : (
-                                <>
-                                  <Clock size={12} />
-                                  Pending
-                                </>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-
-                        {paymentProofImage && (
-                          <div className="mt-3 pt-3 border-t border-slate-200">
-                            <div className="flex items-center justify-between">
-                              <p className="text-sm text-slate-600 font-medium">
-                                Payment Proof:
-                              </p>
-                              <button
-                                onClick={() => {
-                                  if (paymentProofImage) {
-                                    onImageClick(
-                                      paymentProofImage,
-                                      `Payment Proof - ${payment.Payment_Cycle}`
-                                    );
-                                  }
-                                }}
-                                className="text-xs text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-1 cursor-pointer"
-                              >
-                                <Eye size={12} />
-                                View Proof
-                              </button>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="text-center py-6 bg-slate-50 rounded-xl border border-slate-200">
-                  <Receipt size={40} className="mx-auto text-slate-300 mb-3" />
-                  <p className="text-slate-500">No payment history found</p>
-                </div>
-              )}
-            </div>
+        <div className="absolute bottom-4 sm:bottom-6 left-1/2 transform -translate-x-1/2 bg-black/50 backdrop-blur-md rounded-full px-3 py-1.5 sm:px-4 sm:py-2 max-w-[90%]">
+          <h3 className="text-white text-sm sm:text-base md:text-lg font-medium truncate text-center">
+            {name}
+          </h3>
+          <div className="text-xs text-white/70 mt-0.5 text-center">
+            Zoom: {Math.round(zoom * 100)}% • Drag to pan
           </div>
         </div>
       </div>
@@ -1203,7 +1310,7 @@ const ProfileModal = ({
   );
 };
 
-// --- NEW: PAYMENT HISTORY MODAL ---
+// --- PAYMENT HISTORY MODAL (RESPONSIVE) ---
 const PaymentHistoryModal = ({
   isOpen,
   onClose,
@@ -1216,32 +1323,65 @@ const PaymentHistoryModal = ({
 
   const handleViewProof = (imageUrl, cycleName) => {
     onClose();
-    onImageClick(imageUrl, `Payment Proof - ${cycleName}`);
+    setTimeout(() => {
+      onImageClick(imageUrl, `Payment Proof - ${cycleName}`);
+    }, 300);
   };
 
+  const totalPaid = paymentHistory
+    .filter((p) => p.isVerified)
+    .reduce((sum, p) => sum + (Number(p.Amount) || 0), 0);
+
+  const pendingAmount = paymentHistory
+    .filter((p) => !p.isVerified)
+    .reduce((sum, p) => sum + (Number(p.Amount) || 0), 0);
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-      <div className="w-full max-w-2xl bg-white rounded-3xl shadow-2xl overflow-hidden max-h-[80vh] flex flex-col">
-        <div className="p-6 border-b border-slate-200">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h2 className="text-2xl font-bold text-slate-800">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-300">
+      <div className="w-full max-w-md sm:max-w-lg md:max-w-2xl bg-white rounded-xl sm:rounded-2xl md:rounded-3xl shadow-xl sm:shadow-2xl overflow-hidden max-h-[85vh] flex flex-col animate-in zoom-in-95 duration-300 mx-2">
+        <div className="p-4 sm:p-5 md:p-6 border-b border-slate-200 bg-gradient-to-r from-slate-50 to-white">
+          <div className="flex items-center justify-between mb-3 sm:mb-4">
+            <div className="min-w-0 pr-2">
+              <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-slate-800 truncate">
                 Payment History
               </h2>
-              <p className="text-slate-500 text-sm mt-1">{participant.name}</p>
+              <p className="text-slate-500 text-xs sm:text-sm mt-1 truncate">
+                {participant.name} • {paymentHistory.length} payment
+                {paymentHistory.length !== 1 ? "s" : ""}
+              </p>
             </div>
             <button
               onClick={onClose}
-              className="p-2 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+              className="p-1.5 sm:p-2 hover:bg-slate-100 rounded-lg sm:rounded-xl transition-colors cursor-pointer active:scale-95 flex-shrink-0"
             >
-              <X size={20} className="text-slate-400" />
+              <X size={18} className="text-slate-400" />
             </button>
+          </div>
+
+          {/* Summary Cards */}
+          <div className="grid grid-cols-2 gap-2 sm:gap-3 mb-3 sm:mb-4">
+            <div className="p-2.5 sm:p-3 bg-emerald-50 rounded-lg sm:rounded-xl border border-emerald-100">
+              <p className="text-xs text-emerald-600 font-medium mb-0.5 sm:mb-1">
+                Total Paid
+              </p>
+              <p className="text-base sm:text-lg font-bold text-emerald-700 truncate">
+                ₹{totalPaid.toLocaleString("en-IN")}
+              </p>
+            </div>
+            <div className="p-2.5 sm:p-3 bg-amber-50 rounded-lg sm:rounded-xl border border-amber-100">
+              <p className="text-xs text-amber-600 font-medium mb-0.5 sm:mb-1">
+                Pending
+              </p>
+              <p className="text-base sm:text-lg font-bold text-amber-700 truncate">
+                ₹{pendingAmount.toLocaleString("en-IN")}
+              </p>
+            </div>
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-5 md:p-6">
           {paymentHistory && paymentHistory.length > 0 ? (
-            <div className="space-y-4">
+            <div className="space-y-3 sm:space-y-4">
               {paymentHistory.map((payment, index) => {
                 const paymentProofImage = getPaymentProofImage(payment);
                 const paymentDate = new Date(
@@ -1257,34 +1397,47 @@ const PaymentHistoryModal = ({
                 return (
                   <div
                     key={payment.id || index}
-                    className="bg-gradient-to-r from-slate-50 to-white p-5 rounded-xl border border-slate-200 hover:shadow-md transition-shadow"
+                    className="bg-gradient-to-r from-slate-50 to-white p-3 sm:p-4 md:p-5 rounded-lg sm:rounded-xl md:rounded-2xl border border-slate-200 hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 group"
                   >
-                    <div className="flex justify-between items-start mb-3">
-                      <div>
-                        <div className="flex items-center gap-2 mb-1">
-                          <CreditCard size={16} className="text-indigo-500" />
-                          <p className="font-bold text-slate-800">
+                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 sm:gap-0 mb-2 sm:mb-3">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 mb-1 sm:mb-2">
+                          <div
+                            className={`w-2 h-2 sm:w-3 sm:h-3 rounded-full ${
+                              payment.isVerified
+                                ? "bg-emerald-500"
+                                : "bg-amber-500"
+                            } flex-shrink-0`}
+                          ></div>
+                          <p className="font-bold text-slate-800 text-sm sm:text-base truncate">
                             {payment.Payment_Cycle}
                           </p>
                         </div>
-                        <p className="text-sm text-slate-600 mb-1">
-                          Submitted: {paymentDate}
-                        </p>
-                        {payment.due_date && (
-                          <p className="text-xs text-slate-500">
-                            Due:{" "}
-                            {new Date(payment.due_date).toLocaleDateString(
-                              "en-IN"
-                            )}
+                        <div className="space-y-1 ml-4 sm:ml-5">
+                          <p className="text-xs text-slate-600">
+                            <Clock size={10} className="inline mr-1 sm:mr-2" />
+                            Submitted: {paymentDate}
                           </p>
-                        )}
+                          {payment.due_date && (
+                            <p className="text-xs text-slate-500">
+                              <CalendarDays
+                                size={10}
+                                className="inline mr-1 sm:mr-2"
+                              />
+                              Due:{" "}
+                              {new Date(payment.due_date).toLocaleDateString(
+                                "en-IN"
+                              )}
+                            </p>
+                          )}
+                        </div>
                       </div>
-                      <div className="text-right">
-                        <p className="text-2xl font-bold text-emerald-600">
+                      <div className="sm:text-right">
+                        <p className="text-xl sm:text-2xl font-bold text-slate-800">
                           ₹{Number(payment.Amount).toLocaleString("en-IN")}
                         </p>
                         <div
-                          className={`inline-flex items-center gap-1 mt-2 px-3 py-1 rounded-full text-xs font-medium ${
+                          className={`inline-flex items-center gap-1 sm:gap-1.5 mt-1 sm:mt-2 px-2 py-1 sm:px-3 sm:py-1.5 rounded-full text-xs font-semibold ${
                             payment.isVerified
                               ? "bg-emerald-100 text-emerald-700"
                               : "bg-amber-100 text-amber-700"
@@ -1292,13 +1445,16 @@ const PaymentHistoryModal = ({
                         >
                           {payment.isVerified ? (
                             <>
-                              <CheckCircle size={12} />
+                              <CheckCircle
+                                size={10}
+                                className="sm:w-3 sm:h-3"
+                              />
                               Verified
                             </>
                           ) : (
                             <>
-                              <Clock size={12} />
-                              Pending Verification
+                              <Clock size={10} className="sm:w-3 sm:h-3" />
+                              Pending
                             </>
                           )}
                         </div>
@@ -1306,24 +1462,29 @@ const PaymentHistoryModal = ({
                     </div>
 
                     {paymentProofImage && (
-                      <div className="mt-4 pt-4 border-t border-slate-200">
+                      <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-slate-200">
                         <div className="flex items-center justify-between">
-                          <p className="text-sm text-slate-700 font-medium">
-                            Payment Proof
+                          <p className="text-xs sm:text-sm text-slate-700 font-medium flex items-center gap-1 sm:gap-2">
+                            <FileText size={12} className="flex-shrink-0" />
+                            <span>Payment Proof</span>
                           </p>
                           <button
                             onClick={() => {
                               if (paymentProofImage) {
-                                onImageClick(
+                                handleViewProof(
                                   paymentProofImage,
-                                  `Payment Proof - ${payment.Payment_Cycle}`
+                                  payment.Payment_Cycle
                                 );
                               }
                             }}
-                            className="text-xs text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-1 cursor-pointer"
+                            className="text-xs sm:text-sm text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-1 sm:gap-2 cursor-pointer group/btn"
                           >
-                            <Eye size={12} />
-                            View Proof
+                            <Eye size={12} className="flex-shrink-0" />
+                            <span>View Proof</span>
+                            <ArrowRight
+                              size={12}
+                              className="group-hover/btn:translate-x-0.5 sm:group-hover/btn:translate-x-1 transition-transform flex-shrink-0"
+                            />
                           </button>
                         </div>
                       </div>
@@ -1333,16 +1494,22 @@ const PaymentHistoryModal = ({
               })}
             </div>
           ) : (
-            <div className="text-center py-10">
-              <div className="w-20 h-20 mx-auto bg-slate-100 rounded-2xl flex items-center justify-center mb-4">
-                <Receipt size={32} className="text-slate-300" />
+            <div className="text-center py-6 sm:py-8 md:py-10">
+              <div className="w-16 h-16 sm:w-20 sm:h-20 mx-auto bg-gradient-to-br from-slate-100 to-slate-200 rounded-xl sm:rounded-2xl flex items-center justify-center mb-3 sm:mb-4">
+                <Receipt size={24} className="text-slate-300 sm:w-8 sm:h-8" />
               </div>
-              <h3 className="text-lg font-bold text-slate-800 mb-2">
-                No Payments Yet
+              <h3 className="text-base sm:text-lg md:text-lg font-bold text-slate-800 mb-1 sm:mb-2">
+                No Payment History
               </h3>
-              <p className="text-slate-500">
+              <p className="text-slate-500 mb-4 sm:mb-6 text-sm">
                 This participant hasn't made any payments yet.
               </p>
+              <button
+                onClick={onClose}
+                className="px-4 py-2 sm:px-6 sm:py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg sm:rounded-xl font-medium hover:shadow-lg transition-all cursor-pointer text-sm sm:text-base"
+              >
+                Close
+              </button>
             </div>
           )}
         </div>
@@ -1351,9 +1518,100 @@ const PaymentHistoryModal = ({
   );
 };
 
-// --- MAIN PAGE ---
+// --- PARTICIPANT CARD COMPONENT (RESPONSIVE) ---
+const ParticipantCard = ({ participant, index, onImageClick }) => {
+  const [isHovered, setIsHovered] = useState(false);
+
+  const handleImageClick = (url, name) => {
+    if (url) onImageClick(url, name);
+  };
+
+  const statusConfig = {
+    paid: { label: "PAID", icon: CheckCircle },
+    pending_verification: { label: "PENDING VERIFICATION", icon: Clock },
+    pending: { label: "PENDING", icon: AlertCircle },
+  };
+
+  const StatusIcon =
+    statusConfig[participant.paymentStatus]?.icon || AlertCircle;
+
+  return (
+    <div
+      className="group bg-white rounded-xl sm:rounded-2xl p-3 sm:p-4 md:p-5 border border-slate-200 shadow-sm hover:shadow-xl hover:-translate-y-0.5 sm:hover:-translate-y-2 transition-all duration-500 overflow-hidden relative"
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      style={{ animationDelay: `${index * 50}ms` }}
+    >
+      {/* Animated background gradient */}
+      <div className="absolute inset-0 bg-gradient-to-br from-transparent to-green-50 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+
+      {/* Winner Badge */}
+      {participant.isWinner && (
+        <div className="absolute top-2 right-2 sm:top-4 sm:right-4 z-10 animate-in zoom-in duration-300">
+          <div className="bg-gradient-to-r from-amber-400 via-orange-400 to-amber-400 text-white text-xs font-bold px-2 py-1 sm:px-3 sm:py-1.5 rounded-lg flex items-center gap-1 sm:gap-1.5 shadow-lg animate-pulse">
+            <Crown size={10} className="sm:w-3 sm:h-3" />
+            <span className="text-xs">WINNER</span>
+          </div>
+        </div>
+      )}
+
+      {/* Profile Image */}
+      <div className="relative mb-3 sm:mb-4 md:mb-6">
+        <div
+          className="w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 lg:w-28 lg:h-28 rounded-lg sm:rounded-xl md:rounded-2xl mx-auto overflow-hidden bg-gradient-to-br from-slate-100 to-slate-200 cursor-pointer border-2 sm:border-4 border-white shadow-lg sm:shadow-xl group-hover:shadow-2xl group-hover:scale-105 transition-all duration-500 relative"
+          onClick={() =>
+            handleImageClick(participant.photoUrl, participant.name)
+          }
+        >
+          {participant.photoUrl ? (
+            <SmoothImage
+              src={participant.photoUrl}
+              alt={participant.name}
+              className="w-full h-full"
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center">
+              <User
+                size={24}
+                className="text-slate-300 sm:w-8 sm:h-8 md:w-12 md:h-12"
+              />
+            </div>
+          )}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+        </div>
+
+        {/* Animated Ring */}
+        <div className="absolute inset-0 rounded-lg sm:rounded-xl border border-green-200 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+      </div>
+
+      {/* Participant Info */}
+      <div className="text-center mb-3 sm:mb-4 md:mb-5 relative z-10">
+        <h3 className="font-bold text-base sm:text-lg md:text-xl text-slate-900 mb-1 sm:mb-2 truncate group-hover:text-indigo-600 transition-colors duration-300 px-1">
+          {participant.name}
+        </h3>
+        <div className="flex items-center justify-center gap-1 sm:gap-2 mb-1 sm:mb-2 md:mb-3">
+          <Phone size={12} className="text-slate-400" />
+          <p className="text-xs sm:text-sm text-slate-500 font-medium truncate">
+            {participant.phone}
+          </p>
+        </div>
+        <p className="text-xs text-slate-500 truncate px-1">
+          {participant.email || "No email provided"}
+        </p>
+      </div>
+
+      {/* Bottom Border Animation */}
+      <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-0 group-hover:w-3/4 h-0.5 bg-gradient-to-r from-transparent via-indigo-500 to-transparent transition-all duration-700"></div>
+    </div>
+  );
+};
+
+// --- MAIN PAGE (RESPONSIVE) ---
 export default function ParticipantDetailsPage() {
   const { adminId, luckydrawDocumentId } = useParams();
+  const participantDocumentId = localStorage.getItem("participant_documentId");
+  const participantName = localStorage.getItem("participant_name");
+
   const documentId = luckydrawDocumentId;
   const navigate = useNavigate();
 
@@ -1365,6 +1623,7 @@ export default function ParticipantDetailsPage() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [filter, setFilter] = useState("all");
   const [search, setSearch] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
 
   const [toast, setToast] = useState({
     visible: false,
@@ -1392,6 +1651,7 @@ export default function ParticipantDetailsPage() {
 
       if (!isBackgroundRefresh) {
         setIsRefreshing(true);
+        if (!isBackgroundRefresh) setIsLoading(true);
       }
 
       try {
@@ -1434,6 +1694,7 @@ export default function ParticipantDetailsPage() {
             return {
               id: item.id,
               documentId: item.documentId,
+              isVerified: item.isVerified,
               name: item.Name,
               email: item.Email,
               phone: item.Phone_Number,
@@ -1459,9 +1720,15 @@ export default function ParticipantDetailsPage() {
         );
 
         // Set general payment history for the lucky draw
-        setPaymentHistory(
-          participantPayments.map((payment) => ({
+        const myPayments = participantPayments.filter(
+          (payment) =>
+            payment.lucky_draw_form?.documentId === participantDocumentId
+        );
+
+        setUserPaymentHistory(
+          myPayments.map((payment) => ({
             id: payment.id,
+            documentId: payment.documentId,
             Amount: payment.Amount,
             Payment_Cycle: payment.Payment_Cycle,
             due_date: payment.due_date,
@@ -1469,9 +1736,6 @@ export default function ParticipantDetailsPage() {
             Verified_At: payment.Verified_At,
             createdAt: payment.createdAt,
             Payment_Photo: payment.Payment_Photo,
-            participantName: payment.lucky_draw_form?.Name || "Unknown",
-            participantPhone:
-              payment.lucky_draw_form?.Phone_Number || "Unknown",
           }))
         );
 
@@ -1496,6 +1760,7 @@ export default function ParticipantDetailsPage() {
         showToast("Failed to load participants", "error");
       } finally {
         setIsRefreshing(false);
+        setIsLoading(false);
       }
     },
     [documentId]
@@ -1523,6 +1788,10 @@ export default function ParticipantDetailsPage() {
     if (url) setPreviewImage({ isOpen: true, url, name });
   };
 
+  const handleBackToHome = () => {
+    navigate(`/${adminId}/home`);
+  };
+
   if (!isVerified) {
     return (
       <MobileVerificationGate
@@ -1534,12 +1803,13 @@ export default function ParticipantDetailsPage() {
 
   const filtered = participants.filter(
     (p) =>
+      p.isVerified === true && // ✅ participant verified
       (filter === "all" || (filter === "winners" && p.isWinner)) &&
       p.name.toLowerCase().includes(search.toLowerCase())
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
+    <div className="min-h-screen bg-gradient-to-b from-slate-50 via-blue-50/30 to-white">
       {/* Toast Notification */}
       <Toast
         message={toast.message}
@@ -1548,66 +1818,110 @@ export default function ParticipantDetailsPage() {
         onClose={() => setToast({ ...toast, visible: false })}
       />
 
+      {/* Animated Background Elements */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-transparent via-blue-50/10 to-transparent"></div>
+        <div className="absolute top-20 left-4 sm:left-10 w-48 h-48 sm:w-72 sm:h-72 bg-indigo-200 rounded-full mix-blend-multiply filter blur-2xl sm:blur-3xl opacity-10 animate-blob"></div>
+        <div className="absolute bottom-20 right-4 sm:right-10 w-48 h-48 sm:w-72 sm:h-72 bg-purple-200 rounded-full mix-blend-multiply filter blur-2xl sm:blur-3xl opacity-10 animate-blob animation-delay-2000"></div>
+      </div>
+
       {/* Header */}
-      <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-xl border-b border-slate-200 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="flex items-center gap-4">
-              <button
-                onClick={() => navigate(-1)}
-                className="p-2.5 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 hover:border-slate-300 transition-colors cursor-pointer shadow-sm"
-              >
-                <ChevronLeft size={20} />
-              </button>
-              <div>
-                <div className="flex items-center gap-3">
-                  <h1 className="text-2xl font-bold text-slate-900">
-                    Participants
-                  </h1>
-                  <span className="px-2.5 py-1 bg-emerald-100 text-emerald-700 text-xs font-bold rounded-full">
+      <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-xl border-b border-slate-200/80 shadow-sm">
+        <div className="px-3 sm:px-4 md:px-6 py-3 sm:py-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
+            <div className="flex items-center gap-2 sm:gap-4">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <button
+                  onClick={() => navigate(-1)}
+                  className="p-1.5 sm:p-2.5 bg-white border border-slate-200 rounded-lg sm:rounded-xl hover:bg-slate-50 hover:border-slate-300 transition-all duration-300 cursor-pointer shadow-sm hover:shadow-md active:scale-95"
+                  title="Go back"
+                >
+                  <ChevronLeft size={18} className="sm:w-5 sm:h-5" />
+                </button>
+                <button
+                  onClick={handleBackToHome}
+                  className="p-1.5 sm:p-2.5 bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-100 rounded-lg sm:rounded-xl hover:shadow-md transition-all duration-300 cursor-pointer group"
+                  title="Back to home"
+                >
+                  <Home
+                    size={18}
+                    className="text-indigo-600 group-hover:scale-110 transition-transform sm:w-5 sm:h-5"
+                  />
+                </button>
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <div className="relative min-w-0">
+                    <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-slate-900 truncate">
+                      Participants Dashboard
+                    </h1>
+                    <div className="absolute -bottom-1 left-0 w-12 sm:w-16 h-0.5 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full"></div>
+                  </div>
+                  <span className="px-2 py-0.5 sm:px-3 sm:py-1 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white text-xs font-bold rounded-full shadow-lg flex-shrink-0">
                     {participants.length} Total
                   </span>
                 </div>
-                <p className="text-slate-500 text-sm mt-1 flex items-center gap-2">
-                  <Users size={14} />
-                  Manage and view all participants
+                <p className="text-slate-500 text-xs sm:text-sm mt-1 sm:mt-2 flex items-center gap-1 sm:gap-2 truncate">
+                  <Users size={12} className="flex-shrink-0" />
+                  <span>
+                    Welcome,{" "}
+                    <span className="font-bold text-indigo-600">
+                      {participantName}
+                    </span>
+                  </span>
+                  <span className="text-slate-400 hidden sm:inline">•</span>
+                  <span className="hidden sm:inline">
+                    Manage and view all participants
+                  </span>
                 </p>
               </div>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 sm:gap-3">
               <button
                 onClick={() =>
                   openModal("paymentHistory", {
-                    name: "All Payments",
-                    paymentHistory,
+                    name: participantName,
+                    paymentHistory: userPaymentHistory,
                   })
                 }
-                className="px-4 py-2.5 bg-gradient-to-r from-blue-50 to-blue-100 text-blue-700 rounded-xl font-medium hover:shadow-md transition-all flex items-center gap-2 cursor-pointer border border-blue-200"
+                className="px-3 py-1.5 sm:px-4 sm:py-2.5 bg-gradient-to-r from-blue-50 to-blue-100 text-blue-700 rounded-lg sm:rounded-xl font-medium hover:shadow-md sm:hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 flex items-center gap-1 sm:gap-2 cursor-pointer border border-blue-200 group text-xs sm:text-sm"
               >
-                <History size={18} />
-                View All Payments
+                <History
+                  size={14}
+                  className="group-hover:rotate-180 transition-transform duration-700 sm:w-4 sm:h-4"
+                />
+                <span className="hidden sm:inline">View All Payments</span>
+                <span className="inline sm:hidden">Payments</span>
               </button>
               <button
                 onClick={() => openModal("qr", null)}
-                className="px-4 py-2.5 bg-gradient-to-r from-indigo-50 to-indigo-100 text-indigo-700 rounded-xl font-medium hover:shadow-md transition-all flex items-center gap-2 cursor-pointer border border-indigo-200"
+                className="px-3 py-1.5 sm:px-4 sm:py-2.5 bg-gradient-to-r from-indigo-50 to-indigo-100 text-indigo-700 rounded-lg sm:rounded-xl font-medium hover:shadow-md sm:hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 flex items-center gap-1 sm:gap-2 cursor-pointer border border-indigo-200 group text-xs sm:text-sm"
               >
-                <QrCode size={18} />
-                QR Code
+                <QrCode
+                  size={14}
+                  className="group-hover:scale-110 transition-transform sm:w-4 sm:h-4"
+                />
+                <span className="hidden sm:inline">QR Code</span>
+                <span className="inline sm:hidden">QR</span>
               </button>
               <button
                 onClick={() => openModal("upload", null)}
-                className="px-4 py-2.5 bg-gradient-to-r from-slate-900 to-black text-white rounded-xl font-medium hover:shadow-lg transition-all flex items-center gap-2 cursor-pointer"
+                className="px-3 py-1.5 sm:px-4 sm:py-2.5 bg-gradient-to-r from-slate-900 to-black text-white rounded-lg sm:rounded-xl font-medium hover:shadow-lg sm:hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0 transition-all duration-300 flex items-center gap-1 sm:gap-2 cursor-pointer group text-xs sm:text-sm"
               >
-                <Upload size={18} />
-                Upload Proof
+                <Upload
+                  size={14}
+                  className="group-hover:translate-y-1 transition-transform sm:w-4 sm:h-4"
+                />
+                <span className="hidden sm:inline">Upload Proof</span>
+                <span className="inline sm:hidden">Upload</span>
               </button>
             </div>
           </div>
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+      <main className="px-3 sm:px-4 md:px-6 py-4 sm:py-6 md:py-8 relative z-10">
         {/* Stats Section */}
         <StatsCards
           participants={participants}
@@ -1616,48 +1930,56 @@ export default function ParticipantDetailsPage() {
         />
 
         {/* Search and Filter Section */}
-        <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm mb-8">
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-            <div className="flex items-center gap-4">
-              <div className="relative flex-1 lg:flex-none lg:w-80">
+        <div className="bg-white/80 backdrop-blur-sm rounded-lg sm:rounded-xl md:rounded-2xl p-4 sm:p-5 md:p-6 border border-slate-200/80 shadow-sm mb-4 sm:mb-6 md:mb-8 hover:shadow-md transition-shadow duration-300">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 sm:gap-4">
+            <div className="flex-1">
+              <div className="relative group">
                 <Search
-                  className="absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-400"
-                  size={20}
+                  className="absolute left-3 sm:left-4 top-1/2 transform -translate-y-1/2 text-slate-400 group-hover:text-indigo-400 transition-colors"
+                  size={16}
                 />
                 <input
                   type="text"
-                  placeholder="Search participants by name..."
+                  placeholder="Search participants..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-medium"
+                  className="w-full pl-9 sm:pl-10 md:pl-12 pr-8 sm:pr-4 py-2.5 sm:py-3 md:py-3.5 bg-slate-50/50 border-2 border-slate-200 rounded-lg sm:rounded-xl focus:outline-none focus:ring-2 sm:focus:ring-3 focus:ring-indigo-100 focus:border-indigo-500 transition-all duration-300 font-medium placeholder-slate-400 hover:border-slate-300 text-sm sm:text-base"
                 />
+                {search && (
+                  <button
+                    onClick={() => setSearch("")}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 p-0.5 sm:p-1 hover:bg-slate-200 rounded-full transition-colors"
+                  >
+                    <X size={14} className="text-slate-400" />
+                  </button>
+                )}
               </div>
             </div>
 
-            <div className="flex items-center gap-3">
-              <div className="flex bg-slate-100 p-1 rounded-lg">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="flex bg-slate-100 p-0.5 sm:p-1 rounded-lg sm:rounded-xl">
                 {["all", "winners"].map((f) => (
                   <button
                     key={f}
                     onClick={() => setFilter(f)}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all cursor-pointer ${
+                    className={`px-2.5 py-1.5 sm:px-4 sm:py-2 rounded-md sm:rounded-lg text-xs sm:text-sm font-medium transition-all duration-300 cursor-pointer ${
                       filter === f
                         ? "bg-white text-slate-900 shadow-sm"
-                        : "text-slate-600 hover:text-slate-900"
+                        : "text-slate-600 hover:text-slate-900 hover:bg-white/50"
                     }`}
                   >
-                    {f === "all" ? "All Participants" : "Winners Only"}
+                    {f === "all" ? "All" : "Winners"}
                   </button>
                 ))}
               </div>
               <button
                 onClick={() => fetchParticipants(false)}
                 disabled={isRefreshing}
-                className="p-2.5 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer disabled:opacity-50"
-                title="Refresh"
+                className="p-1.5 sm:p-2.5 bg-gradient-to-r from-slate-100 to-slate-200 hover:from-slate-200 hover:to-slate-300 rounded-lg sm:rounded-xl transition-all duration-300 cursor-pointer disabled:opacity-50 hover:shadow-md active:scale-95"
+                title="Refresh data"
               >
                 <RefreshCw
-                  size={18}
+                  size={16}
                   className={isRefreshing ? "animate-spin" : ""}
                 />
               </button>
@@ -1665,112 +1987,82 @@ export default function ParticipantDetailsPage() {
           </div>
         </div>
 
-        {/* Participants Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6">
-          {filtered.map((participant, index) => (
-            <div
-              key={participant.id}
-              className="group bg-white rounded-2xl p-5 border border-slate-200 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 overflow-hidden"
-            >
-              {/* Winner Badge */}
-              {participant.isWinner && (
-                <div className="absolute top-4 right-4 z-10">
-                  <div className="bg-gradient-to-r from-amber-400 to-orange-400 text-white text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 shadow-lg">
-                    <Crown size={12} />
-                    WINNER
-                  </div>
-                </div>
-              )}
-
-              {/* Profile Image */}
-              <div className="relative mb-5">
-                <div
-                  className="w-24 h-24 rounded-2xl mx-auto overflow-hidden bg-slate-100 cursor-pointer border-4 border-white shadow-lg group-hover:shadow-xl transition-shadow"
-                  onClick={() =>
-                    handleImageClick(participant.photoUrl, participant.name)
-                  }
-                >
-                  {participant.photoUrl ? (
-                    <SmoothImage
-                      src={participant.photoUrl}
-                      alt={participant.name}
-                      className="w-full h-full"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <User size={40} className="text-slate-300" />
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Participant Info */}
-              <div className="text-center mb-5">
-                <h3 className="font-bold text-lg text-slate-900 mb-2 truncate group-hover:text-indigo-600 transition-colors">
-                  {participant.name}
-                </h3>
-                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium mb-3">
-                  <div
-                    className={`w-2 h-2 rounded-full ${
-                      participant.paymentStatus === "paid"
-                        ? "bg-emerald-500"
-                        : participant.paymentStatus === "pending_verification"
-                        ? "bg-amber-500"
-                        : "bg-red-500"
-                    }`}
-                  ></div>
-                  <span
-                    className={
-                      participant.paymentStatus === "paid"
-                        ? "text-emerald-600"
-                        : participant.paymentStatus === "pending_verification"
-                        ? "text-amber-600"
-                        : "text-red-600"
-                    }
-                  >
-                    {participant.paymentStatus === "paid"
-                      ? "PAID"
-                      : participant.paymentStatus === "pending_verification"
-                      ? "PENDING VERIFICATION"
-                      : "PENDING"}
-                  </span>
-                </div>
-                <p className="text-sm text-slate-500 truncate">
-                  {participant.email || "No email"}
-                </p>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex gap-2">
-                <button
-                  onClick={() => openModal("profile", participant)}
-                  className="flex-1 py-3 bg-slate-50 hover:bg-slate-100 text-slate-700 font-medium rounded-xl transition-colors flex items-center justify-center gap-2 cursor-pointer group/btn border border-slate-200 text-sm"
-                >
-                  <User size={14} />
-                  Profile
-                </button>
+        {/* Loading State */}
+        {isLoading && (
+          <div className="text-center py-10 sm:py-12 md:py-16 animate-in fade-in duration-300">
+            <div className="w-16 h-16 sm:w-20 sm:h-20 mx-auto mb-4 sm:mb-6">
+              <div className="w-full h-full rounded-lg sm:rounded-xl md:rounded-2xl bg-gradient-to-r from-indigo-200 to-purple-200 animate-pulse flex items-center justify-center">
+                <Loader2
+                  size={24}
+                  className="text-indigo-400 animate-spin sm:w-8 sm:h-8"
+                />
               </div>
             </div>
-          ))}
-        </div>
+            <h3 className="text-lg sm:text-xl font-bold text-slate-800 mb-1 sm:mb-2">
+              Loading Participants...
+            </h3>
+            <p className="text-slate-500 text-sm">Fetching the latest data</p>
+          </div>
+        )}
+
+        {/* Participants Grid */}
+        {!isLoading && (
+          <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4 md:gap-6 animate-in fade-in duration-500">
+            {filtered.map((participant, index) => (
+              <ParticipantCard
+                key={participant.id}
+                participant={participant}
+                index={index}
+                onImageClick={handleImageClick}
+              />
+            ))}
+          </div>
+        )}
 
         {/* Empty State */}
-        {filtered.length === 0 && (
-          <div className="text-center py-16">
-            <div className="w-24 h-24 mx-auto mb-6 bg-slate-100 rounded-2xl flex items-center justify-center">
-              <Users size={40} className="text-slate-300" />
+        {!isLoading && filtered.length === 0 && (
+          <div className="text-center py-10 sm:py-12 md:py-16 animate-in fade-in duration-300">
+            <div className="w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 mx-auto mb-4 sm:mb-6 bg-gradient-to-br from-slate-100 to-slate-200 rounded-lg sm:rounded-xl md:rounded-2xl flex items-center justify-center">
+              <Users size={28} className="text-slate-300 sm:w-10 sm:h-10" />
             </div>
-            <h3 className="text-xl font-bold text-slate-800 mb-2">
+            <h3 className="text-lg sm:text-xl font-bold text-slate-800 mb-1 sm:mb-2">
               No participants found
             </h3>
-            <p className="text-slate-500">
+            <p className="text-slate-500 mb-4 sm:mb-6 text-sm">
               {search
                 ? "Try a different search term"
                 : "No participants available for the selected filter"}
             </p>
+            <div className="flex items-center justify-center gap-2 sm:gap-3">
+              {search && (
+                <button
+                  onClick={() => setSearch("")}
+                  className="px-3 py-1.5 sm:px-4 sm:py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg sm:rounded-xl font-medium transition-colors text-sm"
+                >
+                  Clear Search
+                </button>
+              )}
+              <button
+                onClick={() => setFilter("all")}
+                className="px-3 py-1.5 sm:px-4 sm:py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg sm:rounded-xl font-medium hover:shadow-md sm:hover:shadow-lg transition-all text-sm"
+              >
+                Show All
+              </button>
+            </div>
           </div>
         )}
       </main>
+
+      {/* Floating Action Button */}
+      <button
+        onClick={() => openModal("upload", null)}
+        className="fixed bottom-6 right-4 sm:bottom-8 sm:right-6 md:bottom-8 md:right-8 z-30 p-3 sm:p-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg sm:rounded-xl md:rounded-2xl shadow-xl sm:shadow-2xl hover:shadow-2xl sm:hover:shadow-3xl hover:-translate-y-0.5 active:translate-y-0 transition-all duration-300 cursor-pointer group animate-bounce-slow"
+      >
+        <Upload
+          size={20}
+          className="group-hover:rotate-180 transition-transform duration-500 sm:w-6 sm:h-6"
+        />
+      </button>
 
       {/* Modals */}
       <QRCodeModal
@@ -1789,14 +2081,6 @@ export default function ParticipantDetailsPage() {
         onUploadComplete={fetchParticipants}
         showToast={showToast}
       />
-      <ProfileModal
-        isOpen={activeModal === "profile"}
-        onClose={() => setActiveModal(null)}
-        participant={selectedUser}
-        onImageClick={handleImageClick}
-        paymentHistory={userPaymentHistory}
-        showToast={showToast}
-      />
       <PaymentHistoryModal
         isOpen={activeModal === "paymentHistory"}
         onClose={() => setActiveModal(null)}
@@ -1811,6 +2095,22 @@ export default function ParticipantDetailsPage() {
         imageUrl={previewImage.url}
         name={previewImage.name}
       />
+
+      <style>{`
+        @keyframes bounce-slow {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(-8px); }
+        }
+        .animate-bounce-slow {
+          animation: bounce-slow 2s infinite;
+        }
+        
+        @media (min-width: 475px) {
+          .xs\:grid-cols-2 {
+            grid-template-columns: repeat(2, 1fr);
+          }
+        }
+      `}</style>
     </div>
   );
 }
