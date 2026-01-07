@@ -445,23 +445,42 @@ const StatsCards = ({ participants, luckyDrawAmount, paymentStats }) => {
 };
 
 // --- 1. QR CODE MODAL (RESPONSIVE) ---
+// --- 1. QR CODE MODAL (MOBILE-OPTIMIZED COMPACT VERSION) ---
 const QRCodeModal = ({
   isOpen,
   onClose,
   participant,
   qrImage,
   amount,
+  upiId,
   showToast,
 }) => {
   const [copied, setCopied] = useState(false);
   const [downloading, setDownloading] = useState(false);
 
+
+  // Extract UPI ID from QR image or set a default
+ 
+
   if (!isOpen) return null;
 
-  const paymentLink = `https://regeve.in/payment/${
-    participant?.id || "general"
-  }`;
+  const paymentLink = `https://regeve.in/payment/${upiId || "payment"}`;
+
   const qrImageUrl = qrImage || null;
+
+  const handleCopyUPI = () => {
+  if (!upiId) {
+    showToast("UPI ID not available", "error");
+    return;
+  }
+
+  navigator.clipboard.writeText(upiId).then(() => {
+    setCopied(true);
+    showToast("UPI ID copied!", "success");
+    setTimeout(() => setCopied(false), 2000);
+  });
+};
+
 
   const handleDownloadQR = async () => {
     if (!qrImageUrl) {
@@ -492,7 +511,7 @@ const QRCodeModal = ({
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
-            showToast("QR Code downloaded successfully!", "success");
+            showToast("QR Code downloaded!", "success");
             setDownloading(false);
           },
           "image/jpeg",
@@ -506,87 +525,116 @@ const QRCodeModal = ({
   };
 
   const handleShare = async () => {
+    const shareText = `Pay ₹${amount}\nUPI: ${upiId}\nScan QR to pay`;
+
     if (navigator.share) {
       try {
         await navigator.share({
           title: "Payment QR Code",
-          text: `Scan to pay ₹${amount}`,
+          text: shareText,
           url: paymentLink,
         });
       } catch (error) {
         if (error.name !== "AbortError") {
-          navigator.clipboard.writeText(paymentLink);
+          navigator.clipboard.writeText(shareText);
           setCopied(true);
-          showToast("Payment link copied to clipboard!", "success");
+          showToast("Payment details copied!", "success");
           setTimeout(() => setCopied(false), 2000);
         }
       }
     } else {
-      navigator.clipboard.writeText(paymentLink);
+      navigator.clipboard.writeText(shareText);
       setCopied(true);
-      showToast("Payment link copied to clipboard!", "success");
+      showToast("Payment details copied!", "success");
       setTimeout(() => setCopied(false), 2000);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
-      <div className="relative w-full max-w-xs sm:max-w-sm bg-white rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 mx-2">
-        <div className="absolute top-0 left-0 right-0 h-1 sm:h-2 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500"></div>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
+      <div className="relative w-full max-w-[95vw] sm:max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
+        {/* Top Gradient Bar */}
+        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500"></div>
 
-        <div className="p-4 sm:p-6">
-          <div className="flex items-center justify-between mb-4 sm:mb-6">
+        <div className="p-4 sm:p-5">
+          {/* Compact Header */}
+          <div className="flex items-center justify-between mb-3">
             <div className="min-w-0">
-              <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-slate-800 truncate">
-                Scan to Pay
+              <h2 className="text-lg font-bold text-slate-800 truncate">
+                Pay ₹{amount.toLocaleString("en-IN")}
               </h2>
-              <p className="text-slate-500 text-xs sm:text-sm mt-1 truncate">
-                Secure UPI Payment
+              <p className="text-slate-500 text-xs mt-0.5 truncate">
+                Scan QR or use UPI ID below
               </p>
             </div>
             <button
               onClick={onClose}
-              className="p-1.5 sm:p-2 hover:bg-slate-100 rounded-lg sm:rounded-xl transition-colors cursor-pointer active:scale-95 flex-shrink-0"
+              className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer active:scale-95 flex-shrink-0"
             >
               <X size={18} className="text-slate-400" />
             </button>
           </div>
 
-          <div className="bg-gradient-to-br from-slate-50 to-white rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-slate-200 mb-4 sm:mb-6 flex flex-col items-center group hover:shadow-md transition-shadow">
-            <div className="relative w-32 h-32 sm:w-40 sm:h-40 bg-white rounded-lg sm:rounded-xl p-3 sm:p-4 shadow-lg mb-3 sm:mb-5 group-hover:scale-105 transition-transform duration-300">
-              {qrImageUrl ? (
-                <img
-                  src={qrImageUrl}
-                  alt="QR Code"
-                  className="w-full h-full object-contain"
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200 rounded-lg">
-                  <QrCode size={32} className="text-slate-300" />
+          {/* Main Content - Two Column Layout on Mobile */}
+          <div className="flex flex-col md:flex-row gap-4 mb-4">
+            {/* Left Column - QR Code */}
+            <div className="flex-1">
+              <div className="bg-white rounded-xl p-3 border border-slate-200 shadow-sm">
+                <div className="flex flex-col items-center">
+                  {/* QR Code */}
+                  <div className="relative mb-3">
+                    <div className="w-[220px] h-[220px] sm:w-[240px] sm:h-[240px] bg-white rounded-lg p-2 border-2 border-slate-100">
+                      {qrImageUrl ? (
+                        <img
+                          src={qrImageUrl}
+                          alt="QR Code"
+                          className="w-full h-full object-contain"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 rounded">
+                          <QrCode size={56} className="text-slate-300" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="absolute -top-1 -right-1 w-5 h-5 bg-indigo-500 rounded-full flex items-center justify-center shadow-md">
+                      <CheckCircle size={10} className="text-white" />
+                    </div>
+                  </div>
+
+                  {upiId && (
+  <div className="mt-3 text-center">
+    <p className="text-xs text-slate-500 mb-1">UPI ID</p>
+    <button
+      onClick={handleCopyUPI}
+      className="inline-flex items-center gap-2 px-3 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg font-semibold text-sm text-slate-800 transition cursor-pointer"
+    >
+      <CreditCard size={14} />
+      {upiId}
+    </button>
+  </div>
+)}
+
+
+                  {/* Amount */}
+                  <div className="text-center">
+                    <div className="inline-flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-emerald-50 to-green-50 rounded-lg border border-emerald-100">
+                      <IndianRupee size={14} className="text-emerald-600" />
+                      <p className="text-xl font-bold text-emerald-700">
+                        {amount.toLocaleString("en-IN")}
+                      </p>
+                    </div>
+                  </div>
                 </div>
-              )}
-              <div className="absolute -top-1 -right-1 sm:-top-2 sm:-right-2 w-4 h-4 sm:w-6 sm:h-6 bg-indigo-500 rounded-full flex items-center justify-center">
-                <CheckCircle size={10} className="text-white" />
-              </div>
-            </div>
-            <div className="text-center">
-              <p className="text-xs sm:text-sm text-slate-500 font-medium mb-1 sm:mb-2">
-                Amount to pay
-              </p>
-              <div className="inline-flex items-center gap-1 sm:gap-2 px-3 py-1.5 sm:px-4 sm:py-2 bg-emerald-50 rounded-full">
-                <IndianRupee size={14} className="text-emerald-600" />
-                <p className="text-xl sm:text-2xl md:text-3xl font-bold text-emerald-700">
-                  {amount.toLocaleString("en-IN")}
-                </p>
               </div>
             </div>
           </div>
 
-          <div className="space-y-2 sm:space-y-3">
+          {/* Action Buttons - Side by Side on Mobile */}
+          <div className="flex flex-col sm:flex-row gap-2">
             <button
               onClick={handleDownloadQR}
               disabled={downloading || !qrImageUrl}
-              className="w-full py-2.5 sm:py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg sm:rounded-xl font-semibold flex items-center justify-center gap-2 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed active:scale-95 cursor-pointer text-sm sm:text-base"
+              className="flex-1 py-3 bg-gradient-to-r from-slate-800 to-slate-900 text-white rounded-lg font-semibold flex items-center justify-center gap-2 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-md active:scale-95 cursor-pointer text-sm"
             >
               {downloading ? (
                 <>
@@ -596,36 +644,32 @@ const QRCodeModal = ({
               ) : (
                 <>
                   <Download size={16} />
-                  Save QR Code
+                  Save QR
                 </>
               )}
             </button>
+
             <button
               onClick={handleShare}
-              className="w-full py-2.5 sm:py-3.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg sm:rounded-xl font-semibold flex items-center justify-center gap-2 hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0 transition-all duration-300 cursor-pointer group text-sm sm:text-base"
+              className="flex-1 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg font-semibold flex items-center justify-center gap-2 hover:shadow-lg active:scale-95 transition-all duration-300 cursor-pointer text-sm"
             >
-              {copied ? (
-                <>
-                  <CheckCircle size={16} className="text-emerald-300" />
-                  Copied!
-                </>
-              ) : (
-                <>
-                  <Share2
-                    size={16}
-                    className="group-hover:rotate-12 transition-transform"
-                  />
-                  Share Payment Link
-                </>
-              )}
+              <Share2
+                size={16}
+                className="group-hover:rotate-12 transition-transform"
+              />
+              Share
             </button>
           </div>
 
-          <div className="mt-4 sm:mt-6 pt-4 sm:pt-6 border-t border-slate-100">
-            <div className="flex items-center justify-center gap-2 text-xs text-slate-400">
-              <Shield size={10} />
-              <span className="text-xs">Secure • Encrypted • Instant</span>
+          {/* Footer - Compact */}
+          <div className="mt-3 pt-3 border-t border-slate-100">
+            <div className="flex items-center justify-center gap-1.5 text-xs text-slate-500">
+              <Shield size={10} className="text-slate-400" />
+              <span>Secure payment • Instant confirmation</span>
             </div>
+            <p className="text-center text-xs text-slate-400 mt-1">
+              Scan the QR code for fastest payment
+            </p>
           </div>
         </div>
       </div>
@@ -1513,6 +1557,17 @@ const PaymentHistoryModal = ({
   );
 };
 
+const getWinnerCycleLabel = (paymentHistory = []) => {
+  if (!paymentHistory.length) return null;
+
+  const firstCycle = paymentHistory[0]?.Payment_Cycle || "";
+
+  if (firstCycle.toLowerCase().includes("week")) return "Week 1";
+  if (firstCycle.toLowerCase().includes("month")) return "Month 1";
+
+  return null;
+};
+
 // --- PARTICIPANT CARD COMPONENT (RESPONSIVE) ---
 const ParticipantCard = ({ participant, index, onImageClick }) => {
   const [isHovered, setIsHovered] = useState(false);
@@ -1530,6 +1585,8 @@ const ParticipantCard = ({ participant, index, onImageClick }) => {
   const StatusIcon =
     statusConfig[participant.paymentStatus]?.icon || AlertCircle;
 
+  const winnerCycleLabel = getWinnerCycleLabel(participant.paymentHistory);
+
   return (
     <div
       className="group bg-white rounded-xl sm:rounded-2xl p-3 sm:p-4 md:p-5 border border-slate-200 shadow-sm hover:shadow-xl hover:-translate-y-0.5 sm:hover:-translate-y-2 transition-all duration-500 overflow-hidden relative"
@@ -1543,9 +1600,21 @@ const ParticipantCard = ({ participant, index, onImageClick }) => {
       {/* Winner Badge */}
       {participant.isWinner && (
         <div className="absolute top-2 right-2 sm:top-4 sm:right-4 z-10 animate-in zoom-in duration-300">
-          <div className="bg-gradient-to-r from-amber-400 via-orange-400 to-amber-400 text-white text-xs font-bold px-2 py-1 sm:px-3 sm:py-1.5 rounded-lg flex items-center gap-1 sm:gap-1.5 shadow-lg animate-pulse">
-            <Crown size={10} className="sm:w-3 sm:h-3" />
-            <span className="text-xs">WINNER</span>
+          <div
+            className="bg-gradient-to-r from-amber-400 via-orange-400 to-amber-400 
+                    text-white text-xs font-bold px-2 py-1 sm:px-3 sm:py-1.5 
+                    rounded-lg flex flex-col items-center gap-0.5 shadow-lg"
+          >
+            <div className="flex items-center gap-1">
+              <Crown size={10} />
+              <span>WINNER</span>
+            </div>
+
+            {winnerCycleLabel && (
+              <span className="text-[10px] font-semibold opacity-90">
+                {winnerCycleLabel}
+              </span>
+            )}
           </div>
         </div>
       )}
@@ -1619,6 +1688,8 @@ export default function ParticipantDetailsPage() {
   const [filter, setFilter] = useState("all");
   const [search, setSearch] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [upiId, setUpiId] = useState("");
+
 
   const [toast, setToast] = useState({
     visible: false,
@@ -1640,101 +1711,103 @@ export default function ParticipantDetailsPage() {
     setTimeout(() => setToast((prev) => ({ ...prev, visible: false })), 3000);
   };
 
- const fetchParticipants = useCallback(
-  async (isBackgroundRefresh = false) => {
-    if (!documentId) return;
+  const fetchParticipants = useCallback(
+    async (isBackgroundRefresh = false) => {
+      if (!documentId) return;
 
-    if (!isBackgroundRefresh) {
-      setIsRefreshing(true);
-      setIsLoading(true);
-    }
+      if (!isBackgroundRefresh) {
+        setIsRefreshing(true);
+        setIsLoading(true);
+      }
 
-    try {
-      const res = await api.get(`/public/lucky-draw-names/${documentId}`);
-      const data = res.data;
+      try {
+        const res = await api.get(`/public/lucky-draw-names/${documentId}`);
+        const data = res.data;
 
-      const participantsList = data?.lucky_draw_forms || [];
-      const participantPayments = data?.participant_payments || [];
+        const participantsList = data?.lucky_draw_forms || [];
+        const participantPayments = data?.participant_payments || [];
+        // ✅ SET UPI ID FROM BACKEND
+setUpiId(data?.Upi_Id || "");
 
-      // ✅ BUILD PARTICIPANTS (ONLY ONCE)
-      const mappedParticipants = participantsList.map((item) => {
-        const photo =
-          item.Photo?.formats?.small?.url ||
-          item.Photo?.formats?.thumbnail?.url ||
-          item.Photo?.url ||
-          null;
 
-        const userPayments = participantPayments.filter(
+        // ✅ BUILD PARTICIPANTS (ONLY ONCE)
+        const mappedParticipants = participantsList.map((item) => {
+          const photo =
+            item.Photo?.formats?.small?.url ||
+            item.Photo?.formats?.thumbnail?.url ||
+            item.Photo?.url ||
+            null;
+
+          const userPayments = participantPayments.filter(
+            (payment) =>
+              String(payment.lucky_draw_form?.documentId) ===
+              String(item.documentId)
+          );
+
+          const hasVerified = userPayments.some((p) => p.isVerified);
+          const hasPending = userPayments.some((p) => !p.isVerified);
+
+          let paymentStatus = "pending";
+          if (hasVerified) paymentStatus = "paid";
+          else if (hasPending) paymentStatus = "pending_verification";
+
+          return {
+            id: item.id,
+            documentId: item.documentId,
+            isVerified: item.isVerified,
+            name: item.Name,
+            email: item.Email,
+            phone: item.Phone_Number,
+            isWinner: item.IsWinnedParticipant ?? false,
+            paymentStatus,
+            winAmount: item.Prize_Amount || 0,
+            joinedDate: new Date(item.createdAt).toLocaleDateString(),
+            photoUrl: photo ? `${API_BASE_URL}${photo}` : null,
+            paymentHistory: [...userPayments], // 🔥 IMPORTANT
+          };
+        });
+
+        // 🔥 FORCE UI UPDATE
+        setParticipants([...mappedParticipants]);
+
+        // ✅ CURRENT USER PAYMENT HISTORY
+        const myPayments = participantPayments.filter(
           (payment) =>
             String(payment.lucky_draw_form?.documentId) ===
-            String(item.documentId)
+            String(participantDocumentId)
         );
 
-        const hasVerified = userPayments.some((p) => p.isVerified);
-        const hasPending = userPayments.some((p) => !p.isVerified);
+        setUserPaymentHistory([...myPayments]); // 🔥 FORCE UPDATE
 
-        let paymentStatus = "pending";
-        if (hasVerified) paymentStatus = "paid";
-        else if (hasPending) paymentStatus = "pending_verification";
+        // ✅ QR CODE
+        const qr =
+          data?.QRcode?.formats?.medium?.url ||
+          data?.QRcode?.formats?.small?.url ||
+          data?.QRcode?.formats?.thumbnail?.url ||
+          data?.QRcode?.url ||
+          null;
 
-        return {
-          id: item.id,
-          documentId: item.documentId,
-          isVerified: item.isVerified,
-          name: item.Name,
-          email: item.Email,
-          phone: item.Phone_Number,
-          isWinner: item.IsWinnedParticipant ?? false,
-          paymentStatus,
-          winAmount: item.Prize_Amount || 0,
-          joinedDate: new Date(item.createdAt).toLocaleDateString(),
-          photoUrl: photo ? `${API_BASE_URL}${photo}` : null,
-          paymentHistory: [...userPayments], // 🔥 IMPORTANT
-        };
-      });
+        setLuckyDrawQR(qr ? `${API_BASE_URL}${qr}` : null);
 
-      // 🔥 FORCE UI UPDATE
-      setParticipants([...mappedParticipants]);
+        // ✅ AMOUNT PER PARTICIPANT
+        const totalAmount = Number(data?.Amount || 0);
+        const totalParticipants = participantsList.length || 0;
+        const perParticipantAmount =
+          totalParticipants > 0
+            ? Math.floor(totalAmount / totalParticipants)
+            : 0;
 
-      // ✅ CURRENT USER PAYMENT HISTORY
-      const myPayments = participantPayments.filter(
-        (payment) =>
-          String(payment.lucky_draw_form?.documentId) ===
-          String(participantDocumentId)
-      );
-
-      setUserPaymentHistory([...myPayments]); // 🔥 FORCE UPDATE
-
-      // ✅ QR CODE
-      const qr =
-        data?.QRcode?.formats?.medium?.url ||
-        data?.QRcode?.formats?.small?.url ||
-        data?.QRcode?.formats?.thumbnail?.url ||
-        data?.QRcode?.url ||
-        null;
-
-      setLuckyDrawQR(qr ? `${API_BASE_URL}${qr}` : null);
-
-      // ✅ AMOUNT PER PARTICIPANT
-      const totalAmount = Number(data?.Amount || 0);
-      const totalParticipants = participantsList.length || 0;
-      const perParticipantAmount =
-        totalParticipants > 0
-          ? Math.floor(totalAmount / totalParticipants)
-          : 0;
-
-      setLuckyDrawAmount(perParticipantAmount);
-    } catch (error) {
-      console.error("Error fetching participants:", error);
-      showToast("Failed to load participants", "error");
-    } finally {
-      setIsRefreshing(false);
-      setIsLoading(false);
-    }
-  },
-  [documentId, participantDocumentId]
-);
-
+        setLuckyDrawAmount(perParticipantAmount);
+      } catch (error) {
+        console.error("Error fetching participants:", error);
+        showToast("Failed to load participants", "error");
+      } finally {
+        setIsRefreshing(false);
+        setIsLoading(false);
+      }
+    },
+    [documentId, participantDocumentId]
+  );
 
   useEffect(() => {
     if (isVerified) {
@@ -2019,6 +2092,7 @@ export default function ParticipantDetailsPage() {
         participant={selectedUser}
         qrImage={luckyDrawQR}
         amount={luckyDrawAmount}
+         upiId={upiId}  
         showToast={showToast}
       />
       <UploadScreenshotModal
@@ -2027,7 +2101,6 @@ export default function ParticipantDetailsPage() {
         participant={selectedUser}
         luckydrawDocumentId={documentId}
         onUploadComplete={() => fetchParticipants(false)}
-
         showToast={showToast}
       />
       <PaymentHistoryModal

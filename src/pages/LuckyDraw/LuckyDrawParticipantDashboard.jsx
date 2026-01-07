@@ -95,19 +95,31 @@ const LuckyDrawParticipantDashboard = () => {
         id: item.id,
         documentId: item.documentId,
         luckyDrawId: item.LuckyDraw_ID,
+
         name: item.Name,
         email: item.Email,
         phone: item.Phone_Number,
         gender: item.Gender,
         age: item.Age,
         userId: item.ID_card,
+
         isVerified: item.isVerified ?? false,
         isWinner: item.IsWinnedParticipant ?? false,
+
         createdAt: item.createdAt,
         updatedAt: item.updatedAt,
+
         photo: item.Photo?.url
           ? `https://api.regeve.in${item.Photo.url}`
           : null,
+
+        // ✅ ID PROOF (ARRAY)
+        idPhotos: Array.isArray(item.Id_Photo)
+          ? item.Id_Photo.map((img) => ({
+              id: img.id,
+              url: `https://api.regeve.in${img.url}`,
+            }))
+          : [],
       }));
 
       setAllUsers(users);
@@ -413,52 +425,10 @@ const LuckyDrawParticipantDashboard = () => {
     }
   };
 
-  // ----------------------------- PHOTO UPLOAD -----------------------------
-  const uploadPhoto = async (file) => {
-    const token = localStorage.getItem("jwt");
-
-    const formData = new FormData();
-    formData.append("files", file);
-
-    const response = await axios.post(
-      "https://api.regeve.in/api/upload",
-      formData,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      }
-    );
-
-    // Strapi returns array of uploaded files
-    return response.data[0].id; // ✅ media ID
-  };
-
   const handleEditSave = async () => {
     const token = localStorage.getItem("jwt");
 
     try {
-      let photoId = null;
-
-      // 🔥 Upload new photo if selected
-      if (newPhotoFile) {
-        photoId = await uploadPhoto(newPhotoFile);
-      }
-
-      const updateData = {
-        Name: editForm.Name,
-        Email: editForm.Email,
-        Phone_Number: editForm.Phone_Number,
-        Gender: editForm.Gender,
-        Age: Number(editForm.Age),
-        ID_card: editForm.ID_card,
-      };
-
-      // 🔥 Attach photo only if uploaded
-      if (photoId) {
-        updateData.Photo = photoId;
-      }
-
       await axios.put(
         `https://api.regeve.in/api/lucky-draw-names/${luckydrawDocumentId}`,
         {
@@ -467,7 +437,14 @@ const LuckyDrawParticipantDashboard = () => {
               update: [
                 {
                   where: { documentId: activeParticipant.documentId },
-                  data: updateData,
+                  data: {
+                    Name: editForm.Name,
+                    Email: editForm.Email,
+                    Phone_Number: editForm.Phone_Number,
+                    Gender: editForm.Gender,
+                    Age: Number(editForm.Age),
+                    ID_card: editForm.ID_card,
+                  },
                 },
               ],
             },
@@ -482,7 +459,6 @@ const LuckyDrawParticipantDashboard = () => {
       setShowEditModal(false);
     } catch (err) {
       console.error("Edit failed", err);
-      alert("Failed to update participant");
     }
   };
 
@@ -544,19 +520,17 @@ const LuckyDrawParticipantDashboard = () => {
       <td className="px-6 py-5">
         <div className="flex items-center gap-4">
           <div className="relative">
-            <div className="w-16 h-16 overflow-hidden rounded-lg shadow-lg bg-gray-100 flex items-center justify-center">
+            <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-white shadow-lg bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
               {user.photo ? (
                 <img
                   src={user.photo}
                   alt={user.name}
-                  className="w-full h-full object-cover object-center"
-                  loading="lazy"
+                  className="w-full h-full object-cover"
                 />
               ) : (
                 <div className="text-2xl text-gray-400">👤</div>
               )}
             </div>
-
             {user.isVerified && (
               <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-emerald-500 rounded-full border-2 border-white flex items-center justify-center">
                 <FaUserCheck className="text-white text-xs" />
@@ -1175,7 +1149,7 @@ const LuckyDrawParticipantDashboard = () => {
                     {/* Profile Photo */}
                     <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-6 text-center">
                       <div className="relative inline-block mb-4">
-                        <div className="w-32 h-32 overflow-hidden shadow-lg mx-auto">
+                        <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-white shadow-lg mx-auto">
                           {photoPreview ? (
                             <img
                               src={photoPreview}
@@ -1447,7 +1421,7 @@ const LuckyDrawParticipantDashboard = () => {
                   <div className="space-y-6">
                     {/* Profile Card */}
                     <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-6 text-center">
-                      <div className="w-32 h-32 overflow-hidden shadow-lg mx-auto mb-4">
+                      <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-white shadow-lg mx-auto mb-4">
                         {activeParticipant.photo ? (
                           <img
                             src={activeParticipant.photo}
@@ -1575,6 +1549,45 @@ const LuckyDrawParticipantDashboard = () => {
                       </div>
                     </div>
 
+                    {/* ID Proof Photo */}
+                    {activeParticipant.idPhotos?.length > 0 ? (
+                      <div className="mt-4 space-y-3">
+                        <p className="text-sm font-medium text-gray-700">
+                          ID Proof Photos ({activeParticipant.idPhotos.length})
+                        </p>
+                        <div className="grid grid-cols-2 gap-4">
+                          {activeParticipant.idPhotos.map((img) => (
+                            <div
+                              key={img.id}
+                              className="relative aspect-square rounded-lg overflow-hidden border border-gray-300 bg-white shadow-sm hover:shadow-md transition-all duration-300"
+                            >
+                              <img
+                                src={img.url}
+                                alt="ID Proof"
+                                className="w-full h-full object-contain p-2"
+                              />
+                              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-0 hover:opacity-100 transition-opacity duration-300">
+                                <a
+                                  href={img.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="absolute bottom-4 left-1/2 transform -translate-x-1/2 px-4 py-2 bg-white text-gray-800 rounded-md text-sm font-medium hover:bg-gray-100 transition-colors shadow-lg"
+                                >
+                                  View Full Size
+                                </a>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-dashed border-gray-300">
+                        <p className="text-sm text-gray-500 text-center">
+                          No ID proof documents uploaded
+                        </p>
+                      </div>
+                    )}
+
                     {/* Registration Info */}
                     <div className="md:col-span-2 rounded-xl border border-gray-200 p-5">
                       <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
@@ -1644,6 +1657,7 @@ const LuckyDrawParticipantDashboard = () => {
                   >
                     Close
                   </button>
+                 
                 </div>
               </div>
             </div>

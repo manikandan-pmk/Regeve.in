@@ -174,8 +174,10 @@ const LuckyDraw = () => {
   const [isSpinning, setIsSpinning] = useState(false);
   const [result, setResult] = useState(null);
   const [showResult, setShowResult] = useState(false);
-  const [currentValues, setCurrentValues] = useState(["B", "0", "0", "0"]);
-  const [finalValues, setFinalValues] = useState(["B", "0", "0", "0"]);
+  const [currentValues, setCurrentValues] = useState(["", "", "0", "0", "0"]);
+  const [finalValues, setFinalValues] = useState(["", "", "0", "0", "0"]);
+  const [drawLetters, setDrawLetters] = useState(["", ""]);
+
   const [blastAnimation, setBlastAnimation] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
 
@@ -183,6 +185,13 @@ const LuckyDraw = () => {
 
   const [participants, setParticipants] = useState([]);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (drawLetters[0]) {
+      setCurrentValues([drawLetters[0], drawLetters[1], "0", "0", "0"]);
+      setFinalValues([drawLetters[0], drawLetters[1], "0", "0", "0"]);
+    }
+  }, [drawLetters]);
 
   useEffect(() => {
     console.log("adminId:", adminId);
@@ -205,10 +214,20 @@ const LuckyDraw = () => {
           }
         );
 
-        // ✅ users are inside lucky_draw_forms
-        const users = res.data?.lucky_draw_forms || [];
+        const companyName = res.data?.admin?.Company_Name || "";
 
-        // ✅ only verified users
+        // take first 2 letters only
+        const letters = companyName
+          .replace(/[^A-Za-z]/g, "")
+          .toUpperCase()
+          .padEnd(2, "X")
+          .slice(0, 2);
+
+        // store letters
+        setDrawLetters([letters[0], letters[1]]);
+
+        // ✅ users list
+        const users = res.data?.lucky_draw_forms || [];
         const verifiedUsers = users.filter(
           (user) =>
             user.isVerified === true && user.IsWinnedParticipant !== true
@@ -244,68 +263,89 @@ const LuckyDraw = () => {
     setShowProfile(false);
   };
 
-  const stopSpinning = async () => {
-    setIsSpinning(false);
-    setBlastAnimation(true);
+ const stopSpinning = async () => {
+  setIsSpinning(false);
+  setBlastAnimation(true);
 
-    if (participants.length === 0) return;
+  const availableParticipants = participants.filter(
+    (p) => p.IsWinnedParticipant !== true
+  );
 
-    const randomIndex = Math.floor(Math.random() * participants.length);
-    const winner = participants[randomIndex];
+  if (availableParticipants.length === 0) {
+    alert("All participants have already won!");
+    return;
+  }
 
-    const luckyId = winner.LuckyDraw_ID || "B000";
-    const digits = luckyId.replace(/\D/g, "").padStart(3, "0");
-    setFinalValues(["B", digits[0], digits[1], digits[2]]);
+  const randomIndex = Math.floor(
+    Math.random() * availableParticipants.length
+  );
+  const winner = availableParticipants[randomIndex];
 
-    let updateSuccess = true;
+  const luckyDrawId = winner.LuckyDraw_ID || "";
+  const digits = luckyDrawId
+    .replace(/\D/g, "")
+    .slice(-3)
+    .padStart(3, "0")
+    .split("");
 
-    try {
-      const token = localStorage.getItem("jwt");
+  setFinalValues([
+    drawLetters[0],
+    drawLetters[1],
+    digits[0],
+    digits[1],
+    digits[2],
+  ]);
 
-      await axios.put(
-        `https://api.regeve.in/api/lucky-draw-names/${luckydrawDocumentId}`,
-        {
-          data: {
-            lucky_draw_forms: {
-              update: [
-                {
-                  where: {
-                    documentId: winner.documentId, // 👈 from your JSON
-                  },
-                  data: {
-                    IsWinnedParticipant: true,
-                    WinnedDate: new Date().toISOString(),
-                  },
+  try {
+    const token = localStorage.getItem("jwt");
+
+    await axios.put(
+      `https://api.regeve.in/api/lucky-draw-names/${luckydrawDocumentId}`,
+      {
+        data: {
+          lucky_draw_forms: {
+            update: [
+              {
+                where: { documentId: winner.documentId },
+                data: {
+                  IsWinnedParticipant: true,
+                  WinnedDate: new Date().toISOString(),
                 },
-              ],
-            },
+              },
+            ],
           },
         },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
+      },
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      }
+    );
 
-      // remove winner from current spin
-      setParticipants((prev) => prev.filter((p) => p.id !== winner.id));
-    } catch (err) {
-      console.error("Winner update failed:", err);
-      updateSuccess = false;
-    }
+    // ✅ REMOVE FROM FRONTEND STATE
+    setParticipants((prev) =>
+      prev.filter((p) => p.documentId !== winner.documentId)
+    );
 
     setResult({
-      message: updateSuccess
-        ? "Congratulations! You are the lucky winner!"
-        : "Winner selected but update failed",
-      memberId: luckyId,
+      message: "Congratulations! You are the lucky winner!",
+      memberId: winner.LuckyDraw_ID,
       winner,
-      updateSuccess,
+      updateSuccess: true,
     });
 
-    setTimeout(() => setShowResult(true), 2500);
-  };
+  } catch (err) {
+    console.error("Winner update failed:", err);
+    setResult({
+      message: "Winner selected but update failed",
+      memberId: winner.LuckyDraw_ID,
+      winner,
+      updateSuccess: false,
+    });
+  }
+
+  setTimeout(() => setShowResult(true), 2500);
+};
+
 
   const resetLuckyDraw = () => {
     setIsSpinning(false);
@@ -335,7 +375,13 @@ const LuckyDraw = () => {
       interval = setInterval(() => {
         const randomNumber = Math.floor(Math.random() * 300) + 1;
         const numberStr = randomNumber.toString().padStart(3, "0");
-        setCurrentValues(["B", numberStr[0], numberStr[1], numberStr[2]]);
+        setCurrentValues((prev) => [
+          prev[0],
+          prev[1],
+          numberStr[0],
+          numberStr[1],
+          numberStr[2],
+        ]);
       }, 60);
     } else {
       setCurrentValues(finalValues);
@@ -358,85 +404,120 @@ const LuckyDraw = () => {
 
       <AnimatePresence>
         {showProfile && result?.winner && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm"
-            onClick={closeProfile}
-          >
-            <motion.div
-              initial={{ scale: 0.8, y: 50 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.8, y: 50 }}
-              className="bg-gradient-to-br from-slate-800 to-purple-900 rounded-3xl p-8 max-w-md w-full m-4 border border-purple-500/30 shadow-2xl"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-bold text-white">
-                  Winner Profile
-                </h2>
-                <button
-                  onClick={closeProfile}
-                  className="text-white text-xl hover:text-yellow-400"
-                >
-                  ✕
-                </button>
-              </div>
+  <motion.div
+    initial={{ opacity: 0 }}
+    animate={{ opacity: 1 }}
+    exit={{ opacity: 0 }}
+    className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm"
+    onClick={closeProfile}
+  >
+    <motion.div
+      initial={{ scale: 0.8, y: 50 }}
+      animate={{ scale: 1, y: 0 }}
+      exit={{ scale: 0.8, y: 50 }}
+      className="bg-gradient-to-br from-slate-800 to-purple-900 rounded-3xl p-8 max-w-2xl w-full m-4 border border-purple-500/30 shadow-2xl"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <div className="flex justify-between items-center mb-8 pb-4 border-b border-purple-500/30">
+        <h2 className="text-2xl font-bold text-white">
+          🏆 Winner Profile
+        </h2>
+        <button
+          onClick={closeProfile}
+          className="text-white text-xl hover:text-yellow-400 transition-colors"
+        >
+          ✕
+        </button>
+      </div>
 
-              <div className="text-center mb-6">
-                <div className="w-32 h-32 mx-auto mb-4 rounded-full overflow-hidden border-4 border-yellow-400">
-                  <img
-                    src={
-                      result.winner.Photo?.url
-                        ? `https://api.regeve.in${result.winner.Photo.url}`
-                        : "/default-avatar.png"
-                    }
-                    alt={result.winner.Name}
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-                <h3 className="text-xl font-bold text-white">
-                  {result.winner.Name}
-                </h3>
-                <p className="text-yellow-400 font-mono">
-                  {result.winner.LuckyDraw_ID}
-                </p>
-              </div>
+      <div className="flex flex-col md:flex-row gap-8">
+        {/* Left side - Image section */}
+        <div className="md:w-1/3 flex flex-col items-center">
+          <div className="w-48 h-48 mb-6 rounded-xl overflow-hidden border-4 border-yellow-400 shadow-lg">
+            <img
+              src={
+                result.winner.Photo?.url
+                  ? `https://api.regeve.in${result.winner.Photo.url}`
+                  : "/default-avatar.png"
+              }
+              alt={result.winner.Name}
+              className="w-full h-full object-cover"
+            />
+          </div>
+          
+          <div className="text-center">
+            <h3 className="text-xl font-bold text-white mb-2">
+              {result.winner.Name}
+            </h3>
+            <div className="inline-block bg-purple-800/50 px-4 py-2 rounded-lg">
+              <p className="text-yellow-400 font-mono font-semibold">
+                ID: {result.memberId}
+              </p>
+            </div>
+          </div>
+        </div>
 
+        {/* Right side - Details section */}
+        <div className="md:w-2/3">
+          <div className="mb-8">
+            <h4 className="text-lg font-semibold text-yellow-400 mb-4 pb-2 border-b border-yellow-400/30">
+              Personal Information
+            </h4>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-3">
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Phone:</span>
-                  <span className="text-white">
+                <div>
+                  <label className="text-gray-400 text-sm">Phone Number</label>
+                  <p className="text-white font-medium mt-1">
                     {result.winner.Phone_Number}
-                  </span>
+                  </p>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Email:</span>
-                  <span className="text-white">{result.winner.Email}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Age:</span>
-                  <span className="text-white">{result.winner.Age}</span>
-                </div>
-
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Gender:</span>
-                  <span className="text-white">{result.winner.Gender}</span>
+                
+                <div>
+                  <label className="text-gray-400 text-sm">Email Address</label>
+                  <p className="text-white font-medium mt-1">
+                    {result.winner.Email}
+                  </p>
                 </div>
               </div>
-
-              <div className="mt-6 p-4 bg-purple-900/50 rounded-xl">
-                <p className="text-center text-yellow-300 font-bold">
-                  🎉 CONGRATULATIONS! 🎉
-                </p>
-                <p className="text-center text-gray-300 mt-2">
-                  You are the lucky winner!
-                </p>
+              
+              <div className="space-y-3">
+                <div>
+                  <label className="text-gray-400 text-sm">Age</label>
+                  <p className="text-white font-medium mt-1">
+                    {result.winner.Age} years
+                  </p>
+                </div>
+                
+                <div>
+                  <label className="text-gray-400 text-sm">Gender</label>
+                  <p className="text-white font-medium mt-1">
+                    {result.winner.Gender}
+                  </p>
+                </div>
               </div>
-            </motion.div>
-          </motion.div>
-        )}
+            </div>
+          </div>
+
+          {/* Congratulations Banner */}
+          <div className="mt-6 p-6 bg-gradient-to-r from-yellow-500/10 to-purple-600/10 rounded-xl border border-yellow-400/20">
+            <div className="text-center">
+              <p className="text-2xl font-bold text-yellow-300 mb-3">
+                🎉 CONGRATULATIONS! 🎉
+              </p>
+              <p className="text-gray-200 text-lg">
+                You are the lucky winner of this draw!
+              </p>
+              <p className="text-gray-300 mt-2">
+                Your prize will be processed shortly.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </motion.div>
+  </motion.div>
+)}
       </AnimatePresence>
 
       {/* Animated Background Elements */}
@@ -738,7 +819,7 @@ const LuckyDraw = () => {
                 <div className="absolute inset-0 bg-purple-500/20 rounded-xl blur-sm" />
 
                 <motion.span
-                  animate={index === 0 ? "stable" : isSpinning ? "shake" : {}}
+                  animate={index < 2 ? "stable" : isSpinning ? "shake" : {}}
                   variants={numberShake}
                   className="text-3xl font-bold text-white font-mono tracking-wider z-10"
                 >
