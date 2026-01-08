@@ -178,61 +178,87 @@ const MobileVerificationGate = ({ onVerify, documentId }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-[100] bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute top-0 left-0 w-full h-1/2 bg-gradient-to-b from-white/80 to-transparent"></div>
-        <div className="absolute top-1/4 right-1/4 w-64 md:w-96 h-64 md:h-96 bg-indigo-200 rounded-full mix-blend-multiply filter blur-2xl md:blur-3xl opacity-20 animate-blob"></div>
-        <div className="absolute bottom-1/4 left-1/4 w-64 md:w-96 h-64 md:h-96 bg-purple-200 rounded-full mix-blend-multiply filter blur-2xl md:blur-3xl opacity-20 animate-blob animation-delay-2000"></div>
-        <div className="absolute top-3/4 right-1/2 w-48 md:w-64 h-48 md:h-64 bg-blue-200 rounded-full mix-blend-multiply filter blur-2xl md:blur-3xl opacity-15 animate-blob animation-delay-4000"></div>
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 100,
+        background: 'linear-gradient(to bottom right, #f8fafc, #eff6ff, #eef2ff)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '16px',
+      }}
+    >
+      <div style={{ position: 'absolute', inset: 0, overflow: 'hidden' }}>
+        <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '50%', background: 'linear-gradient(to bottom, rgba(255,255,255,0.8), transparent)' }} />
+        <div style={{ position: 'absolute', top: '25%', right: '25%', width: '200px', height: '200px', backgroundColor: '#c7d2fe', borderRadius: '50%', filter: 'blur(60px)', opacity: 0.2 }} />
+        <div style={{ position: 'absolute', bottom: '25%', left: '25%', width: '200px', height: '200px', backgroundColor: '#ddd6fe', borderRadius: '50%', filter: 'blur(60px)', opacity: 0.2 }} />
       </div>
 
       {step === 1 ? (
         <div
-          className={`relative w-full max-w-sm md:max-w-md bg-white/95 backdrop-blur-xl border border-white/70 shadow-xl md:shadow-2xl rounded-2xl md:rounded-3xl p-6 md:p-8 lg:p-10 text-center ${
-            shaking ? "animate-shake" : "animate-in zoom-in-95 duration-500"
-          }`}
+          style={{
+            position: 'relative',
+            width: '100%',
+            maxWidth: 'min(95vw, 380px)',
+            maxHeight: 'calc(100dvh - 32px)',
+            backgroundColor: 'rgba(255,255,255,0.95)',
+            backdropFilter: 'blur(16px)',
+            border: '1px solid rgba(255,255,255,0.7)',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.15)',
+            borderRadius: '20px',
+            padding: '24px',
+            textAlign: 'center',
+            overflow: 'auto',
+          }}
         >
-          <div className="absolute -top-5 md:-top-6 left-1/2 transform -translate-x-1/2">
-            <div className="w-12 h-12 md:w-14 md:h-14 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl md:rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-200 border-4 border-white transform rotate-3">
-              <Smartphone className="text-white w-5 h-5 md:w-7 md:h-7" />
+          <div style={{ position: 'absolute', top: '-22px', left: '50%', transform: 'translateX(-50%)' }}>
+            <div style={{ width: '48px', height: '48px', background: 'linear-gradient(to bottom right, #6366f1, #7c3aed)', borderRadius: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 8px 16px -4px rgba(99, 102, 241, 0.4)', border: '4px solid white', transform: 'rotate(3deg)' }}>
+              <Smartphone style={{ color: 'white', width: '22px', height: '22px' }} />
             </div>
           </div>
 
-          <div className="mb-6 md:mb-8">
-            <h2 className="text-2xl md:text-3xl font-bold text-slate-800 mb-2 md:mb-3 bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+          <div style={{ marginTop: '16px', marginBottom: '20px' }}>
+            <h2 style={{ fontSize: '22px', fontWeight: 700, marginBottom: '8px', background: 'linear-gradient(to right, #4f46e5, #7c3aed)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
               Participant Portal
             </h2>
-            <p className="text-slate-600 mb-3 md:mb-4 text-xs md:text-sm font-medium px-2">
-              Enter your registered mobile number to access the participant
-              dashboard
+            <p style={{ color: '#475569', marginBottom: '12px', fontSize: '13px', fontWeight: 500, padding: '0 8px' }}>
+              Enter your registered mobile number to access the participant dashboard
             </p>
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2 bg-indigo-50 rounded-full">
-              <Shield size={12} className="text-indigo-500" />
-              <span className="text-xs text-indigo-600 font-medium">
-                Secure Verification
-              </span>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '6px 12px', backgroundColor: '#eef2ff', borderRadius: '9999px' }}>
+              <Shield size={12} style={{ color: '#6366f1' }} />
+              <span style={{ fontSize: '11px', color: '#4f46e5', fontWeight: 500 }}>Secure Verification</span>
             </div>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4 md:space-y-6">
-            <div className="relative group">
-              <div className="absolute inset-y-0 left-3 md:left-4 flex items-center pointer-events-none">
-                <Phone className="w-4 h-4 md:w-5 md:h-5 text-slate-400 group-hover:text-indigo-400 transition-colors" />
+          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div style={{ position: 'relative' }}>
+              <div style={{ position: 'absolute', insetInlineStart: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>
+                <Phone style={{ width: '18px', height: '18px', color: '#94a3b8' }} />
               </div>
               <input
                 type="tel"
                 value={phoneNumber}
-                onChange={(e) => {
-                  const val = e.target.value.replace(/\D/g, "");
-                  setPhoneNumber(val);
-                  setError("");
-                }}
+                onChange={(e) => { setPhoneNumber(e.target.value.replace(/\D/g, "")); setError(""); }}
                 maxLength={10}
-                className={`w-full pl-10 pr-4 md:pl-12 py-3 md:py-4 bg-white border-2 rounded-xl md:rounded-xl outline-none font-bold text-base md:text-lg tracking-wider text-center transition-all duration-300 ${
-                  error
-                    ? "border-red-300 text-red-600 focus:border-red-500 bg-red-50"
-                    : "border-slate-200 text-slate-800 focus:border-indigo-500 focus:ring-3 focus:ring-indigo-100 hover:border-indigo-300"
-                }`}
+                style={{
+                  width: '100%',
+                  paddingLeft: '42px',
+                  paddingRight: '16px',
+                  paddingTop: '14px',
+                  paddingBottom: '14px',
+                  backgroundColor: error ? '#fef2f2' : 'white',
+                  border: `2px solid ${error ? '#fca5a5' : '#e2e8f0'}`,
+                  borderRadius: '12px',
+                  outline: 'none',
+                  fontWeight: 700,
+                  fontSize: '16px',
+                  letterSpacing: '0.05em',
+                  textAlign: 'center',
+                  color: error ? '#dc2626' : '#1e293b',
+                  boxSizing: 'border-box',
+                }}
                 placeholder="Enter 10-digit number"
                 autoFocus
                 disabled={isLoading}
@@ -240,102 +266,79 @@ const MobileVerificationGate = ({ onVerify, documentId }) => {
             </div>
 
             {error && (
-              <div className="animate-in fade-in duration-300">
-                <div className="inline-flex items-center gap-2 px-3 py-2 md:px-4 md:py-2.5 bg-red-50 rounded-lg md:rounded-xl border border-red-100">
-                  <AlertCircle
-                    size={14}
-                    className="text-red-500 flex-shrink-0"
-                  />
-                  <p className="text-red-600 text-xs md:text-sm font-medium text-left">
-                    {error}
-                  </p>
-                </div>
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '10px 14px', backgroundColor: '#fef2f2', borderRadius: '10px', border: '1px solid #fecaca' }}>
+                <AlertCircle size={14} style={{ color: '#ef4444', flexShrink: 0 }} />
+                <p style={{ color: '#dc2626', fontSize: '12px', fontWeight: 500, textAlign: 'left', margin: 0 }}>{error}</p>
               </div>
             )}
 
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full cursor-pointer py-3 md:py-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl font-bold text-base md:text-lg shadow-lg hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-70 disabled:cursor-not-allowed transition-all duration-300 flex items-center justify-center gap-2 md:gap-3 group"
+              style={{
+                width: '100%',
+                padding: '14px',
+                background: 'linear-gradient(to right, #4f46e5, #7c3aed)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '12px',
+                fontWeight: 700,
+                fontSize: '15px',
+                boxShadow: '0 10px 15px -3px rgba(79, 70, 229, 0.3)',
+                cursor: isLoading ? 'not-allowed' : 'pointer',
+                opacity: isLoading ? 0.7 : 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+              }}
             >
-              {isLoading ? (
-                <>
-                  <Loader2 size={18} className="animate-spin" />
-                  Verifying...
-                </>
-              ) : (
-                <>
-                  <span>Access Dashboard</span>
-                  <ArrowRight
-                    size={18}
-                    className="group-hover:translate-x-1 transition-transform"
-                  />
-                </>
-              )}
+              {isLoading ? <><Loader2 size={18} className="animate-spin" /> Verifying...</> : <>Access Dashboard <ArrowRight size={18} /></>}
             </button>
           </form>
 
-          <div className="mt-6 md:mt-8 pt-4 md:pt-6 border-t border-slate-100">
-            <div className="flex items-center justify-center gap-2 text-xs text-slate-400">
+          <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid #f1f5f9' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontSize: '11px', color: '#94a3b8' }}>
               <Lock size={10} />
-              <span className="font-medium text-xs">End-to-end encrypted</span>
+              <span style={{ fontWeight: 500 }}>End-to-end encrypted</span>
             </div>
           </div>
         </div>
       ) : (
-        <div className="relative w-full max-w-sm md:max-w-md bg-white/95 backdrop-blur-xl border border-white/70 shadow-xl md:shadow-2xl rounded-2xl md:rounded-3xl p-6 md:p-8 lg:p-10 text-center animate-in zoom-in-95 duration-500">
-          <div className="mb-6 md:mb-8">
-            <div className="w-16 h-16 md:w-20 md:h-20 bg-gradient-to-br from-emerald-400 to-green-500 rounded-xl md:rounded-2xl flex items-center justify-center mx-auto mb-4 md:mb-6 animate-in zoom-in-100 duration-700">
-              <CheckCircle2 className="text-white w-8 h-8 md:w-10 md:h-10" />
+        <div
+          style={{
+            position: 'relative',
+            width: '100%',
+            maxWidth: 'min(95vw, 380px)',
+            backgroundColor: 'rgba(255,255,255,0.95)',
+            backdropFilter: 'blur(16px)',
+            border: '1px solid rgba(255,255,255,0.7)',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.15)',
+            borderRadius: '20px',
+            padding: '24px',
+            textAlign: 'center',
+          }}
+        >
+          <div style={{ marginBottom: '24px' }}>
+            <div style={{ width: '64px', height: '64px', background: 'linear-gradient(to bottom right, #34d399, #22c55e)', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
+              <CheckCircle2 style={{ color: 'white', width: '32px', height: '32px' }} />
             </div>
-            <h2 className="text-xl md:text-2xl font-bold text-slate-800 mb-2 md:mb-3">
-              Verification Successful!
-            </h2>
-            <p className="text-slate-600 mb-4 md:mb-6 text-sm">
-              Welcome back,{" "}
-              <span className="font-bold text-indigo-600">{phoneNumber}</span>
-            </p>
+            <h2 style={{ fontSize: '20px', fontWeight: 700, color: '#1e293b', marginBottom: '8px' }}>Verification Successful!</h2>
+            <p style={{ color: '#64748b', fontSize: '14px' }}>Welcome back, <span style={{ fontWeight: 700, color: '#4f46e5' }}>{phoneNumber}</span></p>
           </div>
 
-          <div className="flex items-center justify-center gap-2 md:gap-3">
-            <div className="w-2 h-2 md:w-3 md:h-3 bg-emerald-400 rounded-full animate-pulse"></div>
-            <div
-              className="w-2 h-2 md:w-3 md:h-3 bg-emerald-400 rounded-full animate-pulse"
-              style={{ animationDelay: "0.2s" }}
-            ></div>
-            <div
-              className="w-2 h-2 md:w-3 md:h-3 bg-emerald-400 rounded-full animate-pulse"
-              style={{ animationDelay: "0.4s" }}
-            ></div>
-            <span className="text-xs text-slate-500 ml-2">Redirecting...</span>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+            <div style={{ width: '8px', height: '8px', backgroundColor: '#34d399', borderRadius: '50%' }} className="animate-pulse" />
+            <div style={{ width: '8px', height: '8px', backgroundColor: '#34d399', borderRadius: '50%' }} className="animate-pulse" />
+            <div style={{ width: '8px', height: '8px', backgroundColor: '#34d399', borderRadius: '50%' }} className="animate-pulse" />
+            <span style={{ fontSize: '12px', color: '#64748b', marginLeft: '8px' }}>Redirecting...</span>
           </div>
         </div>
       )}
 
       <style>{`
-        @keyframes shake {
-          0%, 100% { transform: translateX(0); }
-          25% { transform: translateX(-6px); }
-          75% { transform: translateX(6px); }
-        }
-        .animate-shake {
-          animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
-        }
-        @keyframes blob {
-          0% { transform: translate(0px, 0px) scale(1); }
-          33% { transform: translate(20px, -30px) scale(1.1); }
-          66% { transform: translate(-15px, 15px) scale(0.9); }
-          100% { transform: translate(0px, 0px) scale(1); }
-        }
-        .animate-blob {
-          animation: blob 7s infinite;
-        }
-        .animation-delay-2000 {
-          animation-delay: 2s;
-        }
-        .animation-delay-4000 {
-          animation-delay: 4s;
-        }
+        @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
+        .animate-shake { animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both; }
       `}</style>
     </div>
   );
@@ -444,8 +447,7 @@ const StatsCards = ({ participants, luckyDrawAmount, paymentStats }) => {
   );
 };
 
-// --- 1. QR CODE MODAL (RESPONSIVE) ---
-// --- 1. QR CODE MODAL (MOBILE-OPTIMIZED COMPACT VERSION) ---
+// --- 1. QR CODE MODAL (RESPONSIVE - NO SCROLL, FIT TO SCREEN) ---
 const QRCodeModal = ({
   isOpen,
   onClose,
@@ -458,12 +460,9 @@ const QRCodeModal = ({
   const [copied, setCopied] = useState(false);
   const [downloading, setDownloading] = useState(false);
 
-  // Extract UPI ID from QR image or set a default
-
   if (!isOpen) return null;
 
   const paymentLink = `https://regeve.in/payment/${upiId || "payment"}`;
-
   const qrImageUrl = qrImage || null;
 
   const handleCopyUPI = () => {
@@ -548,124 +547,117 @@ const QRCodeModal = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
-      <div className="relative w-full max-w-[95vw] sm:max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 50,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '8px',
+        backgroundColor: 'rgba(0, 0, 0, 0.6)',
+        backdropFilter: 'blur(4px)',
+      }}
+    >
+      <div
+        style={{
+          position: 'relative',
+          width: '100%',
+          maxWidth: 'min(95vw, 400px)',
+          maxHeight: 'calc(100dvh - 32px)',
+          backgroundColor: 'white',
+          borderRadius: '16px',
+          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
+        }}
+      >
         {/* Top Gradient Bar */}
-        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500"></div>
+        <div style={{ height: '4px', background: 'linear-gradient(to right, #6366f1, #a855f7, #ec4899)', flexShrink: 0 }} />
 
-        <div className="p-4 sm:p-5">
+        <div style={{ padding: '16px', overflow: 'auto', flex: 1 }}>
           {/* Compact Header */}
-          <div className="flex items-center justify-between mb-3">
-            <div className="min-w-0">
-              <h2 className="text-lg font-bold text-slate-800 truncate">
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+            <div style={{ minWidth: 0 }}>
+              <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', margin: 0 }}>
                 Pay ₹{amount.toLocaleString("en-IN")}
               </h2>
-              <p className="text-slate-500 text-xs mt-0.5 truncate">
+              <p style={{ color: '#64748b', fontSize: '12px', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 Scan QR or use UPI ID below
               </p>
             </div>
             <button
               onClick={onClose}
-              className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer active:scale-95 flex-shrink-0"
+              style={{ padding: '6px', background: 'transparent', border: 'none', borderRadius: '8px', cursor: 'pointer', flexShrink: 0 }}
             >
-              <X size={18} className="text-slate-400" />
+              <X size={18} style={{ color: '#94a3b8' }} />
             </button>
           </div>
 
-          {/* Main Content - Two Column Layout on Mobile */}
-          <div className="flex flex-col md:flex-row gap-4 mb-4">
-            {/* Left Column - QR Code */}
-            <div className="flex-1">
-              <div className="bg-white rounded-xl p-3 border border-slate-200 shadow-sm">
-                <div className="flex flex-col items-center">
-                  {/* QR Code */}
-                  <div className="relative mb-3">
-                    <div className="w-[220px] h-[220px] sm:w-[240px] sm:h-[240px] bg-white rounded-lg p-2 border-2 border-slate-100">
-                      {qrImageUrl ? (
-                        <img
-                          src={qrImageUrl}
-                          alt="QR Code"
-                          className="w-full h-full object-contain"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 rounded">
-                          <QrCode size={56} className="text-slate-300" />
-                        </div>
-                      )}
-                    </div>
-                    <div className="absolute -top-1 -right-1 w-5 h-5 bg-indigo-500 rounded-full flex items-center justify-center shadow-md">
-                      <CheckCircle size={10} className="text-white" />
-                    </div>
+          {/* QR Code Section */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: '12px' }}>
+            <div style={{ position: 'relative', marginBottom: '8px' }}>
+              <div style={{ width: 'min(180px, 45vw)', height: 'min(180px, 45vw)', backgroundColor: 'white', borderRadius: '8px', padding: '8px', border: '2px solid #f1f5f9' }}>
+                {qrImageUrl ? (
+                  <img src={qrImageUrl} alt="QR Code" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                ) : (
+                  <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(to bottom right, #f8fafc, #f1f5f9)', borderRadius: '4px' }}>
+                    <QrCode size={48} style={{ color: '#cbd5e1' }} />
                   </div>
-
-                  {upiId && (
-                    <div className="mt-3 text-center">
-                      <p className="text-xs text-slate-500 mb-1">UPI ID</p>
-                      <button
-                        onClick={handleCopyUPI}
-                        className="inline-flex items-center gap-2 px-3 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg font-semibold text-sm text-slate-800 transition cursor-pointer"
-                      >
-                        <CreditCard size={14} />
-                        {upiId}
-                      </button>
-                    </div>
-                  )}
-
-                  {/* Amount */}
-                  <div className="text-center">
-                    <div className="inline-flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-emerald-50 to-green-50 rounded-lg border border-emerald-100">
-                      <IndianRupee size={14} className="text-emerald-600" />
-                      <p className="text-xl font-bold text-emerald-700">
-                        {amount.toLocaleString("en-IN")}
-                      </p>
-                    </div>
-                  </div>
-                </div>
+                )}
+              </div>
+              <div style={{ position: 'absolute', top: '-4px', right: '-4px', width: '20px', height: '20px', backgroundColor: '#6366f1', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}>
+                <CheckCircle size={10} style={{ color: 'white' }} />
               </div>
             </div>
+
+            {/* Amount Display */}
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '8px 12px', background: 'linear-gradient(to right, #ecfdf5, #f0fdf4)', borderRadius: '8px', border: '1px solid #d1fae5', marginBottom: '8px' }}>
+              <IndianRupee size={14} style={{ color: '#059669' }} />
+              <p style={{ fontSize: '20px', fontWeight: 700, color: '#047857', margin: 0 }}>
+                {amount.toLocaleString("en-IN")}
+              </p>
+            </div>
+
+            {upiId && (
+              <div style={{ textAlign: 'center' }}>
+                <p style={{ fontSize: '11px', color: '#64748b', marginBottom: '4px' }}>UPI ID</p>
+                <button
+                  onClick={handleCopyUPI}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '8px 12px', backgroundColor: '#f1f5f9', border: 'none', borderRadius: '8px', fontWeight: 600, fontSize: '13px', color: '#1e293b', cursor: 'pointer' }}
+                >
+                  <CreditCard size={14} />
+                  {upiId}
+                </button>
+              </div>
+            )}
           </div>
 
-          {/* Action Buttons - Side by Side on Mobile */}
-          <div className="flex flex-col sm:flex-row gap-2">
+          {/* Action Buttons */}
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
             <button
               onClick={handleDownloadQR}
               disabled={downloading || !qrImageUrl}
-              className="flex-1 py-3 bg-gradient-to-r from-slate-800 to-slate-900 text-white rounded-lg font-semibold flex items-center justify-center gap-2 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-md active:scale-95 cursor-pointer text-sm"
+              style={{ flex: 1, padding: '12px', background: 'linear-gradient(to right, #1e293b, #0f172a)', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', cursor: downloading || !qrImageUrl ? 'not-allowed' : 'pointer', opacity: downloading || !qrImageUrl ? 0.5 : 1, fontSize: '13px' }}
             >
-              {downloading ? (
-                <>
-                  <Loader2 size={16} className="animate-spin" />
-                  Downloading...
-                </>
-              ) : (
-                <>
-                  <Download size={16} />
-                  Save QR
-                </>
-              )}
+              {downloading ? <><Loader2 size={16} className="animate-spin" /> Downloading...</> : <><Download size={16} /> Save QR</>}
             </button>
-
             <button
               onClick={handleShare}
-              className="flex-1 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg font-semibold flex items-center justify-center gap-2 hover:shadow-lg active:scale-95 transition-all duration-300 cursor-pointer text-sm"
+              style={{ flex: 1, padding: '12px', background: 'linear-gradient(to right, #4f46e5, #7c3aed)', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px' }}
             >
-              <Share2
-                size={16}
-                className="group-hover:rotate-12 transition-transform"
-              />
-              Share
+              <Share2 size={16} /> Share
             </button>
           </div>
 
-          {/* Footer - Compact */}
-          <div className="mt-3 pt-3 border-t border-slate-100">
-            <div className="flex items-center justify-center gap-1.5 text-xs text-slate-500">
-              <Shield size={10} className="text-slate-400" />
+          {/* Footer */}
+          <div style={{ paddingTop: '12px', borderTop: '1px solid #f1f5f9', textAlign: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontSize: '11px', color: '#64748b' }}>
+              <Shield size={10} style={{ color: '#94a3b8' }} />
               <span>Secure payment • Instant confirmation</span>
             </div>
-            <p className="text-center text-xs text-slate-400 mt-1">
-              Scan the QR code for fastest payment
-            </p>
           </div>
         </div>
       </div>
@@ -929,105 +921,106 @@ const UploadScreenshotModal = ({
     <>
       {/* Main Modal */}
       <div
-        className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-black/70 backdrop-blur-sm animate-in fade-in duration-300"
+        style={{
+          position: 'fixed',
+          inset: 0,
+          zIndex: 50,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '8px',
+          backgroundColor: 'rgba(0, 0, 0, 0.7)',
+          backdropFilter: 'blur(4px)',
+        }}
         onClick={handleBackdropClick}
       >
         <div
           ref={modalRef}
-          className="w-full max-w-md sm:max-w-lg bg-white rounded-xl sm:rounded-2xl md:rounded-3xl shadow-xl sm:shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 mx-2 max-h-[90vh] overflow-y-auto"
+          style={{
+            width: '100%',
+            maxWidth: 'min(95vw, 440px)',
+            maxHeight: 'calc(100dvh - 24px)',
+            backgroundColor: 'white',
+            borderRadius: '16px',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+            overflow: 'hidden',
+            display: 'flex',
+            flexDirection: 'column',
+          }}
         >
-          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 to-purple-500"></div>
+          <div style={{ height: '4px', background: 'linear-gradient(to right, #3b82f6, #a855f7)', flexShrink: 0 }} />
 
-          <div className="p-4 sm:p-5 md:p-6">
+          <div style={{ padding: '16px', overflow: 'auto', flex: 1 }}>
             {/* Header */}
-            <div className="flex items-start justify-between mb-4 sm:mb-6">
-              <div className="min-w-0 pr-2">
-                <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-slate-800 truncate">
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '12px' }}>
+              <div style={{ minWidth: 0, paddingRight: '8px' }}>
+                <h2 style={{ fontSize: '16px', fontWeight: 700, color: '#1e293b', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   Submit Payment Proof
                 </h2>
-                <p className="text-slate-500 text-xs sm:text-sm mt-1 truncate">
-                  Upload screenshot and fill payment details
+                <p style={{ color: '#64748b', fontSize: '11px', marginTop: '4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  Upload screenshot and fill details
                 </p>
               </div>
-
               <button
                 onClick={onClose}
                 disabled={uploading}
-                className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed active:scale-95 flex-shrink-0"
+                style={{ padding: '6px', background: 'transparent', border: 'none', borderRadius: '8px', cursor: uploading ? 'not-allowed' : 'pointer', opacity: uploading ? 0.5 : 1, flexShrink: 0 }}
               >
-                <X size={18} className="text-slate-400" />
+                <X size={18} style={{ color: '#94a3b8' }} />
               </button>
             </div>
 
             {/* Payment Amount Input */}
-            <div className="mb-4 sm:mb-6">
-              <label className="block text-xs sm:text-sm font-medium text-slate-700 mb-2 sm:mb-3 flex items-center gap-2">
-                <IndianRupee
-                  size={14}
-                  className="text-emerald-500 flex-shrink-0"
-                />
+            <div style={{ marginBottom: '12px' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: 500, color: '#374151', marginBottom: '6px' }}>
+                <IndianRupee size={12} style={{ color: '#10b981' }} />
                 <span>Payment Amount (₹)</span>
               </label>
-              <div className="relative group">
+              <div style={{ position: 'relative' }}>
                 <input
                   type="number"
                   value={paymentAmount}
                   onChange={(e) => setPaymentAmount(e.target.value)}
                   min="1"
-                  className="w-full px-4 py-3 sm:px-5 sm:py-4 bg-slate-50 border-2 border-slate-200 rounded-lg sm:rounded-xl focus:outline-none focus:ring-2 sm:focus:ring-3 focus:ring-indigo-100 focus:border-indigo-500 transition-all duration-300 text-base sm:text-lg font-bold text-slate-800 hover:border-slate-300"
+                  style={{ width: '100%', padding: '10px 40px 10px 12px', backgroundColor: '#f8fafc', border: '2px solid #e2e8f0', borderRadius: '8px', outline: 'none', fontSize: '14px', fontWeight: 700, color: '#1e293b', boxSizing: 'border-box' }}
                   placeholder="Enter amount"
                   disabled={uploading}
                 />
-                <div className="absolute inset-y-0 right-3 sm:right-4 flex items-center pointer-events-none">
-                  <span className="text-slate-400 font-medium text-sm">
-                    INR
-                  </span>
+                <div style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>
+                  <span style={{ color: '#94a3b8', fontWeight: 500, fontSize: '12px' }}>INR</span>
                 </div>
               </div>
-              {durationInfo.value && (
-                <p className="text-xs text-slate-500 mt-1 sm:mt-2 ml-1">
-                  <CalendarDays size={10} className="inline mr-1" />
-                  Event duration: {durationInfo.value} {durationInfo.unit}(s)
-                </p>
-              )}
             </div>
 
             {/* Payment Cycle Selection */}
-            <div className="mb-4 sm:mb-6 relative">
-              <label className="block text-xs sm:text-sm font-medium text-slate-700 mb-2 sm:mb-3 flex items-center gap-2">
-                <CalendarDays
-                  size={14}
-                  className="text-blue-500 flex-shrink-0"
-                />
+            <div style={{ marginBottom: '12px', position: 'relative' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: 500, color: '#374151', marginBottom: '6px' }}>
+                <CalendarDays size={12} style={{ color: '#3b82f6' }} />
                 <span>Payment Cycle</span>
               </label>
               <select
                 value={paymentCycle?.value || ""}
                 onChange={(e) => {
-                  const selected = paymentCycles.find(
-                    (c) => c.value === e.target.value
-                  );
+                  const selected = paymentCycles.find((c) => c.value === e.target.value);
                   setPaymentCycle(selected);
                 }}
-                className="w-full px-4 py-3 sm:px-5 sm:py-4 bg-slate-50 border-2 border-slate-200 rounded-lg sm:rounded-xl focus:outline-none focus:ring-2 sm:focus:ring-3 focus:ring-indigo-100 focus:border-indigo-500 transition-all duration-300 appearance-none hover:border-slate-300 cursor-pointer pr-10"
+                style={{ width: '100%', padding: '10px 32px 10px 12px', backgroundColor: '#f8fafc', border: '2px solid #e2e8f0', borderRadius: '8px', outline: 'none', appearance: 'none', cursor: 'pointer', fontSize: '13px', color: '#1e293b', boxSizing: 'border-box' }}
                 disabled={uploading}
               >
                 <option value="">Select a payment cycle</option>
                 {paymentCycles.map((cycle) => (
-                  <option key={cycle.value} value={cycle.value}>
-                    {cycle.label}
-                  </option>
+                  <option key={cycle.value} value={cycle.value}>{cycle.label}</option>
                 ))}
               </select>
-              <div className="absolute right-3 sm:right-5 top-1/2 transform -translate-y-1/2 pointer-events-none">
-                <ChevronRight size={16} className="text-slate-400 rotate-90" />
+              <div style={{ position: 'absolute', right: '12px', bottom: '12px', pointerEvents: 'none' }}>
+                <ChevronRight size={14} style={{ color: '#94a3b8', transform: 'rotate(90deg)' }} />
               </div>
             </div>
 
-            {/* Upload Box - Improved with drag & drop */}
-            <div className="mb-4 sm:mb-6">
-              <label className="block text-xs sm:text-sm font-medium text-slate-700 mb-2 sm:mb-3 flex items-center gap-2">
-                <Upload size={14} className="text-purple-500 flex-shrink-0" />
+            {/* Upload Box */}
+            <div style={{ marginBottom: '12px' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: 500, color: '#374151', marginBottom: '6px' }}>
+                <Upload size={12} style={{ color: '#a855f7' }} />
                 <span>Payment Screenshot</span>
               </label>
               <div
@@ -1035,72 +1028,44 @@ const UploadScreenshotModal = ({
                 onDrop={handleDrop}
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
-                className={`border-2 ${
-                  dragOver
-                    ? "border-dashed border-indigo-400 bg-indigo-50"
-                    : "border-dashed border-slate-300"
-                } rounded-xl sm:rounded-2xl p-4 sm:p-6 text-center min-h-[140px] sm:min-h-[160px] md:min-h-[180px] flex flex-col items-center justify-center transition-all duration-300 ${
-                  preview
-                    ? "border-solid border-indigo-400 bg-indigo-50"
-                    : "hover:border-indigo-300 hover:bg-slate-50"
-                } ${
-                  uploading ? "opacity-60 cursor-not-allowed" : "cursor-pointer"
-                }`}
+                style={{
+                  border: `2px dashed ${dragOver ? '#818cf8' : preview ? '#818cf8' : '#cbd5e1'}`,
+                  borderRadius: '12px',
+                  padding: '16px',
+                  textAlign: 'center',
+                  minHeight: '100px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: uploading ? 'not-allowed' : 'pointer',
+                  backgroundColor: dragOver || preview ? '#eef2ff' : 'transparent',
+                  opacity: uploading ? 0.6 : 1,
+                }}
               >
-                <input
-                  ref={fileRef}
-                  type="file"
-                  hidden
-                  accept="image/*"
-                  onChange={handleFileChange}
-                  disabled={uploading}
-                />
+                <input ref={fileRef} type="file" hidden accept="image/*" onChange={handleFileChange} disabled={uploading} />
 
                 {preview ? (
-                  <div className="relative w-full">
-                    <div className="flex flex-col items-center">
-                      <img
-                        src={preview}
-                        alt="Preview"
-                        className="max-h-32 sm:max-h-40 rounded-lg sm:rounded-xl shadow-lg mb-3 sm:mb-4"
-                      />
-                      {!uploading && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setFile(null);
-                            setPreview(null);
-                          }}
-                          className="px-3 py-1.5 sm:px-4 sm:py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg font-medium flex items-center gap-1 sm:gap-2 transition-colors text-sm"
-                        >
-                          <X size={12} />
-                          Change Image
-                        </button>
-                      )}
-                    </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                    <img src={preview} alt="Preview" style={{ maxHeight: '80px', borderRadius: '8px', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)', marginBottom: '8px' }} />
+                    {!uploading && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setFile(null); setPreview(null); }}
+                        style={{ padding: '6px 12px', backgroundColor: '#1e293b', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', fontSize: '12px' }}
+                      >
+                        <X size={12} /> Change
+                      </button>
+                    )}
                   </div>
                 ) : (
                   <>
-                    <div
-                      className={`w-12 h-12 sm:w-16 sm:h-16 ${
-                        dragOver
-                          ? "bg-indigo-100 text-indigo-600"
-                          : "bg-slate-100 text-slate-400"
-                      } rounded-full flex items-center justify-center mb-3 sm:mb-4 transition-colors`}
-                    >
-                      <Upload size={20} />
+                    <div style={{ width: '40px', height: '40px', backgroundColor: dragOver ? '#c7d2fe' : '#f1f5f9', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '8px' }}>
+                      <Upload size={18} style={{ color: dragOver ? '#4f46e5' : '#94a3b8' }} />
                     </div>
-                    <p className="font-medium text-slate-700 mb-1 sm:mb-2 text-xs sm:text-sm">
-                      {dragOver
-                        ? "Drop image here"
-                        : "Click to upload or drag & drop"}
+                    <p style={{ fontWeight: 500, color: '#374151', marginBottom: '4px', fontSize: '12px' }}>
+                      {dragOver ? "Drop image here" : "Click to upload or drag & drop"}
                     </p>
-                    <p className="text-xs text-slate-500">PNG, JPG up to 5MB</p>
-                    {dragOver && (
-                      <div className="mt-2 text-xs text-indigo-600 font-medium animate-pulse">
-                        Release to upload
-                      </div>
-                    )}
+                    <p style={{ fontSize: '11px', color: '#64748b' }}>PNG, JPG up to 5MB</p>
                   </>
                 )}
               </div>
@@ -1110,22 +1075,24 @@ const UploadScreenshotModal = ({
             <button
               onClick={openConfirmPopup}
               disabled={!file || !paymentAmount || !paymentCycle || uploading}
-              className="w-full py-3 sm:py-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg sm:rounded-xl font-semibold disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0 transition-all duration-300 shadow-md cursor-pointer group text-sm sm:text-base"
+              style={{
+                width: '100%',
+                padding: '12px',
+                background: 'linear-gradient(to right, #4f46e5, #7c3aed)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '10px',
+                fontWeight: 600,
+                cursor: !file || !paymentAmount || !paymentCycle || uploading ? 'not-allowed' : 'pointer',
+                opacity: !file || !paymentAmount || !paymentCycle || uploading ? 0.5 : 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                fontSize: '14px',
+              }}
             >
-              {uploading ? (
-                <span className="flex items-center justify-center gap-2">
-                  <Loader2 size={18} className="animate-spin" />
-                  Processing...
-                </span>
-              ) : (
-                <span className="flex items-center justify-center gap-2">
-                  Continue to Review
-                  <ArrowRight
-                    size={16}
-                    className="group-hover:translate-x-1 transition-transform"
-                  />
-                </span>
-              )}
+              {uploading ? <><Loader2 size={16} className="animate-spin" /> Processing...</> : <>Continue to Review <ArrowRight size={16} /></>}
             </button>
           </div>
         </div>
@@ -1134,113 +1101,90 @@ const UploadScreenshotModal = ({
       {/* Confirmation Modal */}
       {confirmOpen && (
         <div
-          className="fixed inset-0 z-[60] flex items-center justify-center p-2 sm:p-4 md:p-6 bg-black/70 backdrop-blur-sm animate-in fade-in duration-300"
-          onClick={(e) =>
-            e.target === e.currentTarget && !uploading && setConfirmOpen(false)
-          }
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 60,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '8px',
+            backgroundColor: 'rgba(0, 0, 0, 0.7)',
+            backdropFilter: 'blur(4px)',
+          }}
+          onClick={(e) => e.target === e.currentTarget && !uploading && setConfirmOpen(false)}
         >
-          <div className="w-full max-w-md sm:max-w-lg bg-white rounded-xl sm:rounded-2xl md:rounded-3xl shadow-xl sm:shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 mx-2 max-h-[90vh] overflow-y-auto">
-            <div className="p-4 sm:p-5 md:p-6">
-              <div className="flex items-center justify-between mb-4 sm:mb-6">
-                <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-slate-800 truncate">
-                  Confirm Payment Details
-                </h2>
+          <div
+            style={{
+              width: '100%',
+              maxWidth: 'min(95vw, 440px)',
+              maxHeight: 'calc(100dvh - 24px)',
+              backgroundColor: 'white',
+              borderRadius: '16px',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column',
+            }}
+          >
+            <div style={{ padding: '16px', overflow: 'auto', flex: 1 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+                <h2 style={{ fontSize: '16px', fontWeight: 700, color: '#1e293b', margin: 0 }}>Confirm Payment Details</h2>
                 <button
                   onClick={() => !uploading && setConfirmOpen(false)}
                   disabled={uploading}
-                  className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors disabled:opacity-50 flex-shrink-0"
+                  style={{ padding: '6px', background: 'transparent', border: 'none', borderRadius: '8px', cursor: uploading ? 'not-allowed' : 'pointer', opacity: uploading ? 0.5 : 1 }}
                 >
-                  <X size={18} className="text-slate-400" />
+                  <X size={18} style={{ color: '#94a3b8' }} />
                 </button>
               </div>
 
-              <div className="space-y-3 sm:space-y-4 mb-6 sm:mb-8">
-                <div className="p-4 sm:p-5 bg-gradient-to-r from-slate-50 to-white rounded-xl sm:rounded-2xl border border-slate-200 shadow-sm">
-                  <p className="text-xs text-slate-500 mb-1 sm:mb-2 flex items-center gap-2">
-                    <IndianRupee size={12} className="flex-shrink-0" />
-                    Payment Amount
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '16px' }}>
+                <div style={{ padding: '12px', background: 'linear-gradient(to right, #f8fafc, white)', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                  <p style={{ fontSize: '11px', color: '#64748b', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <IndianRupee size={10} /> Payment Amount
                   </p>
-                  <p className="font-bold text-xl sm:text-2xl md:text-3xl text-slate-800">
-                    ₹{Number(paymentAmount).toLocaleString("en-IN")}
-                  </p>
+                  <p style={{ fontWeight: 700, fontSize: '20px', color: '#1e293b', margin: 0 }}>₹{Number(paymentAmount).toLocaleString("en-IN")}</p>
                 </div>
 
-                <div className="p-4 sm:p-5 bg-gradient-to-r from-slate-50 to-white rounded-xl sm:rounded-2xl border border-slate-200 shadow-sm">
-                  <p className="text-xs text-slate-500 mb-1 sm:mb-2 flex items-center gap-2">
-                    <CalendarDays size={12} className="flex-shrink-0" />
-                    Payment Cycle
+                <div style={{ padding: '12px', background: 'linear-gradient(to right, #f8fafc, white)', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                  <p style={{ fontSize: '11px', color: '#64748b', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <CalendarDays size={10} /> Payment Cycle
                   </p>
-                  <p className="font-semibold text-slate-800 text-base sm:text-lg truncate">
-                    {paymentCycle?.label}
-                  </p>
-                </div>
-
-                <div className="p-4 sm:p-5 bg-gradient-to-r from-indigo-50 to-white rounded-xl sm:rounded-2xl border border-indigo-100 shadow-sm">
-                  <p className="text-xs text-indigo-600 font-semibold mb-1 sm:mb-2 flex items-center gap-2">
-                    <BadgeCheck size={12} className="flex-shrink-0" />
-                    Payment Cycle Code
-                  </p>
-                  <p className="font-bold text-indigo-700 text-base sm:text-lg truncate">
-                    {paymentCycle?.value}
-                  </p>
+                  <p style={{ fontWeight: 600, fontSize: '14px', color: '#1e293b', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{paymentCycle?.label}</p>
                 </div>
 
                 {preview && (
-                  <div className="p-4 sm:p-5 bg-gradient-to-r from-emerald-50 to-white rounded-xl sm:rounded-2xl border border-emerald-100 shadow-sm">
-                    <p className="text-xs text-emerald-600 font-semibold mb-2 sm:mb-3 flex items-center gap-2">
-                      <CheckCircle size={12} className="flex-shrink-0" />
-                      Screenshot Preview
+                  <div style={{ padding: '12px', background: 'linear-gradient(to right, #ecfdf5, white)', borderRadius: '12px', border: '1px solid #d1fae5', textAlign: 'center' }}>
+                    <p style={{ fontSize: '11px', color: '#059669', fontWeight: 600, marginBottom: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                      <CheckCircle size={10} /> Screenshot Preview
                     </p>
-                    <img
-                      src={preview}
-                      alt="Payment proof"
-                      className="rounded-lg max-h-32 sm:max-h-40 mx-auto shadow"
-                    />
+                    <img src={preview} alt="Payment proof" style={{ borderRadius: '8px', maxHeight: '70px', margin: '0 auto', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }} />
                   </div>
                 )}
 
-                <div className="p-4 sm:p-5 bg-gradient-to-r from-blue-50 to-white rounded-xl sm:rounded-2xl border border-blue-100 shadow-sm">
-                  <p className="text-xs text-blue-600 font-semibold mb-1 sm:mb-2">
-                    <span className="flex items-center gap-2">
-                      <AlertCircle size={12} className="flex-shrink-0" />
-                      Important Note
-                    </span>
+                <div style={{ padding: '10px', background: 'linear-gradient(to right, #eff6ff, white)', borderRadius: '12px', border: '1px solid #bfdbfe' }}>
+                  <p style={{ fontSize: '11px', color: '#2563eb', fontWeight: 600, marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <AlertCircle size={10} /> Important Note
                   </p>
-                  <p className="text-xs sm:text-sm text-blue-700">
-                    Your payment will be verified by the admin within 24 hours.
-                    You'll receive a notification once verified.
-                  </p>
+                  <p style={{ fontSize: '11px', color: '#1d4ed8', margin: 0 }}>Your payment will be verified within 24 hours.</p>
                 </div>
               </div>
 
-              <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+              <div style={{ display: 'flex', gap: '8px' }}>
                 <button
                   onClick={() => !uploading && setConfirmOpen(false)}
                   disabled={uploading}
-                  className="flex-1 py-2.5 sm:py-3.5 rounded-lg sm:rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold transition-all duration-300 disabled:opacity-50 cursor-pointer active:scale-95 text-sm sm:text-base"
+                  style={{ flex: 1, padding: '12px', backgroundColor: '#f1f5f9', color: '#475569', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: uploading ? 'not-allowed' : 'pointer', opacity: uploading ? 0.5 : 1, fontSize: '13px' }}
                 >
-                  Back to Edit
+                  Back
                 </button>
-
                 <button
                   onClick={submitPayment}
                   disabled={uploading}
-                  className="flex-1 py-2.5 sm:py-3.5 rounded-lg sm:rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0 transition-all duration-300 shadow-md cursor-pointer disabled:opacity-50 group text-sm sm:text-base"
+                  style={{ flex: 1, padding: '12px', background: 'linear-gradient(to right, #4f46e5, #7c3aed)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: uploading ? 'not-allowed' : 'pointer', opacity: uploading ? 0.5 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontSize: '13px' }}
                 >
-                  {uploading ? (
-                    <span className="flex items-center justify-center gap-2">
-                      <Loader2 size={18} className="animate-spin" />
-                      Submitting...
-                    </span>
-                  ) : (
-                    <span className="flex items-center justify-center gap-2">
-                      Confirm & Submit
-                      <CheckCircle
-                        size={16}
-                        className="group-hover:scale-110 transition-transform"
-                      />
-                    </span>
-                  )}
+                  {uploading ? <><Loader2 size={16} className="animate-spin" /> Submitting...</> : <>Confirm <CheckCircle size={14} /></>}
                 </button>
               </div>
             </div>
@@ -1251,7 +1195,7 @@ const UploadScreenshotModal = ({
   );
 };
 
-// --- 3. IMAGE PREVIEW MODAL (RESPONSIVE) ---
+// --- 3. IMAGE PREVIEW MODAL (RESPONSIVE - NO SCROLL) ---
 const ImagePreviewModal = ({ isOpen, onClose, imageUrl, name }) => {
   const [zoom, setZoom] = useState(1);
   const [position, setPosition] = useState({ x: 0, y: 0 });
@@ -1262,24 +1206,15 @@ const ImagePreviewModal = ({ isOpen, onClose, imageUrl, name }) => {
 
   const handleMouseDown = (e) => {
     setIsDragging(true);
-    setStartPos({
-      x: e.clientX - position.x,
-      y: e.clientY - position.y,
-    });
+    setStartPos({ x: e.clientX - position.x, y: e.clientY - position.y });
   };
 
   const handleMouseMove = (e) => {
     if (!isDragging) return;
-
-    setPosition({
-      x: e.clientX - startPos.x,
-      y: e.clientY - startPos.y,
-    });
+    setPosition({ x: e.clientX - startPos.x, y: e.clientY - startPos.y });
   };
 
-  const handleMouseUp = () => {
-    setIsDragging(false);
-  };
+  const handleMouseUp = () => setIsDragging(false);
 
   const handleWheel = (e) => {
     e.preventDefault();
@@ -1287,66 +1222,63 @@ const ImagePreviewModal = ({ isOpen, onClose, imageUrl, name }) => {
     setZoom((prev) => Math.max(0.5, Math.min(3, prev + delta)));
   };
 
-  const resetView = () => {
-    setZoom(1);
-    setPosition({ x: 0, y: 0 });
-  };
+  const resetView = () => { setZoom(1); setPosition({ x: 0, y: 0 }); };
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/95 backdrop-blur-md p-2 sm:p-4 animate-in fade-in duration-300"
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 100,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: 'rgba(0, 0, 0, 0.95)',
+        backdropFilter: 'blur(8px)',
+        padding: '8px',
+      }}
       onClick={onClose}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
       onWheel={handleWheel}
     >
-      <div className="absolute top-4 right-4 sm:top-6 sm:right-6 flex items-center gap-2 sm:gap-3 z-50">
-        <button
-          onClick={resetView}
-          className="p-2 sm:p-3 bg-white/10 hover:bg-white/20 text-white rounded-full backdrop-blur-md transition-colors cursor-pointer"
-          title="Reset Zoom"
-        >
-          <RefreshCw size={16} className="sm:w-5 sm:h-5" />
+      <div style={{ position: 'absolute', top: '16px', right: '16px', display: 'flex', alignItems: 'center', gap: '8px', zIndex: 50 }}>
+        <button onClick={resetView} style={{ padding: '10px', backgroundColor: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '50%', cursor: 'pointer', color: 'white' }} title="Reset Zoom">
+          <RefreshCw size={18} />
         </button>
-        <button
-          onClick={onClose}
-          className="p-2 sm:p-3 bg-white/10 hover:bg-white/20 text-white rounded-full backdrop-blur-md transition-colors cursor-pointer"
-        >
-          <X size={20} className="sm:w-6 sm:h-6" />
+        <button onClick={onClose} style={{ padding: '10px', backgroundColor: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '50%', cursor: 'pointer', color: 'white' }}>
+          <X size={20} />
         </button>
       </div>
 
-      <div
-        className="relative w-full h-full flex items-center justify-center p-2"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="relative rounded-lg sm:rounded-xl md:rounded-2xl overflow-hidden bg-black/30 backdrop-blur-sm border border-white/10 max-w-full max-h-[80vh]">
+      <div style={{ position: 'relative', width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '8px' }} onClick={(e) => e.stopPropagation()}>
+        <div style={{ position: 'relative', borderRadius: '12px', overflow: 'hidden', backgroundColor: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', maxWidth: '100%', maxHeight: 'calc(100dvh - 100px)' }}>
           <img
             src={imageUrl}
             alt={name}
-            className="w-full h-auto max-h-[60vh] sm:max-h-[70vh] object-contain cursor-grab active:cursor-grabbing"
             style={{
+              width: '100%',
+              height: 'auto',
+              maxHeight: 'calc(100dvh - 120px)',
+              objectFit: 'contain',
+              cursor: isDragging ? 'grabbing' : 'grab',
               transform: `translate(${position.x}px, ${position.y}px) scale(${zoom})`,
-              transition: isDragging ? "none" : "transform 0.2s ease",
+              transition: isDragging ? 'none' : 'transform 0.2s ease',
             }}
             onMouseDown={handleMouseDown}
           />
         </div>
-        <div className="absolute bottom-4 sm:bottom-6 left-1/2 transform -translate-x-1/2 bg-black/50 backdrop-blur-md rounded-full px-3 py-1.5 sm:px-4 sm:py-2 max-w-[90%]">
-          <h3 className="text-white text-sm sm:text-base md:text-lg font-medium truncate text-center">
-            {name}
-          </h3>
-          <div className="text-xs text-white/70 mt-0.5 text-center">
-            Zoom: {Math.round(zoom * 100)}% • Drag to pan
-          </div>
+        <div style={{ position: 'absolute', bottom: '16px', left: '50%', transform: 'translateX(-50%)', backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(8px)', borderRadius: '9999px', padding: '8px 16px', maxWidth: '90%' }}>
+          <h3 style={{ color: 'white', fontSize: '14px', fontWeight: 500, margin: 0, textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</h3>
+          <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.7)', marginTop: '2px', textAlign: 'center' }}>Zoom: {Math.round(zoom * 100)}% • Drag to pan</div>
         </div>
       </div>
     </div>
   );
 };
 
-// --- PAYMENT HISTORY MODAL (RESPONSIVE) ---
+// --- PAYMENT HISTORY MODAL (RESPONSIVE - NO SCROLL, FIT TO SCREEN) ---
 const PaymentHistoryModal = ({
   isOpen,
   onClose,
@@ -1364,165 +1296,105 @@ const PaymentHistoryModal = ({
     }, 300);
   };
 
-  const totalPaid = paymentHistory
-    .filter((p) => p.isVerified)
-    .reduce((sum, p) => sum + (Number(p.Amount) || 0), 0);
-
-  const pendingAmount = paymentHistory
-    .filter((p) => !p.isVerified)
-    .reduce((sum, p) => sum + (Number(p.Amount) || 0), 0);
+  const totalPaid = paymentHistory.filter((p) => p.isVerified).reduce((sum, p) => sum + (Number(p.Amount) || 0), 0);
+  const pendingAmount = paymentHistory.filter((p) => !p.isVerified).reduce((sum, p) => sum + (Number(p.Amount) || 0), 0);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-300">
-      <div className="w-full max-w-md sm:max-w-lg md:max-w-2xl bg-white rounded-xl sm:rounded-2xl md:rounded-3xl shadow-xl sm:shadow-2xl overflow-hidden max-h-[85vh] flex flex-col animate-in zoom-in-95 duration-300 mx-2">
-        <div className="p-4 sm:p-5 md:p-6 border-b border-slate-200 bg-gradient-to-r from-slate-50 to-white">
-          <div className="flex items-center justify-between mb-3 sm:mb-4">
-            <div className="min-w-0 pr-2">
-              <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-slate-800 truncate">
-                Payment History
-              </h2>
-              <p className="text-slate-500 text-xs sm:text-sm mt-1 truncate">
-                {participant.name} • {paymentHistory.length} payment
-                {paymentHistory.length !== 1 ? "s" : ""}
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 50,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '8px',
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        backdropFilter: 'blur(4px)',
+      }}
+    >
+      <div
+        style={{
+          width: '100%',
+          maxWidth: 'min(95vw, 560px)',
+          maxHeight: 'calc(100dvh - 24px)',
+          backgroundColor: 'white',
+          borderRadius: '16px',
+          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
+        }}
+      >
+        {/* Header */}
+        <div style={{ padding: '16px', borderBottom: '1px solid #e2e8f0', background: 'linear-gradient(to right, #f8fafc, white)', flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+            <div style={{ minWidth: 0, paddingRight: '8px' }}>
+              <h2 style={{ fontSize: '16px', fontWeight: 700, color: '#1e293b', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Payment History</h2>
+              <p style={{ color: '#64748b', fontSize: '12px', marginTop: '4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {participant.name} • {paymentHistory.length} payment{paymentHistory.length !== 1 ? "s" : ""}
               </p>
             </div>
-            <button
-              onClick={onClose}
-              className="p-1.5 sm:p-2 hover:bg-slate-100 rounded-lg sm:rounded-xl transition-colors cursor-pointer active:scale-95 flex-shrink-0"
-            >
-              <X size={18} className="text-slate-400" />
+            <button onClick={onClose} style={{ padding: '6px', background: 'transparent', border: 'none', borderRadius: '8px', cursor: 'pointer', flexShrink: 0 }}>
+              <X size={18} style={{ color: '#94a3b8' }} />
             </button>
           </div>
 
           {/* Summary Cards */}
-          <div className="grid grid-cols-2 gap-2 sm:gap-3 mb-3 sm:mb-4">
-            <div className="p-2.5 sm:p-3 bg-emerald-50 rounded-lg sm:rounded-xl border border-emerald-100">
-              <p className="text-xs text-emerald-600 font-medium mb-0.5 sm:mb-1">
-                Total Paid
-              </p>
-              <p className="text-base sm:text-lg font-bold text-emerald-700 truncate">
-                ₹{totalPaid.toLocaleString("en-IN")}
-              </p>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+            <div style={{ padding: '10px', backgroundColor: '#ecfdf5', borderRadius: '10px', border: '1px solid #d1fae5' }}>
+              <p style={{ fontSize: '11px', color: '#059669', fontWeight: 500, marginBottom: '2px' }}>Total Paid</p>
+              <p style={{ fontSize: '16px', fontWeight: 700, color: '#047857', margin: 0 }}>₹{totalPaid.toLocaleString("en-IN")}</p>
             </div>
-            <div className="p-2.5 sm:p-3 bg-amber-50 rounded-lg sm:rounded-xl border border-amber-100">
-              <p className="text-xs text-amber-600 font-medium mb-0.5 sm:mb-1">
-                Pending
-              </p>
-              <p className="text-base sm:text-lg font-bold text-amber-700 truncate">
-                ₹{pendingAmount.toLocaleString("en-IN")}
-              </p>
+            <div style={{ padding: '10px', backgroundColor: '#fffbeb', borderRadius: '10px', border: '1px solid #fde68a' }}>
+              <p style={{ fontSize: '11px', color: '#d97706', fontWeight: 500, marginBottom: '2px' }}>Pending</p>
+              <p style={{ fontSize: '16px', fontWeight: 700, color: '#b45309', margin: 0 }}>₹{pendingAmount.toLocaleString("en-IN")}</p>
             </div>
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 sm:p-5 md:p-6">
+        {/* Scrollable Content */}
+        <div style={{ flex: 1, overflow: 'auto', padding: '16px' }}>
           {paymentHistory && paymentHistory.length > 0 ? (
-            <div className="space-y-3 sm:space-y-4">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               {paymentHistory.map((payment, index) => {
                 const paymentProofImage = getPaymentProofImage(payment);
-                const paymentDate = new Date(
-                  payment.createdAt
-                ).toLocaleDateString("en-IN", {
-                  day: "numeric",
-                  month: "short",
-                  year: "numeric",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                });
+                const paymentDate = new Date(payment.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
 
                 return (
                   <div
                     key={payment.id || index}
-                    className="bg-gradient-to-r from-slate-50 to-white p-3 sm:p-4 md:p-5 rounded-lg sm:rounded-xl md:rounded-2xl border border-slate-200 hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 group"
+                    style={{ background: 'linear-gradient(to right, #f8fafc, white)', padding: '12px', borderRadius: '12px', border: '1px solid #e2e8f0' }}
                   >
-                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 sm:gap-0 mb-2 sm:mb-3">
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2 mb-1 sm:mb-2">
-                          <div
-                            className={`w-2 h-2 sm:w-3 sm:h-3 rounded-full ${
-                              payment.isVerified
-                                ? "bg-emerald-500"
-                                : "bg-amber-500"
-                            } flex-shrink-0`}
-                          ></div>
-                          <p className="font-bold text-slate-800 text-sm sm:text-base truncate">
-                            {payment.Payment_Cycle}
-                          </p>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+                          <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: payment.isVerified ? '#10b981' : '#f59e0b', flexShrink: 0 }} />
+                          <p style={{ fontWeight: 700, color: '#1e293b', fontSize: '13px', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{payment.Payment_Cycle}</p>
                         </div>
-                        <div className="space-y-1 ml-4 sm:ml-5">
-                          <p className="text-xs text-slate-600">
-                            <Clock size={10} className="inline mr-1 sm:mr-2" />
-                            Submitted: {paymentDate}
-                          </p>
-                          {payment.due_date && (
-                            <p className="text-xs text-slate-500">
-                              <CalendarDays
-                                size={10}
-                                className="inline mr-1 sm:mr-2"
-                              />
-                              Due:{" "}
-                              {new Date(payment.due_date).toLocaleDateString(
-                                "en-IN"
-                              )}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                      <div className="sm:text-right">
-                        <p className="text-xl sm:text-2xl font-bold text-slate-800">
-                          ₹{Number(payment.Amount).toLocaleString("en-IN")}
+                        <p style={{ fontSize: '11px', color: '#64748b', marginLeft: '14px' }}>
+                          <Clock size={10} style={{ display: 'inline', marginRight: '4px' }} />{paymentDate}
                         </p>
-                        <div
-                          className={`inline-flex items-center gap-1 sm:gap-1.5 mt-1 sm:mt-2 px-2 py-1 sm:px-3 sm:py-1.5 rounded-full text-xs font-semibold ${
-                            payment.isVerified
-                              ? "bg-emerald-100 text-emerald-700"
-                              : "bg-amber-100 text-amber-700"
-                          }`}
-                        >
-                          {payment.isVerified ? (
-                            <>
-                              <CheckCircle
-                                size={10}
-                                className="sm:w-3 sm:h-3"
-                              />
-                              Verified
-                            </>
-                          ) : (
-                            <>
-                              <Clock size={10} className="sm:w-3 sm:h-3" />
-                              Pending
-                            </>
-                          )}
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <p style={{ fontSize: '18px', fontWeight: 700, color: '#1e293b', margin: 0 }}>₹{Number(payment.Amount).toLocaleString("en-IN")}</p>
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', marginTop: '4px', padding: '3px 8px', borderRadius: '9999px', fontSize: '10px', fontWeight: 600, backgroundColor: payment.isVerified ? '#d1fae5' : '#fef3c7', color: payment.isVerified ? '#047857' : '#b45309' }}>
+                          {payment.isVerified ? <><CheckCircle size={10} /> Verified</> : <><Clock size={10} /> Pending</>}
                         </div>
                       </div>
                     </div>
 
                     {paymentProofImage && (
-                      <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-slate-200">
-                        <div className="flex items-center justify-between">
-                          <p className="text-xs sm:text-sm text-slate-700 font-medium flex items-center gap-1 sm:gap-2">
-                            <FileText size={12} className="flex-shrink-0" />
-                            <span>Payment Proof</span>
-                          </p>
-                          <button
-                            onClick={() => {
-                              if (paymentProofImage) {
-                                handleViewProof(
-                                  paymentProofImage,
-                                  payment.Payment_Cycle
-                                );
-                              }
-                            }}
-                            className="text-xs sm:text-sm text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-1 sm:gap-2 cursor-pointer group/btn"
-                          >
-                            <Eye size={12} className="flex-shrink-0" />
-                            <span>View Proof</span>
-                            <ArrowRight
-                              size={12}
-                              className="group-hover/btn:translate-x-0.5 sm:group-hover/btn:translate-x-1 transition-transform flex-shrink-0"
-                            />
-                          </button>
-                        </div>
+                      <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <p style={{ fontSize: '11px', color: '#374151', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '4px', margin: 0 }}>
+                          <FileText size={10} /> Payment Proof
+                        </p>
+                        <button
+                          onClick={() => { if (paymentProofImage) handleViewProof(paymentProofImage, payment.Payment_Cycle); }}
+                          style={{ fontSize: '11px', color: '#4f46e5', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '4px', background: 'transparent', border: 'none', cursor: 'pointer', padding: 0 }}
+                        >
+                          <Eye size={10} /> View <ArrowRight size={10} />
+                        </button>
                       </div>
                     )}
                   </div>
@@ -1530,19 +1402,15 @@ const PaymentHistoryModal = ({
               })}
             </div>
           ) : (
-            <div className="text-center py-6 sm:py-8 md:py-10">
-              <div className="w-16 h-16 sm:w-20 sm:h-20 mx-auto bg-gradient-to-br from-slate-100 to-slate-200 rounded-xl sm:rounded-2xl flex items-center justify-center mb-3 sm:mb-4">
-                <Receipt size={24} className="text-slate-300 sm:w-8 sm:h-8" />
+            <div style={{ textAlign: 'center', padding: '32px 16px' }}>
+              <div style={{ width: '60px', height: '60px', margin: '0 auto 16px', background: 'linear-gradient(to bottom right, #f1f5f9, #e2e8f0)', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Receipt size={24} style={{ color: '#cbd5e1' }} />
               </div>
-              <h3 className="text-base sm:text-lg md:text-lg font-bold text-slate-800 mb-1 sm:mb-2">
-                No Payment History
-              </h3>
-              <p className="text-slate-500 mb-4 sm:mb-6 text-sm">
-                This participant hasn't made any payments yet.
-              </p>
+              <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#1e293b', marginBottom: '8px' }}>No Payment History</h3>
+              <p style={{ color: '#64748b', fontSize: '13px', marginBottom: '16px' }}>No payments made yet.</p>
               <button
                 onClick={onClose}
-                className="px-4 py-2 sm:px-6 sm:py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg sm:rounded-xl font-medium hover:shadow-lg transition-all cursor-pointer text-sm sm:text-base"
+                style={{ padding: '10px 20px', background: 'linear-gradient(to right, #4f46e5, #7c3aed)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 500, cursor: 'pointer', fontSize: '13px' }}
               >
                 Close
               </button>
@@ -1579,7 +1447,6 @@ const ParticipantCard = ({ participant, index, onImageClick }) => {
     statusConfig[participant.paymentStatus]?.icon || AlertCircle;
 
   const winnerCycleLabel = getWinnerCycleLabel(participant);
-
 
   return (
     <div
@@ -1717,62 +1584,59 @@ export default function ParticipantDetailsPage() {
         const res = await api.get(`/public/lucky-draw-names/${documentId}`);
         const data = res.data;
 
-        
-
         const participantPayments = data?.participant_payments || [];
         const participantsList = data?.lucky_draw_forms || [];
 
         // 🔥 FLATTEN WINNERS FROM PARTICIPANTS (IMPORTANT)
-const allWinners = participantsList.flatMap(
-  (p) => p.lucky_draw_winners || []
-);
-
+        const allWinners = participantsList.flatMap(
+          (p) => p.lucky_draw_winners || []
+        );
 
         // ✅ SET UPI ID FROM BACKEND
         setUpiId(data?.Upi_Id || "");
 
-       const mappedParticipants = participantsList.map((item) => {
-  const photo =
-    item.Photo?.formats?.small?.url ||
-    item.Photo?.formats?.thumbnail?.url ||
-    item.Photo?.url ||
-    null;
+        const mappedParticipants = participantsList.map((item) => {
+          const photo =
+            item.Photo?.formats?.small?.url ||
+            item.Photo?.formats?.thumbnail?.url ||
+            item.Photo?.url ||
+            null;
 
-  const userPayments = participantPayments.filter(
-    (payment) =>
-      String(payment.lucky_draw_form?.documentId) ===
-      String(item.documentId)
-  );
+          const userPayments = participantPayments.filter(
+            (payment) =>
+              String(payment.lucky_draw_form?.documentId) ===
+              String(item.documentId)
+          );
 
-  const hasVerified = userPayments.some((p) => p.isVerified);
-  const hasPending = userPayments.some((p) => !p.isVerified);
+          const hasVerified = userPayments.some((p) => p.isVerified);
+          const hasPending = userPayments.some((p) => !p.isVerified);
 
-  let paymentStatus = "pending";
-  if (hasVerified) paymentStatus = "paid";
-  else if (hasPending) paymentStatus = "pending_verification";
+          let paymentStatus = "pending";
+          if (hasVerified) paymentStatus = "paid";
+          else if (hasPending) paymentStatus = "pending_verification";
 
-  // ✅ CORRECT WINNER SOURCE
-  const winnerInfo = (item.lucky_draw_winners || [])[0] || null;
+          // ✅ CORRECT WINNER SOURCE
+          const winnerInfo = (item.lucky_draw_winners || [])[0] || null;
 
-  return {
-    id: item.id,
-    documentId: item.documentId,
-    isVerified: item.isVerified,
-    name: item.Name,
-    email: item.Email,
-    phone: item.Phone_Number,
+          return {
+            id: item.id,
+            documentId: item.documentId,
+            isVerified: item.isVerified,
+            name: item.Name,
+            email: item.Email,
+            phone: item.Phone_Number,
 
-    // 🏆 WINNER FLAGS (FIXED)
-    isWinner: !!winnerInfo,
-    winnerCycleNumber: winnerInfo?.Cycle_Number ?? null,
-    winnerCycleUnit: winnerInfo?.Cycle_Unit ?? null,
+            // 🏆 WINNER FLAGS (FIXED)
+            isWinner: !!winnerInfo,
+            winnerCycleNumber: winnerInfo?.Cycle_Number ?? null,
+            winnerCycleUnit: winnerInfo?.Cycle_Unit ?? null,
 
-    paymentStatus,
-    joinedDate: new Date(item.createdAt).toLocaleDateString(),
-    photoUrl: photo ? `${API_BASE_URL}${photo}` : null,
-    paymentHistory: [...userPayments],
-  };
-});
+            paymentStatus,
+            joinedDate: new Date(item.createdAt).toLocaleDateString(),
+            photoUrl: photo ? `${API_BASE_URL}${photo}` : null,
+            paymentHistory: [...userPayments],
+          };
+        });
 
         // 🔥 FORCE UI UPDATE
         setParticipants([...mappedParticipants]);

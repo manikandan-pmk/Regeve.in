@@ -77,6 +77,23 @@ axiosWithAuth.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
+const getCycleLabel = (payment, durationUnit) => {
+  if (!payment) return "N/A";
+
+  const unit = payment.Cycle_Unit || 
+                payment.lucky_draw_name?.Duration_Unit || 
+                durationUnit || 
+                "Cycle";
+
+  const number = payment.Cycle_Number || 
+                 payment.Payment_Cycle || 
+                 payment.cycle_number;
+
+  if (!number) return unit || "N/A";
+
+  return `${unit} ${number}`;
+};
+
 const LuckyDrawDashboard = () => {
   const { adminId, luckydrawDocumentId } = useParams();
   const navigate = useNavigate();
@@ -152,6 +169,20 @@ const LuckyDrawDashboard = () => {
       return match ? Number(match[0]) : null;
     }
     return null;
+  };
+
+  // Helper function to format payment cycle label
+  const getPaymentCycleLabel = (cycleNumber) => {
+    if (!cycleNumber || cycleNumber === "all") return "All Cycles";
+    
+    const durationUnit = luckyDrawData?.Duration_Unit || "Cycle";
+    
+    if (!isNaN(cycleNumber)) {
+      return `${durationUnit} ${cycleNumber}`;
+    }
+    
+    // If it's already formatted, return as is
+    return cycleNumber;
   };
 
   useEffect(() => {
@@ -1026,7 +1057,7 @@ const LuckyDrawDashboard = () => {
                           <div className="font-semibold text-gray-900 text-sm">
                             {selectedCycle === "all"
                               ? "All Payment Cycles"
-                              : `Cycle ${selectedCycle}`}
+                              : getPaymentCycleLabel(selectedCycle)}
                           </div>
                           <div className="text-xs text-gray-500">
                             {selectedCycle === "all"
@@ -1076,7 +1107,10 @@ const LuckyDrawDashboard = () => {
                                   : "text-gray-700"
                               }`}
                             >
-                              <div className="font-medium text-sm">{cycle}</div>
+                              <div className="font-medium text-sm">
+                                {getPaymentCycleLabel(cycle)}
+                              </div>
+
                               <div className="text-xs text-gray-500">
                                 {cycleStats.data[cycle]?.total || 0} payments
                               </div>
@@ -1205,7 +1239,7 @@ const LuckyDrawDashboard = () => {
                               </p>
                               <div className="flex flex-wrap items-center gap-2 mt-2">
                                 <span className="px-2.5 py-1 bg-blue-50 text-blue-700 text-xs font-medium rounded-full">
-                                  {payment.Payment_Cycle || "N/A"}
+                                  {getPaymentCycleLabel(payment.Payment_Cycle)}
                                 </span>
                                 <span className="text-gray-500 text-xs">
                                   Due: {formatDate(payment.due_date)}
