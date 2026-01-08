@@ -285,9 +285,6 @@ const RegistrationFormLuckydraw = () => {
     return response.data[0].id;
   };
 
-
-
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSubmitStatus({ type: "", message: "" });
@@ -301,8 +298,6 @@ const RegistrationFormLuckydraw = () => {
       }
       return;
     }
-
-   
 
     if (!adminId) {
       setSubmitStatus({
@@ -591,9 +586,10 @@ const RegistrationFormLuckydraw = () => {
                       className={`w-full px-4 py-3.5 pl-12 bg-gray-50/80 border-2 rounded-xl focus:outline-none transition-all duration-300 text-base ${
                         errors.Name
                           ? "border-red-500 focus:ring-2 focus:ring-red-200"
-                          : "border-gray-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
+                          : "border-gray-300 "
                       }`}
                       placeholder="John Doe"
+                      required
                     />
                     <User className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                   </div>
@@ -626,9 +622,10 @@ const RegistrationFormLuckydraw = () => {
                       className={`w-full px-4 py-3.5 pl-12 bg-gray-50/80 border-2 rounded-xl focus:outline-none transition-all duration-300 text-base ${
                         errors.Email
                           ? "border-red-500 focus:ring-2 focus:ring-red-200"
-                          : "border-gray-300 focus:border-pink-500 focus:ring-2 focus:ring-pink-200"
+                          : "border-gray-300 "
                       }`}
                       placeholder="john@example.com"
+                      required
                     />
                     <Mail className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                   </div>
@@ -668,9 +665,10 @@ const RegistrationFormLuckydraw = () => {
                       className={`w-full px-4 py-3.5 pl-12 bg-gray-50/80 border-2 rounded-xl focus:outline-none transition-all duration-300 text-base ${
                         errors.Phone_Number
                           ? "border-red-500 focus:ring-2 focus:ring-red-200"
-                          : "border-gray-300 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200"
+                          : "border-gray-300 "
                       }`}
-                      placeholder="9876543210"
+                      placeholder="Phone Number"
+                      required
                     />
                     <Phone className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                   </div>
@@ -699,10 +697,11 @@ const RegistrationFormLuckydraw = () => {
                       name="Gender"
                       value={formData.Gender}
                       onChange={handleChange}
+                      required
                       className={`w-full px-4 py-3.5 pl-12 bg-gray-50/80 border-2 rounded-xl focus:outline-none appearance-none transition-all duration-300 text-base ${
                         errors.Gender
                           ? "border-red-500 focus:ring-2 focus:ring-red-200"
-                          : "border-gray-300 focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
+                          : "border-gray-300"
                       }`}
                     >
                       <option value="" className="text-gray-400">
@@ -750,10 +749,11 @@ const RegistrationFormLuckydraw = () => {
                       min="18"
                       max="100"
                       step="1"
+                      required
                       className={`w-full px-4 py-3.5 pl-12 bg-gray-50/80 border-2 rounded-xl focus:outline-none transition-all duration-300 text-base ${
                         errors.Age
                           ? "border-red-500 focus:ring-2 focus:ring-red-200"
-                          : "border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                          : "border-gray-300 "
                       }`}
                       placeholder="Enter your age"
                     />
@@ -800,6 +800,7 @@ const RegistrationFormLuckydraw = () => {
 
                 <input
                   type="file"
+                  required
                   ref={profileFileInputRef}
                   onChange={(e) => handleFileChange("Photo", e)}
                   accept="image/*"
@@ -876,12 +877,6 @@ const RegistrationFormLuckydraw = () => {
                       Upload clear images of your Aadhaar Card or PAN Card (both
                       sides)
                     </p>
-                    <div className="flex items-center mt-2">
-                      <div className="w-2 h-2 rounded-full bg-green-500 mr-2 animate-pulse"></div>
-                      <p className="text-xs font-medium text-green-600">
-                        Required for verification
-                      </p>
-                    </div>
                   </div>
                 </div>
 

@@ -178,87 +178,55 @@ const MobileVerificationGate = ({ onVerify, documentId }) => {
   };
 
   return (
-    <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: 100,
-        background: 'linear-gradient(to bottom right, #f8fafc, #eff6ff, #eef2ff)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '16px',
-      }}
-    >
-      <div style={{ position: 'absolute', inset: 0, overflow: 'hidden' }}>
-        <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '50%', background: 'linear-gradient(to bottom, rgba(255,255,255,0.8), transparent)' }} />
-        <div style={{ position: 'absolute', top: '25%', right: '25%', width: '200px', height: '200px', backgroundColor: '#c7d2fe', borderRadius: '50%', filter: 'blur(60px)', opacity: 0.2 }} />
-        <div style={{ position: 'absolute', bottom: '25%', left: '25%', width: '200px', height: '200px', backgroundColor: '#ddd6fe', borderRadius: '50%', filter: 'blur(60px)', opacity: 0.2 }} />
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/30">
+      <div className="absolute inset-0 overflow-hidden">
+        <div className="absolute top-0 left-0 w-full h-1/2 bg-gradient-to-b from-white/80 to-transparent" />
+        <div className="absolute top-1/4 right-1/4 w-48 h-48 bg-indigo-200 rounded-full blur-[60px] opacity-20" />
+        <div className="absolute bottom-1/4 left-1/4 w-48 h-48 bg-purple-200 rounded-full blur-[60px] opacity-20" />
       </div>
 
       {step === 1 ? (
-        <div
-          style={{
-            position: 'relative',
-            width: '100%',
-            maxWidth: 'min(95vw, 380px)',
-            maxHeight: 'calc(100dvh - 32px)',
-            backgroundColor: 'rgba(255,255,255,0.95)',
-            backdropFilter: 'blur(16px)',
-            border: '1px solid rgba(255,255,255,0.7)',
-            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.15)',
-            borderRadius: '20px',
-            padding: '24px',
-            textAlign: 'center',
-            overflow: 'auto',
-          }}
-        >
-          <div style={{ position: 'absolute', top: '-22px', left: '50%', transform: 'translateX(-50%)' }}>
-            <div style={{ width: '48px', height: '48px', background: 'linear-gradient(to bottom right, #6366f1, #7c3aed)', borderRadius: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 8px 16px -4px rgba(99, 102, 241, 0.4)', border: '4px solid white', transform: 'rotate(3deg)' }}>
-              <Smartphone style={{ color: 'white', width: '22px', height: '22px' }} />
+        <div className="relative w-full max-w-[95vw] sm:max-w-md max-h-[calc(100dvh-2rem)] bg-white/95 backdrop-blur-md border border-white/70 shadow-2xl rounded-2xl p-6 text-center overflow-auto">
+          <div className="absolute -top-1 left-1/2 -translate-x-1/2">
+            <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg border-4 border-white rotate-3">
+              <Smartphone className="text-white w-5 h-5" />
             </div>
           </div>
 
-          <div style={{ marginTop: '16px', marginBottom: '20px' }}>
-            <h2 style={{ fontSize: '22px', fontWeight: 700, marginBottom: '8px', background: 'linear-gradient(to right, #4f46e5, #7c3aed)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+          <div className="mt-4 mb-5">
+            <h2 className="text-2xl font-bold mb-2 bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
               Participant Portal
             </h2>
-            <p style={{ color: '#475569', marginBottom: '12px', fontSize: '13px', fontWeight: 500, padding: '0 8px' }}>
-              Enter your registered mobile number to access the participant dashboard
+            <p className="text-slate-600 mb-3 text-sm font-medium px-2">
+              Enter your registered mobile number to access the participant
+              dashboard
             </p>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '6px 12px', backgroundColor: '#eef2ff', borderRadius: '9999px' }}>
-              <Shield size={12} style={{ color: '#6366f1' }} />
-              <span style={{ fontSize: '11px', color: '#4f46e5', fontWeight: 500 }}>Secure Verification</span>
+            <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 rounded-full">
+              <Shield size={12} className="text-indigo-500" />
+              <span className="text-xs text-indigo-700 font-medium">
+                Secure Verification
+              </span>
             </div>
           </div>
 
-          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <div style={{ position: 'relative' }}>
-              <div style={{ position: 'absolute', insetInlineStart: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>
-                <Phone style={{ width: '18px', height: '18px', color: '#94a3b8' }} />
+          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+            <div className="relative">
+              <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                <Phone className="w-4 h-4 text-slate-400" />
               </div>
               <input
                 type="tel"
                 value={phoneNumber}
-                onChange={(e) => { setPhoneNumber(e.target.value.replace(/\D/g, "")); setError(""); }}
-                maxLength={10}
-                style={{
-                  width: '100%',
-                  paddingLeft: '42px',
-                  paddingRight: '16px',
-                  paddingTop: '14px',
-                  paddingBottom: '14px',
-                  backgroundColor: error ? '#fef2f2' : 'white',
-                  border: `2px solid ${error ? '#fca5a5' : '#e2e8f0'}`,
-                  borderRadius: '12px',
-                  outline: 'none',
-                  fontWeight: 700,
-                  fontSize: '16px',
-                  letterSpacing: '0.05em',
-                  textAlign: 'center',
-                  color: error ? '#dc2626' : '#1e293b',
-                  boxSizing: 'border-box',
+                onChange={(e) => {
+                  setPhoneNumber(e.target.value.replace(/\D/g, ""));
+                  setError("");
                 }}
+                maxLength={10}
+                className={`w-full pl-10 pr-4 py-3.5 ${
+                  error
+                    ? "bg-red-50 border-red-300 text-red-600"
+                    : "bg-white border-slate-200 text-slate-800"
+                } border-2 rounded-xl outline-none font-bold text-base tracking-wide text-center placeholder-slate-400 disabled:opacity-50`}
                 placeholder="Enter 10-digit number"
                 autoFocus
                 disabled={isLoading}
@@ -266,79 +234,71 @@ const MobileVerificationGate = ({ onVerify, documentId }) => {
             </div>
 
             {error && (
-              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '10px 14px', backgroundColor: '#fef2f2', borderRadius: '10px', border: '1px solid #fecaca' }}>
-                <AlertCircle size={14} style={{ color: '#ef4444', flexShrink: 0 }} />
-                <p style={{ color: '#dc2626', fontSize: '12px', fontWeight: 500, textAlign: 'left', margin: 0 }}>{error}</p>
+              <div className="flex items-center gap-2 p-2.5 bg-red-50 rounded-lg border border-red-200">
+                <AlertCircle size={14} className="text-red-500 flex-shrink-0" />
+                <p className="text-red-600 text-xs font-medium text-left m-0">
+                  {error}
+                </p>
               </div>
             )}
 
             <button
               type="submit"
               disabled={isLoading}
-              style={{
-                width: '100%',
-                padding: '14px',
-                background: 'linear-gradient(to right, #4f46e5, #7c3aed)',
-                color: 'white',
-                border: 'none',
-                borderRadius: '12px',
-                fontWeight: 700,
-                fontSize: '15px',
-                boxShadow: '0 10px 15px -3px rgba(79, 70, 229, 0.3)',
-                cursor: isLoading ? 'not-allowed' : 'pointer',
-                opacity: isLoading ? 0.7 : 1,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px',
-              }}
+              className="w-full cursor-pointer py-3.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white border-none rounded-xl font-bold text-sm shadow-lg hover:shadow-xl transition-all duration-300 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
-              {isLoading ? <><Loader2 size={18} className="animate-spin" /> Verifying...</> : <>Access Dashboard <ArrowRight size={18} /></>}
+              {isLoading ? (
+                <>
+                  <Loader2 size={18} className="animate-spin" />
+                  Verifying...
+                </>
+              ) : (
+                <>
+                  Access Dashboard
+                  <ArrowRight size={18} />
+                </>
+              )}
             </button>
           </form>
 
-          <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid #f1f5f9' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontSize: '11px', color: '#94a3b8' }}>
+          <div className="mt-5 pt-4 border-t border-slate-100">
+            <div className="flex items-center justify-center gap-1.5 text-xs text-slate-400">
               <Lock size={10} />
-              <span style={{ fontWeight: 500 }}>End-to-end encrypted</span>
+              <span className="font-medium">End-to-end encrypted</span>
             </div>
           </div>
         </div>
       ) : (
-        <div
-          style={{
-            position: 'relative',
-            width: '100%',
-            maxWidth: 'min(95vw, 380px)',
-            backgroundColor: 'rgba(255,255,255,0.95)',
-            backdropFilter: 'blur(16px)',
-            border: '1px solid rgba(255,255,255,0.7)',
-            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.15)',
-            borderRadius: '20px',
-            padding: '24px',
-            textAlign: 'center',
-          }}
-        >
-          <div style={{ marginBottom: '24px' }}>
-            <div style={{ width: '64px', height: '64px', background: 'linear-gradient(to bottom right, #34d399, #22c55e)', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
-              <CheckCircle2 style={{ color: 'white', width: '32px', height: '32px' }} />
+        <div className="relative w-full max-w-[95vw] sm:max-w-md bg-white/95 backdrop-blur-md border border-white/70 shadow-2xl rounded-2xl p-6 text-center">
+          <div className="mb-6">
+            <div className="w-16 h-16 bg-gradient-to-br from-emerald-400 to-emerald-500 rounded-2xl flex items-center justify-center mx-auto mb-5">
+              <CheckCircle2 className="text-white w-8 h-8" />
             </div>
-            <h2 style={{ fontSize: '20px', fontWeight: 700, color: '#1e293b', marginBottom: '8px' }}>Verification Successful!</h2>
-            <p style={{ color: '#64748b', fontSize: '14px' }}>Welcome back, <span style={{ fontWeight: 700, color: '#4f46e5' }}>{phoneNumber}</span></p>
+            <h2 className="text-xl font-bold text-slate-800 mb-2">
+              Verification Successful!
+            </h2>
+            <p className="text-slate-600 text-sm">
+              Welcome back,{" "}
+              <span className="font-bold text-indigo-600">{phoneNumber}</span>
+            </p>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-            <div style={{ width: '8px', height: '8px', backgroundColor: '#34d399', borderRadius: '50%' }} className="animate-pulse" />
-            <div style={{ width: '8px', height: '8px', backgroundColor: '#34d399', borderRadius: '50%' }} className="animate-pulse" />
-            <div style={{ width: '8px', height: '8px', backgroundColor: '#34d399', borderRadius: '50%' }} className="animate-pulse" />
-            <span style={{ fontSize: '12px', color: '#64748b', marginLeft: '8px' }}>Redirecting...</span>
+          <div className="flex items-center justify-center gap-2">
+            <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
+            <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
+            <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
+            <span className="text-xs text-slate-500 ml-2">Redirecting...</span>
           </div>
         </div>
       )}
 
       <style>{`
         @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
-        .animate-shake { animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both; }
+        ${
+          shaking
+            ? ".animate-shake { animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both; }"
+            : ""
+        }
       `}</style>
     </div>
   );
@@ -352,7 +312,7 @@ const SmoothImage = ({ src, alt, className }) => {
     <div className={`relative overflow-hidden ${className}`}>
       {!isLoaded && (
         <div className="absolute inset-0 bg-gradient-to-br from-slate-100 to-slate-200 animate-pulse flex items-center justify-center">
-          <User className="text-slate-300" size={20} />
+          <User className="text-slate-300 w-5 h-5" />
         </div>
       )}
       <img
@@ -405,7 +365,7 @@ const StatsCards = ({ participants, luckyDrawAmount, paymentStats }) => {
       {stats.map((stat, index) => (
         <div
           key={stat.label}
-          className="bg-white rounded-xl md:rounded-2xl p-4 md:p-5 border border-slate-200 shadow-sm hover:shadow-lg hover:-translate-y-0.5 md:hover:-translate-y-1 transition-all duration-300 group"
+          className="bg-white rounded-xl md:rounded-2xl p-4 md:p-5 border border-slate-200 shadow-sm hover:shadow-lg hover:-translate-y-0.5 md:hover:-translate-y-1 transition-all duration-300 group animate-in fade-in"
           style={{ animationDelay: `${index * 100}ms` }}
         >
           <div className="flex items-start justify-between">
@@ -547,86 +507,65 @@ const QRCodeModal = ({
   };
 
   return (
-    <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: 50,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '8px',
-        backgroundColor: 'rgba(0, 0, 0, 0.6)',
-        backdropFilter: 'blur(4px)',
-      }}
-    >
-      <div
-        style={{
-          position: 'relative',
-          width: '100%',
-          maxWidth: 'min(95vw, 400px)',
-          maxHeight: 'calc(100dvh - 32px)',
-          backgroundColor: 'white',
-          borderRadius: '16px',
-          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-          overflow: 'hidden',
-          display: 'flex',
-          flexDirection: 'column',
-        }}
-      >
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 bg-black/60 backdrop-blur-sm">
+      <div className="relative w-full max-w-[95vw] sm:max-w-md max-h-[calc(100dvh-1rem)] bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col">
         {/* Top Gradient Bar */}
-        <div style={{ height: '4px', background: 'linear-gradient(to right, #6366f1, #a855f7, #ec4899)', flexShrink: 0 }} />
+        <div className="h-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 flex-shrink-0" />
 
-        <div style={{ padding: '16px', overflow: 'auto', flex: 1 }}>
+        <div className="p-4 overflow-auto flex-1">
           {/* Compact Header */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-            <div style={{ minWidth: 0 }}>
-              <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', margin: 0 }}>
+          <div className="flex items-center justify-between mb-3">
+            <div className="min-w-0">
+              <h2 className="text-lg font-bold text-slate-800 truncate">
                 Pay ₹{amount.toLocaleString("en-IN")}
               </h2>
-              <p style={{ color: '#64748b', fontSize: '12px', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <p className="text-slate-500 text-xs mt-0.5 truncate">
                 Scan QR or use UPI ID below
               </p>
             </div>
             <button
               onClick={onClose}
-              style={{ padding: '6px', background: 'transparent', border: 'none', borderRadius: '8px', cursor: 'pointer', flexShrink: 0 }}
+              className="p-1.5 bg-transparent border-none rounded-lg cursor-pointer flex-shrink-0 hover:bg-slate-100 transition-colors"
             >
-              <X size={18} style={{ color: '#94a3b8' }} />
+              <X size={18} className="text-slate-400" />
             </button>
           </div>
 
           {/* QR Code Section */}
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: '12px' }}>
-            <div style={{ position: 'relative', marginBottom: '8px' }}>
-              <div style={{ width: 'min(180px, 45vw)', height: 'min(180px, 45vw)', backgroundColor: 'white', borderRadius: '8px', padding: '8px', border: '2px solid #f1f5f9' }}>
+          <div className="flex flex-col items-center mb-3">
+            <div className="relative mb-2">
+              <div className="w-[180px] h-[180px] max-w-[45vw] max-h-[45vw] bg-white rounded-lg p-2 border-2 border-slate-100">
                 {qrImageUrl ? (
-                  <img src={qrImageUrl} alt="QR Code" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                  <img
+                    src={qrImageUrl}
+                    alt="QR Code"
+                    className="w-full h-full object-contain"
+                  />
                 ) : (
-                  <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(to bottom right, #f8fafc, #f1f5f9)', borderRadius: '4px' }}>
-                    <QrCode size={48} style={{ color: '#cbd5e1' }} />
+                  <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 rounded">
+                    <QrCode size={48} className="text-slate-300" />
                   </div>
                 )}
               </div>
-              <div style={{ position: 'absolute', top: '-4px', right: '-4px', width: '20px', height: '20px', backgroundColor: '#6366f1', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}>
-                <CheckCircle size={10} style={{ color: 'white' }} />
+              <div className="absolute -top-1 -right-1 w-5 h-5 bg-indigo-500 rounded-full flex items-center justify-center shadow-md">
+                <CheckCircle size={10} className="text-white" />
               </div>
             </div>
 
             {/* Amount Display */}
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '8px 12px', background: 'linear-gradient(to right, #ecfdf5, #f0fdf4)', borderRadius: '8px', border: '1px solid #d1fae5', marginBottom: '8px' }}>
-              <IndianRupee size={14} style={{ color: '#059669' }} />
-              <p style={{ fontSize: '20px', fontWeight: 700, color: '#047857', margin: 0 }}>
+            <div className="inline-flex items-center gap-2 p-2 bg-gradient-to-r from-emerald-50 to-green-50 rounded-lg border border-emerald-200 mb-2">
+              <IndianRupee size={14} className="text-emerald-600" />
+              <p className="text-md font-bold text-emerald-700 m-0">
                 {amount.toLocaleString("en-IN")}
               </p>
             </div>
 
             {upiId && (
-              <div style={{ textAlign: 'center' }}>
-                <p style={{ fontSize: '11px', color: '#64748b', marginBottom: '4px' }}>UPI ID</p>
+              <div className="text-center">
+                <p className="text-xs text-slate-500 mb-1">UPI ID</p>
                 <button
                   onClick={handleCopyUPI}
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '8px 12px', backgroundColor: '#f1f5f9', border: 'none', borderRadius: '8px', fontWeight: 600, fontSize: '13px', color: '#1e293b', cursor: 'pointer' }}
+                  className="inline-flex items-center gap-2 px-3 py-2 bg-slate-50 border-none rounded-lg font-semibold text-sm text-slate-800 cursor-pointer hover:bg-slate-100 transition-colors"
                 >
                   <CreditCard size={14} />
                   {upiId}
@@ -636,26 +575,37 @@ const QRCodeModal = ({
           </div>
 
           {/* Action Buttons */}
-          <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+          <div className="flex gap-2 mb-3">
             <button
               onClick={handleDownloadQR}
               disabled={downloading || !qrImageUrl}
-              style={{ flex: 1, padding: '12px', background: 'linear-gradient(to right, #1e293b, #0f172a)', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', cursor: downloading || !qrImageUrl ? 'not-allowed' : 'pointer', opacity: downloading || !qrImageUrl ? 0.5 : 1, fontSize: '13px' }}
+              className="flex-1 py-3 bg-gradient-to-r from-slate-800 to-slate-900 text-white border-none rounded-lg font-semibold flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 text-sm hover:shadow-md transition-shadow"
             >
-              {downloading ? <><Loader2 size={16} className="animate-spin" /> Downloading...</> : <><Download size={16} /> Save QR</>}
+              {downloading ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" />
+                  Downloading...
+                </>
+              ) : (
+                <>
+                  <Download size={16} />
+                  Save QR
+                </>
+              )}
             </button>
             <button
               onClick={handleShare}
-              style={{ flex: 1, padding: '12px', background: 'linear-gradient(to right, #4f46e5, #7c3aed)', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px' }}
+              className="flex-1 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white border-none rounded-lg font-semibold flex items-center justify-center gap-2 cursor-pointer text-sm hover:shadow-md transition-shadow"
             >
-              <Share2 size={16} /> Share
+              <Share2 size={16} />
+              Share
             </button>
           </div>
 
           {/* Footer */}
-          <div style={{ paddingTop: '12px', borderTop: '1px solid #f1f5f9', textAlign: 'center' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontSize: '11px', color: '#64748b' }}>
-              <Shield size={10} style={{ color: '#94a3b8' }} />
+          <div className="pt-3 border-t border-slate-100 text-center">
+            <div className="flex items-center justify-center gap-1.5 text-xs text-slate-500">
+              <Shield size={10} className="text-slate-400" />
               <span>Secure payment • Instant confirmation</span>
             </div>
           </div>
@@ -921,106 +871,92 @@ const UploadScreenshotModal = ({
     <>
       {/* Main Modal */}
       <div
-        style={{
-          position: 'fixed',
-          inset: 0,
-          zIndex: 50,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '8px',
-          backgroundColor: 'rgba(0, 0, 0, 0.7)',
-          backdropFilter: 'blur(4px)',
-        }}
+        className="fixed inset-0 z-50 flex items-center justify-center p-2 bg-black/70 backdrop-blur-sm"
         onClick={handleBackdropClick}
       >
         <div
           ref={modalRef}
-          style={{
-            width: '100%',
-            maxWidth: 'min(95vw, 440px)',
-            maxHeight: 'calc(100dvh - 24px)',
-            backgroundColor: 'white',
-            borderRadius: '16px',
-            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-            overflow: 'hidden',
-            display: 'flex',
-            flexDirection: 'column',
-          }}
+          className="w-full max-w-[95vw] sm:max-w-md max-h-[calc(100dvh-0.5rem)] bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col"
         >
-          <div style={{ height: '4px', background: 'linear-gradient(to right, #3b82f6, #a855f7)', flexShrink: 0 }} />
+          <div className="h-1 bg-gradient-to-r from-blue-500 to-purple-500 flex-shrink-0" />
 
-          <div style={{ padding: '16px', overflow: 'auto', flex: 1 }}>
+          <div className="p-4 overflow-auto flex-1">
             {/* Header */}
-            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '12px' }}>
-              <div style={{ minWidth: 0, paddingRight: '8px' }}>
-                <h2 style={{ fontSize: '16px', fontWeight: 700, color: '#1e293b', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <div className="flex items-start justify-between mb-3">
+              <div className="min-w-0 pr-2">
+                <h2 className="text-base font-bold text-slate-800 truncate">
                   Submit Payment Proof
                 </h2>
-                <p style={{ color: '#64748b', fontSize: '11px', marginTop: '4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <p className="text-slate-500 text-xs mt-1 truncate">
                   Upload screenshot and fill details
                 </p>
               </div>
               <button
                 onClick={onClose}
                 disabled={uploading}
-                style={{ padding: '6px', background: 'transparent', border: 'none', borderRadius: '8px', cursor: uploading ? 'not-allowed' : 'pointer', opacity: uploading ? 0.5 : 1, flexShrink: 0 }}
+                className="p-1.5 bg-transparent border-none rounded-lg cursor-pointer flex-shrink-0 opacity-50 disabled:opacity-30 hover:bg-slate-100 transition-colors"
               >
-                <X size={18} style={{ color: '#94a3b8' }} />
+                <X size={18} className="text-slate-400" />
               </button>
             </div>
 
             {/* Payment Amount Input */}
-            <div style={{ marginBottom: '12px' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: 500, color: '#374151', marginBottom: '6px' }}>
-                <IndianRupee size={12} style={{ color: '#10b981' }} />
+            <div className="mb-3">
+              <label className="flex items-center gap-1.5 text-xs font-medium text-gray-700 mb-1.5">
+                <IndianRupee size={12} className="text-emerald-500" />
                 <span>Payment Amount (₹)</span>
               </label>
-              <div style={{ position: 'relative' }}>
+              <div className="relative">
                 <input
                   type="number"
                   value={paymentAmount}
                   onChange={(e) => setPaymentAmount(e.target.value)}
                   min="1"
-                  style={{ width: '100%', padding: '10px 40px 10px 12px', backgroundColor: '#f8fafc', border: '2px solid #e2e8f0', borderRadius: '8px', outline: 'none', fontSize: '14px', fontWeight: 700, color: '#1e293b', boxSizing: 'border-box' }}
+                  className="w-full pl-3 pr-10 py-2.5 bg-slate-50 border-2 border-slate-200 rounded-lg outline-none text-sm font-bold text-slate-800 placeholder-slate-400 disabled:opacity-50"
                   placeholder="Enter amount"
                   disabled={uploading}
                 />
-                <div style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>
-                  <span style={{ color: '#94a3b8', fontWeight: 500, fontSize: '12px' }}>INR</span>
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                  <span className="text-slate-400 font-medium text-xs">
+                    INR
+                  </span>
                 </div>
               </div>
             </div>
 
             {/* Payment Cycle Selection */}
-            <div style={{ marginBottom: '12px', position: 'relative' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: 500, color: '#374151', marginBottom: '6px' }}>
-                <CalendarDays size={12} style={{ color: '#3b82f6' }} />
+            <div className="mb-3 relative">
+              <label className="flex items-center gap-1.5 text-xs font-medium text-gray-700 mb-1.5">
+                <CalendarDays size={12} className="text-blue-500" />
                 <span>Payment Cycle</span>
               </label>
               <select
                 value={paymentCycle?.value || ""}
                 onChange={(e) => {
-                  const selected = paymentCycles.find((c) => c.value === e.target.value);
+                  const selected = paymentCycles.find(
+                    (c) => c.value === e.target.value
+                  );
                   setPaymentCycle(selected);
                 }}
-                style={{ width: '100%', padding: '10px 32px 10px 12px', backgroundColor: '#f8fafc', border: '2px solid #e2e8f0', borderRadius: '8px', outline: 'none', appearance: 'none', cursor: 'pointer', fontSize: '13px', color: '#1e293b', boxSizing: 'border-box' }}
+                className="w-full pl-3 pr-8 py-2.5 bg-slate-50 border-2 border-slate-200 rounded-lg outline-none appearance-none cursor-pointer text-sm text-slate-800 disabled:opacity-50"
                 disabled={uploading}
               >
                 <option value="">Select a payment cycle</option>
                 {paymentCycles.map((cycle) => (
-                  <option key={cycle.value} value={cycle.value}>{cycle.label}</option>
+                  <option key={cycle.value} value={cycle.value}>
+                    {cycle.label}
+                  </option>
                 ))}
               </select>
-              <div style={{ position: 'absolute', right: '12px', bottom: '12px', pointerEvents: 'none' }}>
-                <ChevronRight size={14} style={{ color: '#94a3b8', transform: 'rotate(90deg)' }} />
+              <div className="absolute right-3 bottom-3 pointer-events-none">
+                <ChevronRight size={14} className="text-slate-400 rotate-90" />
               </div>
             </div>
 
             {/* Upload Box */}
-            <div style={{ marginBottom: '12px' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: 500, color: '#374151', marginBottom: '6px' }}>
-                <Upload size={12} style={{ color: '#a855f7' }} />
+            <div className="mb-3">
+              <label className="flex items-center gap-1.5 text-xs font-medium text-gray-700 mb-1.5">
+                <Upload size={12} className="text-purple-500" />
                 <span>Payment Screenshot</span>
               </label>
               <div
@@ -1028,30 +964,48 @@ const UploadScreenshotModal = ({
                 onDrop={handleDrop}
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
-                style={{
-                  border: `2px dashed ${dragOver ? '#818cf8' : preview ? '#818cf8' : '#cbd5e1'}`,
-                  borderRadius: '12px',
-                  padding: '16px',
-                  textAlign: 'center',
-                  minHeight: '100px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: uploading ? 'not-allowed' : 'pointer',
-                  backgroundColor: dragOver || preview ? '#eef2ff' : 'transparent',
-                  opacity: uploading ? 0.6 : 1,
-                }}
+                className={`
+                  border-2 border-dashed rounded-xl p-4 text-center min-h-[100px]
+                  flex flex-col items-center justify-center cursor-pointer
+                  ${
+                    dragOver
+                      ? "border-indigo-400 bg-indigo-50"
+                      : preview
+                      ? "border-indigo-400 bg-indigo-50"
+                      : "border-slate-300"
+                  }
+                  ${
+                    uploading
+                      ? "cursor-not-allowed opacity-60"
+                      : "hover:border-indigo-400 hover:bg-indigo-50"
+                  }
+                  transition-all duration-200
+                `}
               >
-                <input ref={fileRef} type="file" hidden accept="image/*" onChange={handleFileChange} disabled={uploading} />
+                <input
+                  ref={fileRef}
+                  type="file"
+                  hidden
+                  accept="image/*"
+                  onChange={handleFileChange}
+                  disabled={uploading}
+                />
 
                 {preview ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                    <img src={preview} alt="Preview" style={{ maxHeight: '80px', borderRadius: '8px', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)', marginBottom: '8px' }} />
+                  <div className="flex flex-col items-center">
+                    <img
+                      src={preview}
+                      alt="Preview"
+                      className="max-h-20 rounded-lg shadow-md mb-2"
+                    />
                     {!uploading && (
                       <button
-                        onClick={(e) => { e.stopPropagation(); setFile(null); setPreview(null); }}
-                        style={{ padding: '6px 12px', backgroundColor: '#1e293b', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', fontSize: '12px' }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setFile(null);
+                          setPreview(null);
+                        }}
+                        className="px-3 py-1.5 bg-slate-900 text-white border-none rounded font-medium flex items-center gap-1 cursor-pointer text-xs hover:bg-slate-800 transition-colors"
                       >
                         <X size={12} /> Change
                       </button>
@@ -1059,13 +1013,24 @@ const UploadScreenshotModal = ({
                   </div>
                 ) : (
                   <>
-                    <div style={{ width: '40px', height: '40px', backgroundColor: dragOver ? '#c7d2fe' : '#f1f5f9', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '8px' }}>
-                      <Upload size={18} style={{ color: dragOver ? '#4f46e5' : '#94a3b8' }} />
+                    <div
+                      className={`w-10 h-10 rounded-full flex items-center justify-center mb-2 ${
+                        dragOver ? "bg-indigo-100" : "bg-slate-100"
+                      }`}
+                    >
+                      <Upload
+                        size={18}
+                        className={
+                          dragOver ? "text-indigo-500" : "text-slate-400"
+                        }
+                      />
                     </div>
-                    <p style={{ fontWeight: 500, color: '#374151', marginBottom: '4px', fontSize: '12px' }}>
-                      {dragOver ? "Drop image here" : "Click to upload or drag & drop"}
+                    <p className="font-medium text-gray-700 mb-1 text-xs">
+                      {dragOver
+                        ? "Drop image here"
+                        : "Click to upload or drag & drop"}
                     </p>
-                    <p style={{ fontSize: '11px', color: '#64748b' }}>PNG, JPG up to 5MB</p>
+                    <p className="text-xs text-slate-500">PNG, JPG up to 5MB</p>
                   </>
                 )}
               </div>
@@ -1075,24 +1040,19 @@ const UploadScreenshotModal = ({
             <button
               onClick={openConfirmPopup}
               disabled={!file || !paymentAmount || !paymentCycle || uploading}
-              style={{
-                width: '100%',
-                padding: '12px',
-                background: 'linear-gradient(to right, #4f46e5, #7c3aed)',
-                color: 'white',
-                border: 'none',
-                borderRadius: '10px',
-                fontWeight: 600,
-                cursor: !file || !paymentAmount || !paymentCycle || uploading ? 'not-allowed' : 'pointer',
-                opacity: !file || !paymentAmount || !paymentCycle || uploading ? 0.5 : 1,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px',
-                fontSize: '14px',
-              }}
+              className="w-full py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white border-none rounded-xl font-semibold cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 flex items-center justify-center gap-2 text-sm hover:shadow-md transition-all"
             >
-              {uploading ? <><Loader2 size={16} className="animate-spin" /> Processing...</> : <>Continue to Review <ArrowRight size={16} /></>}
+              {uploading ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" />
+                  Processing...
+                </>
+              ) : (
+                <>
+                  Continue to Review
+                  <ArrowRight size={16} />
+                </>
+              )}
             </button>
           </div>
         </div>
@@ -1101,90 +1061,92 @@ const UploadScreenshotModal = ({
       {/* Confirmation Modal */}
       {confirmOpen && (
         <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 60,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '8px',
-            backgroundColor: 'rgba(0, 0, 0, 0.7)',
-            backdropFilter: 'blur(4px)',
-          }}
-          onClick={(e) => e.target === e.currentTarget && !uploading && setConfirmOpen(false)}
+          className="fixed inset-0 z-60 flex items-center justify-center p-2 bg-black/70 backdrop-blur-sm"
+          onClick={(e) =>
+            e.target === e.currentTarget && !uploading && setConfirmOpen(false)
+          }
         >
-          <div
-            style={{
-              width: '100%',
-              maxWidth: 'min(95vw, 440px)',
-              maxHeight: 'calc(100dvh - 24px)',
-              backgroundColor: 'white',
-              borderRadius: '16px',
-              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-              overflow: 'hidden',
-              display: 'flex',
-              flexDirection: 'column',
-            }}
-          >
-            <div style={{ padding: '16px', overflow: 'auto', flex: 1 }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-                <h2 style={{ fontSize: '16px', fontWeight: 700, color: '#1e293b', margin: 0 }}>Confirm Payment Details</h2>
+          <div className="w-full max-w-[95vw] sm:max-w-md max-h-[calc(100dvh-0.5rem)] bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col">
+            <div className="p-4 overflow-auto flex-1">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-base font-bold text-slate-800">
+                  Confirm Payment Details
+                </h2>
                 <button
                   onClick={() => !uploading && setConfirmOpen(false)}
                   disabled={uploading}
-                  style={{ padding: '6px', background: 'transparent', border: 'none', borderRadius: '8px', cursor: uploading ? 'not-allowed' : 'pointer', opacity: uploading ? 0.5 : 1 }}
+                  className="p-1.5 bg-transparent border-none rounded-lg cursor-pointer opacity-50 disabled:opacity-30 hover:bg-slate-100 transition-colors"
                 >
-                  <X size={18} style={{ color: '#94a3b8' }} />
+                  <X size={18} className="text-slate-400" />
                 </button>
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '16px' }}>
-                <div style={{ padding: '12px', background: 'linear-gradient(to right, #f8fafc, white)', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-                  <p style={{ fontSize: '11px', color: '#64748b', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <div className="flex flex-col gap-2.5 mb-4">
+                <div className="p-3 bg-gradient-to-r from-slate-50 to-white rounded-xl border border-slate-200">
+                  <p className="text-xs text-slate-500 mb-1 flex items-center gap-1.5">
                     <IndianRupee size={10} /> Payment Amount
                   </p>
-                  <p style={{ fontWeight: 700, fontSize: '20px', color: '#1e293b', margin: 0 }}>₹{Number(paymentAmount).toLocaleString("en-IN")}</p>
+                  <p className="text-xl font-bold text-slate-800 m-0">
+                    ₹{Number(paymentAmount).toLocaleString("en-IN")}
+                  </p>
                 </div>
 
-                <div style={{ padding: '12px', background: 'linear-gradient(to right, #f8fafc, white)', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-                  <p style={{ fontSize: '11px', color: '#64748b', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <div className="p-3 bg-gradient-to-r from-slate-50 to-white rounded-xl border border-slate-200">
+                  <p className="text-xs text-slate-500 mb-1 flex items-center gap-1.5">
                     <CalendarDays size={10} /> Payment Cycle
                   </p>
-                  <p style={{ fontWeight: 600, fontSize: '14px', color: '#1e293b', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{paymentCycle?.label}</p>
+                  <p className="text-sm font-semibold text-slate-800 m-0 truncate">
+                    {paymentCycle?.label}
+                  </p>
                 </div>
 
                 {preview && (
-                  <div style={{ padding: '12px', background: 'linear-gradient(to right, #ecfdf5, white)', borderRadius: '12px', border: '1px solid #d1fae5', textAlign: 'center' }}>
-                    <p style={{ fontSize: '11px', color: '#059669', fontWeight: 600, marginBottom: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                  <div className="p-3 bg-gradient-to-r from-emerald-50 to-white rounded-xl border border-emerald-200 text-center">
+                    <p className="text-xs text-emerald-600 font-semibold mb-2 flex items-center justify-center gap-1.5">
                       <CheckCircle size={10} /> Screenshot Preview
                     </p>
-                    <img src={preview} alt="Payment proof" style={{ borderRadius: '8px', maxHeight: '70px', margin: '0 auto', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }} />
+                    <img
+                      src={preview}
+                      alt="Payment proof"
+                      className="rounded-lg max-h-[70px] mx-auto shadow-sm"
+                    />
                   </div>
                 )}
 
-                <div style={{ padding: '10px', background: 'linear-gradient(to right, #eff6ff, white)', borderRadius: '12px', border: '1px solid #bfdbfe' }}>
-                  <p style={{ fontSize: '11px', color: '#2563eb', fontWeight: 600, marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <div className="p-2.5 bg-gradient-to-r from-blue-50 to-white rounded-xl border border-blue-200">
+                  <p className="text-xs text-blue-600 font-semibold mb-1 flex items-center gap-1.5">
                     <AlertCircle size={10} /> Important Note
                   </p>
-                  <p style={{ fontSize: '11px', color: '#1d4ed8', margin: 0 }}>Your payment will be verified within 24 hours.</p>
+                  <p className="text-xs text-blue-700 m-0">
+                    Your payment will be verified within 24 hours.
+                  </p>
                 </div>
               </div>
 
-              <div style={{ display: 'flex', gap: '8px' }}>
+              <div className="flex gap-2">
                 <button
                   onClick={() => !uploading && setConfirmOpen(false)}
                   disabled={uploading}
-                  style={{ flex: 1, padding: '12px', backgroundColor: '#f1f5f9', color: '#475569', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: uploading ? 'not-allowed' : 'pointer', opacity: uploading ? 0.5 : 1, fontSize: '13px' }}
+                  className="flex-1 py-3 bg-slate-100 text-slate-600 border-none rounded-xl font-semibold cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 text-sm hover:bg-slate-200 transition-colors"
                 >
                   Back
                 </button>
                 <button
                   onClick={submitPayment}
                   disabled={uploading}
-                  style={{ flex: 1, padding: '12px', background: 'linear-gradient(to right, #4f46e5, #7c3aed)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: uploading ? 'not-allowed' : 'pointer', opacity: uploading ? 0.5 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontSize: '13px' }}
+                  className="flex-1 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white border-none rounded-xl font-semibold cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 flex items-center justify-center gap-1.5 text-sm hover:shadow-md transition-all"
                 >
-                  {uploading ? <><Loader2 size={16} className="animate-spin" /> Submitting...</> : <>Confirm <CheckCircle size={14} /></>}
+                  {uploading ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" />
+                      Submitting...
+                    </>
+                  ) : (
+                    <>
+                      Confirm
+                      <CheckCircle size={14} />
+                    </>
+                  )}
                 </button>
               </div>
             </div>
@@ -1222,60 +1184,70 @@ const ImagePreviewModal = ({ isOpen, onClose, imageUrl, name }) => {
     setZoom((prev) => Math.max(0.5, Math.min(3, prev + delta)));
   };
 
-  const resetView = () => { setZoom(1); setPosition({ x: 0, y: 0 }); };
+  const resetView = () => {
+    setZoom(1);
+    setPosition({ x: 0, y: 0 });
+  };
 
   return (
     <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: 100,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: 'rgba(0, 0, 0, 0.95)',
-        backdropFilter: 'blur(8px)',
-        padding: '8px',
-      }}
+      className="fixed inset-0 z-100 flex items-center justify-center p-2 bg-black/95 backdrop-blur-lg"
       onClick={onClose}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
       onWheel={handleWheel}
     >
-      <div style={{ position: 'absolute', top: '16px', right: '16px', display: 'flex', alignItems: 'center', gap: '8px', zIndex: 50 }}>
-        <button onClick={resetView} style={{ padding: '10px', backgroundColor: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '50%', cursor: 'pointer', color: 'white' }} title="Reset Zoom">
+      <div className="absolute top-4 right-4 flex items-center gap-2 z-50">
+        <button
+          onClick={resetView}
+          className="p-2.5 bg-white/10 border-none rounded-full cursor-pointer text-white hover:bg-white/20 transition-colors"
+          title="Reset Zoom"
+        >
           <RefreshCw size={18} />
         </button>
-        <button onClick={onClose} style={{ padding: '10px', backgroundColor: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '50%', cursor: 'pointer', color: 'white' }}>
+        <button
+          onClick={onClose}
+          className="p-2.5 bg-white/10 border-none rounded-full cursor-pointer text-white hover:bg-white/20 transition-colors"
+        >
           <X size={20} />
         </button>
       </div>
 
-      <div style={{ position: 'relative', width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '8px' }} onClick={(e) => e.stopPropagation()}>
-        <div style={{ position: 'relative', borderRadius: '12px', overflow: 'hidden', backgroundColor: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', maxWidth: '100%', maxHeight: 'calc(100dvh - 100px)' }}>
+      <div
+        className="relative w-full h-full flex items-center justify-center p-2"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="relative rounded-xl overflow-hidden bg-black/30 border border-white/10 max-w-full max-h-[calc(100dvh-6rem)]">
           <img
             src={imageUrl}
             alt={name}
+            className="w-full h-auto max-h-[calc(100dvh-7.5rem)] object-contain"
             style={{
-              width: '100%',
-              height: 'auto',
-              maxHeight: 'calc(100dvh - 120px)',
-              objectFit: 'contain',
-              cursor: isDragging ? 'grabbing' : 'grab',
+              cursor: isDragging ? "grabbing" : "grab",
               transform: `translate(${position.x}px, ${position.y}px) scale(${zoom})`,
-              transition: isDragging ? 'none' : 'transform 0.2s ease',
+              transition: isDragging ? "none" : "transform 0.2s ease",
             }}
             onMouseDown={handleMouseDown}
           />
         </div>
-        <div style={{ position: 'absolute', bottom: '16px', left: '50%', transform: 'translateX(-50%)', backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(8px)', borderRadius: '9999px', padding: '8px 16px', maxWidth: '90%' }}>
-          <h3 style={{ color: 'white', fontSize: '14px', fontWeight: 500, margin: 0, textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</h3>
-          <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.7)', marginTop: '2px', textAlign: 'center' }}>Zoom: {Math.round(zoom * 100)}% • Drag to pan</div>
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/50 backdrop-blur-md rounded-full px-4 py-2 max-w-[90%]">
+          <h3 className="text-sm font-medium text-white m-0 text-center truncate">
+            {name}
+          </h3>
+          <div className="text-xs text-white/70 mt-0.5 text-center">
+            Zoom: {Math.round(zoom * 100)}% • Drag to pan
+          </div>
         </div>
       </div>
     </div>
   );
+};
+
+const formatPaymentCycle = (cycleNumber, unit) => {
+  if (!cycleNumber) return "";
+  const label = unit?.toLowerCase().includes("month") ? "Month" : "Week";
+  return `${label} ${cycleNumber}`;
 };
 
 // --- PAYMENT HISTORY MODAL (RESPONSIVE - NO SCROLL, FIT TO SCREEN) ---
@@ -1284,9 +1256,11 @@ const PaymentHistoryModal = ({
   onClose,
   participant,
   paymentHistory,
+  cycleUnit = "week",
   onImageClick,
   showToast,
 }) => {
+
   if (!isOpen || !participant) return null;
 
   const handleViewProof = (imageUrl, cycleName) => {
@@ -1296,104 +1270,140 @@ const PaymentHistoryModal = ({
     }, 300);
   };
 
-  const totalPaid = paymentHistory.filter((p) => p.isVerified).reduce((sum, p) => sum + (Number(p.Amount) || 0), 0);
-  const pendingAmount = paymentHistory.filter((p) => !p.isVerified).reduce((sum, p) => sum + (Number(p.Amount) || 0), 0);
+  const totalPaid = paymentHistory
+    .filter((p) => p.isVerified)
+    .reduce((sum, p) => sum + (Number(p.Amount) || 0), 0);
+  const pendingAmount = paymentHistory
+    .filter((p) => !p.isVerified)
+    .reduce((sum, p) => sum + (Number(p.Amount) || 0), 0);
 
   return (
-    <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: 50,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '8px',
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        backdropFilter: 'blur(4px)',
-      }}
-    >
-      <div
-        style={{
-          width: '100%',
-          maxWidth: 'min(95vw, 560px)',
-          maxHeight: 'calc(100dvh - 24px)',
-          backgroundColor: 'white',
-          borderRadius: '16px',
-          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-          overflow: 'hidden',
-          display: 'flex',
-          flexDirection: 'column',
-        }}
-      >
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 bg-black/50 backdrop-blur-sm">
+      <div className="w-full max-w-[95vw] sm:max-w-lg max-h-[calc(100dvh-0.5rem)] bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col">
         {/* Header */}
-        <div style={{ padding: '16px', borderBottom: '1px solid #e2e8f0', background: 'linear-gradient(to right, #f8fafc, white)', flexShrink: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-            <div style={{ minWidth: 0, paddingRight: '8px' }}>
-              <h2 style={{ fontSize: '16px', fontWeight: 700, color: '#1e293b', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Payment History</h2>
-              <p style={{ color: '#64748b', fontSize: '12px', marginTop: '4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {participant.name} • {paymentHistory.length} payment{paymentHistory.length !== 1 ? "s" : ""}
+        <div className="p-4 border-b border-slate-200 bg-gradient-to-r from-slate-50 to-white flex-shrink-0">
+          <div className="flex items-center justify-between mb-3">
+            <div className="min-w-0 pr-2">
+              <h2 className="text-base font-bold text-slate-800 truncate">
+                Payment History
+              </h2>
+              <p className="text-slate-500 text-xs mt-1 truncate">
+                {participant.name} • {paymentHistory.length} payment
+                {paymentHistory.length !== 1 ? "s" : ""}
               </p>
             </div>
-            <button onClick={onClose} style={{ padding: '6px', background: 'transparent', border: 'none', borderRadius: '8px', cursor: 'pointer', flexShrink: 0 }}>
-              <X size={18} style={{ color: '#94a3b8' }} />
+            <button
+              onClick={onClose}
+              className="p-1.5 bg-transparent border-none rounded-lg cursor-pointer flex-shrink-0 hover:bg-slate-100 transition-colors"
+            >
+              <X size={18} className="text-slate-400" />
             </button>
           </div>
 
           {/* Summary Cards */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-            <div style={{ padding: '10px', backgroundColor: '#ecfdf5', borderRadius: '10px', border: '1px solid #d1fae5' }}>
-              <p style={{ fontSize: '11px', color: '#059669', fontWeight: 500, marginBottom: '2px' }}>Total Paid</p>
-              <p style={{ fontSize: '16px', fontWeight: 700, color: '#047857', margin: 0 }}>₹{totalPaid.toLocaleString("en-IN")}</p>
+          <div className="grid grid-cols-2 gap-2">
+            <div className="p-2.5 bg-emerald-50 rounded-lg border border-emerald-200">
+              <p className="text-xs text-emerald-600 font-medium mb-0.5">
+                Total Paid
+              </p>
+              <p className="text-base font-bold text-emerald-700 m-0">
+                ₹{totalPaid.toLocaleString("en-IN")}
+              </p>
             </div>
-            <div style={{ padding: '10px', backgroundColor: '#fffbeb', borderRadius: '10px', border: '1px solid #fde68a' }}>
-              <p style={{ fontSize: '11px', color: '#d97706', fontWeight: 500, marginBottom: '2px' }}>Pending</p>
-              <p style={{ fontSize: '16px', fontWeight: 700, color: '#b45309', margin: 0 }}>₹{pendingAmount.toLocaleString("en-IN")}</p>
+            <div className="p-2.5 bg-amber-50 rounded-lg border border-amber-200">
+              <p className="text-xs text-amber-600 font-medium mb-0.5">
+                Pending
+              </p>
+              <p className="text-base font-bold text-amber-700 m-0">
+                ₹{pendingAmount.toLocaleString("en-IN")}
+              </p>
             </div>
           </div>
         </div>
 
         {/* Scrollable Content */}
-        <div style={{ flex: 1, overflow: 'auto', padding: '16px' }}>
+        <div className="flex-1 overflow-auto p-4">
           {paymentHistory && paymentHistory.length > 0 ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <div className="flex flex-col gap-2.5">
               {paymentHistory.map((payment, index) => {
                 const paymentProofImage = getPaymentProofImage(payment);
-                const paymentDate = new Date(payment.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+                const paymentDate = new Date(
+                  payment.createdAt
+                ).toLocaleDateString("en-IN", {
+                  day: "numeric",
+                  month: "short",
+                  year: "numeric",
+                });
 
                 return (
                   <div
                     key={payment.id || index}
-                    style={{ background: 'linear-gradient(to right, #f8fafc, white)', padding: '12px', borderRadius: '12px', border: '1px solid #e2e8f0' }}
+                    className="bg-gradient-to-r from-slate-50 to-white p-3 rounded-xl border border-slate-200"
                   >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
-                      <div style={{ minWidth: 0 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
-                          <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: payment.isVerified ? '#10b981' : '#f59e0b', flexShrink: 0 }} />
-                          <p style={{ fontWeight: 700, color: '#1e293b', fontSize: '13px', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{payment.Payment_Cycle}</p>
+                    <div className="flex justify-between items-start mb-2">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <div
+                            className={`w-2 h-2 rounded-full ${
+                              payment.isVerified
+                                ? "bg-emerald-500"
+                                : "bg-amber-500"
+                            } flex-shrink-0`}
+                          />
+                          <p className="font-bold text-slate-800 text-sm truncate">
+                            {formatPaymentCycle(payment.Payment_Cycle, cycleUnit)}
+                          </p>
                         </div>
-                        <p style={{ fontSize: '11px', color: '#64748b', marginLeft: '14px' }}>
-                          <Clock size={10} style={{ display: 'inline', marginRight: '4px' }} />{paymentDate}
+                        <p className="text-xs text-slate-500 ml-3.5">
+                          <Clock size={10} className="inline mr-1" />
+                          {paymentDate}
                         </p>
                       </div>
-                      <div style={{ textAlign: 'right' }}>
-                        <p style={{ fontSize: '18px', fontWeight: 700, color: '#1e293b', margin: 0 }}>₹{Number(payment.Amount).toLocaleString("en-IN")}</p>
-                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', marginTop: '4px', padding: '3px 8px', borderRadius: '9999px', fontSize: '10px', fontWeight: 600, backgroundColor: payment.isVerified ? '#d1fae5' : '#fef3c7', color: payment.isVerified ? '#047857' : '#b45309' }}>
-                          {payment.isVerified ? <><CheckCircle size={10} /> Verified</> : <><Clock size={10} /> Pending</>}
+                      <div className="text-right">
+                        <p className="text-lg font-bold text-slate-800 m-0">
+                          ₹{Number(payment.Amount).toLocaleString("en-IN")}
+                        </p>
+                        <div
+                          className={`inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                            payment.isVerified
+                              ? "bg-emerald-100 text-emerald-700"
+                              : "bg-amber-100 text-amber-700"
+                          }`}
+                        >
+                          {payment.isVerified ? (
+                            <>
+                              <CheckCircle size={10} />
+                              Verified
+                            </>
+                          ) : (
+                            <>
+                              <Clock size={10} />
+                              Pending
+                            </>
+                          )}
                         </div>
                       </div>
                     </div>
 
                     {paymentProofImage && (
-                      <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <p style={{ fontSize: '11px', color: '#374151', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '4px', margin: 0 }}>
-                          <FileText size={10} /> Payment Proof
+                      <div className="mt-2 pt-2 border-t border-slate-200 flex items-center justify-between">
+                        <p className="text-xs text-gray-700 font-medium flex items-center gap-1 m-0">
+                          <FileText size={10} />
+                          Payment Proof
                         </p>
                         <button
-                          onClick={() => { if (paymentProofImage) handleViewProof(paymentProofImage, payment.Payment_Cycle); }}
-                          style={{ fontSize: '11px', color: '#4f46e5', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '4px', background: 'transparent', border: 'none', cursor: 'pointer', padding: 0 }}
+                          onClick={() => {
+                            if (paymentProofImage)
+                              handleViewProof(
+                                paymentProofImage,
+                                payment.Payment_Cycle
+                              );
+                          }}
+                          className="text-xs text-indigo-600 font-medium flex items-center gap-1 bg-transparent border-none cursor-pointer p-0 hover:text-indigo-700 transition-colors"
                         >
-                          <Eye size={10} /> View <ArrowRight size={10} />
+                          <Eye size={10} />
+                          View
+                          <ArrowRight size={10} />
                         </button>
                       </div>
                     )}
@@ -1402,15 +1412,19 @@ const PaymentHistoryModal = ({
               })}
             </div>
           ) : (
-            <div style={{ textAlign: 'center', padding: '32px 16px' }}>
-              <div style={{ width: '60px', height: '60px', margin: '0 auto 16px', background: 'linear-gradient(to bottom right, #f1f5f9, #e2e8f0)', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Receipt size={24} style={{ color: '#cbd5e1' }} />
+            <div className="text-center py-8 px-4">
+              <div className="w-15 h-15 mx-auto mb-4 bg-gradient-to-br from-slate-100 to-slate-200 rounded-2xl flex items-center justify-center">
+                <Receipt size={24} className="text-slate-300" />
               </div>
-              <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#1e293b', marginBottom: '8px' }}>No Payment History</h3>
-              <p style={{ color: '#64748b', fontSize: '13px', marginBottom: '16px' }}>No payments made yet.</p>
+              <h3 className="text-base font-bold text-slate-800 mb-2">
+                No Payment History
+              </h3>
+              <p className="text-slate-500 text-sm mb-4">
+                No payments made yet.
+              </p>
               <button
                 onClick={onClose}
-                style={{ padding: '10px 20px', background: 'linear-gradient(to right, #4f46e5, #7c3aed)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 500, cursor: 'pointer', fontSize: '13px' }}
+                className="px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white border-none rounded-xl font-medium cursor-pointer text-sm hover:shadow-md transition-all"
               >
                 Close
               </button>
@@ -1450,10 +1464,10 @@ const ParticipantCard = ({ participant, index, onImageClick }) => {
 
   return (
     <div
-      className="group bg-white rounded-xl sm:rounded-2xl p-3 sm:p-4 md:p-5 border border-slate-200 shadow-sm hover:shadow-xl hover:-translate-y-0.5 sm:hover:-translate-y-2 transition-all duration-500 overflow-hidden relative"
+      className="group bg-white rounded-xl sm:rounded-2xl p-3 sm:p-4 md:p-5 border border-slate-200 shadow-sm hover:shadow-xl hover:-translate-y-0.5 sm:hover:-translate-y-2 transition-all duration-500 overflow-hidden relative animate-in fade-in"
+      style={{ animationDelay: `${index * 50}ms` }}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      style={{ animationDelay: `${index * 50}ms` }}
     >
       {/* Animated background gradient */}
       <div className="absolute inset-0 bg-gradient-to-br from-transparent to-green-50 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
@@ -1496,10 +1510,7 @@ const ParticipantCard = ({ participant, index, onImageClick }) => {
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center">
-              <User
-                size={24}
-                className="text-slate-300 sm:w-8 sm:h-8 md:w-12 md:h-12"
-              />
+              <User className="text-slate-300 w-6 h-6 sm:w-8 sm:h-8 md:w-12 md:h-12" />
             </div>
           )}
           <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
@@ -1526,7 +1537,7 @@ const ParticipantCard = ({ participant, index, onImageClick }) => {
       </div>
 
       {/* Bottom Border Animation */}
-      <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-0 group-hover:w-3/4 h-0.5 bg-gradient-to-r from-transparent via-indigo-500 to-transparent transition-all duration-700"></div>
+      <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-0 group-hover:w-3/4 h-0.5 bg-gradient-to-r from-transparent via-indigo-500 to-transparent transition-all duration-700"></div>
     </div>
   );
 };
@@ -1775,6 +1786,7 @@ export default function ParticipantDetailsPage() {
                   openModal("paymentHistory", {
                     name: participantName,
                     paymentHistory: userPaymentHistory,
+                    cycleUnit: "week", // or "month" (temporary default)
                   })
                 }
                 className="px-3 py-1.5 sm:px-4 sm:py-2.5 bg-gradient-to-r from-blue-50 to-blue-100 text-blue-700 rounded-lg sm:rounded-xl font-medium hover:shadow-md sm:hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 flex items-center gap-1 sm:gap-2 cursor-pointer border border-blue-200 group text-xs sm:text-sm"
@@ -1827,7 +1839,7 @@ export default function ParticipantDetailsPage() {
             <div className="flex-1">
               <div className="relative group">
                 <Search
-                  className="absolute left-3 sm:left-4 top-1/2 transform -translate-y-1/2 text-slate-400 group-hover:text-indigo-400 transition-colors"
+                  className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 text-slate-400 group-hover:text-indigo-400 transition-colors"
                   size={16}
                 />
                 <input
@@ -1840,7 +1852,7 @@ export default function ParticipantDetailsPage() {
                 {search && (
                   <button
                     onClick={() => setSearch("")}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 p-0.5 sm:p-1 hover:bg-slate-200 rounded-full transition-colors"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 p-0.5 sm:p-1 hover:bg-slate-200 rounded-full transition-colors"
                   >
                     <X size={14} className="text-slate-400" />
                   </button>
