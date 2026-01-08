@@ -1554,17 +1554,11 @@ const PaymentHistoryModal = ({
   );
 };
 
-const getWinnerCycleLabel = (paymentHistory = []) => {
-  if (!Array.isArray(paymentHistory) || paymentHistory.length === 0)
+const getWinnerCycleLabel = (participant) => {
+  if (!participant?.winnerCycleNumber || !participant?.winnerCycleUnit)
     return null;
 
-  const cycleNumber = Number(paymentHistory[0]?.Payment_Cycle);
-
-  if (!cycleNumber || isNaN(cycleNumber)) return null;
-
-  // You already know duration unit from LuckyDraw
-  // Defaulting to "Week" (you can improve later)
-  return `Week ${cycleNumber}`;
+  return `${participant.winnerCycleUnit} ${participant.winnerCycleNumber}`;
 };
 
 // --- PARTICIPANT CARD COMPONENT (RESPONSIVE) ---
@@ -1584,7 +1578,8 @@ const ParticipantCard = ({ participant, index, onImageClick }) => {
   const StatusIcon =
     statusConfig[participant.paymentStatus]?.icon || AlertCircle;
 
-  const winnerCycleLabel = getWinnerCycleLabel(participant.paymentHistory);
+  const winnerCycleLabel = getWinnerCycleLabel(participant);
+
 
   return (
     <div
@@ -1722,47 +1717,62 @@ export default function ParticipantDetailsPage() {
         const res = await api.get(`/public/lucky-draw-names/${documentId}`);
         const data = res.data;
 
-        const participantsList = data?.lucky_draw_forms || [];
+        
+
         const participantPayments = data?.participant_payments || [];
+        const participantsList = data?.lucky_draw_forms || [];
+
+        // 🔥 FLATTEN WINNERS FROM PARTICIPANTS (IMPORTANT)
+const allWinners = participantsList.flatMap(
+  (p) => p.lucky_draw_winners || []
+);
+
+
         // ✅ SET UPI ID FROM BACKEND
         setUpiId(data?.Upi_Id || "");
 
-        // ✅ BUILD PARTICIPANTS (ONLY ONCE)
-        const mappedParticipants = participantsList.map((item) => {
-          const photo =
-            item.Photo?.formats?.small?.url ||
-            item.Photo?.formats?.thumbnail?.url ||
-            item.Photo?.url ||
-            null;
+       const mappedParticipants = participantsList.map((item) => {
+  const photo =
+    item.Photo?.formats?.small?.url ||
+    item.Photo?.formats?.thumbnail?.url ||
+    item.Photo?.url ||
+    null;
 
-          const userPayments = participantPayments.filter(
-            (payment) =>
-              String(payment.lucky_draw_form?.documentId) ===
-              String(item.documentId)
-          );
+  const userPayments = participantPayments.filter(
+    (payment) =>
+      String(payment.lucky_draw_form?.documentId) ===
+      String(item.documentId)
+  );
 
-          const hasVerified = userPayments.some((p) => p.isVerified);
-          const hasPending = userPayments.some((p) => !p.isVerified);
+  const hasVerified = userPayments.some((p) => p.isVerified);
+  const hasPending = userPayments.some((p) => !p.isVerified);
 
-          let paymentStatus = "pending";
-          if (hasVerified) paymentStatus = "paid";
-          else if (hasPending) paymentStatus = "pending_verification";
+  let paymentStatus = "pending";
+  if (hasVerified) paymentStatus = "paid";
+  else if (hasPending) paymentStatus = "pending_verification";
 
-          return {
-            id: item.id,
-            documentId: item.documentId,
-            isVerified: item.isVerified,
-            name: item.Name,
-            email: item.Email,
-            phone: item.Phone_Number,
-            isWinner: item.IsWinnedParticipant ?? false,
-            paymentStatus,
-            winAmount: item.Prize_Amount || 0,
-            joinedDate: new Date(item.createdAt).toLocaleDateString(),
-            photoUrl: photo ? `${API_BASE_URL}${photo}` : null,
-            paymentHistory: [...userPayments], // 🔥 IMPORTANT
-          };
-        });
+  // ✅ CORRECT WINNER SOURCE
+  const winnerInfo = (item.lucky_draw_winners || [])[0] || null;
+
+  return {
+    id: item.id,
+    documentId: item.documentId,
+    isVerified: item.isVerified,
+    name: item.Name,
+    email: item.Email,
+    phone: item.Phone_Number,
+
+    // 🏆 WINNER FLAGS (FIXED)
+    isWinner: !!winnerInfo,
+    winnerCycleNumber: winnerInfo?.Cycle_Number ?? null,
+    winnerCycleUnit: winnerInfo?.Cycle_Unit ?? null,
+
+    paymentStatus,
+    joinedDate: new Date(item.createdAt).toLocaleDateString(),
+    photoUrl: photo ? `${API_BASE_URL}${photo}` : null,
+    paymentHistory: [...userPayments],
+  };
+});
 
         // 🔥 FORCE UI UPDATE
         setParticipants([...mappedParticipants]);

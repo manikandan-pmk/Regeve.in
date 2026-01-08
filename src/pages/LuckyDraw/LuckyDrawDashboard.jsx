@@ -1,7 +1,6 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import { useNavigate, useParams } from "react-router-dom";
-import { useRef } from "react";
 import {
   Users,
   DollarSign,
@@ -127,7 +126,7 @@ const LuckyDrawDashboard = () => {
   const [hoveredCard, setHoveredCard] = useState(null);
 
   // Payment filter states
-  const [paymentFilter, setPaymentFilter] = useState("all"); // all, paid, pending
+  const [paymentFilter, setPaymentFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [verifyingPaymentId, setVerifyingPaymentId] = useState(null);
   const [paymentStats, setPaymentStats] = useState({
@@ -138,12 +137,23 @@ const LuckyDrawDashboard = () => {
 
   // Cycle states
   const [selectedCycle, setSelectedCycle] = useState("all");
-  const [showCycleDropdown, setShowCycleDropdown] = useState(false);
   const [cycleStats, setCycleStats] = useState({});
 
   const refetchAll = async () => {
     await Promise.all([fetchLuckyDrawData(), fetchWinners(), fetchPayments()]);
   };
+
+  // Helper function to get cycle number
+  const getCycleNumber = (cycle) => {
+    if (cycle == null) return null;
+    if (typeof cycle === "number") return cycle;
+    if (typeof cycle === "string") {
+      const match = cycle.match(/\d+/);
+      return match ? Number(match[0]) : null;
+    }
+    return null;
+  };
+
   useEffect(() => {
     if (
       !cycleInfo?.startAt ||
@@ -193,34 +203,21 @@ const LuckyDrawDashboard = () => {
     showWinnerModal,
   ]);
 
-  // useEffect(() => {
-  //   if (!luckydrawDocumentId) {
-  //     setError("Lucky Draw ID missing in URL");
-  //     setLoading(false);
-  //     return;
-  //   }
-  //   fetchLuckyDrawData();
-  //   fetchWinners();
-  //   fetchPayments();
-  // }, [luckydrawDocumentId]);
-
   const fetchLuckyDrawData = async () => {
     try {
       setLoading(true);
-
       const response = await axiosWithAuth.get(
         `/lucky-draw-names/${luckydrawDocumentId}`
       );
 
       const data = response.data;
       const participants = data.lucky_draw_forms || [];
-
       const verifiedCount = participants.filter(
         (p) => p.isVerified === true
       ).length;
 
       setLuckyDrawData(data);
-      setCycleInfo(data.cycleInfo); // 🔥 ADD THIS
+      setCycleInfo(data.cycleInfo);
 
       setStats((prev) => ({
         ...prev,
@@ -251,38 +248,81 @@ const LuckyDrawDashboard = () => {
 
       const data = response.data;
 
-      if (!data || !data.lucky_draw_forms) {
-        throw new Error("No participants data found");
+      // Debug log to see the data structure
+      console.log("Fetched data:", data);
+      console.log("lucky_draw_winners:", data.lucky_draw_winners);
+      console.log(
+        "lucky_draw_forms with IsWinnedParticipant:",
+        data.lucky_draw_forms
+          ?.filter((p) => p.IsWinnedParticipant === true)
+          .map((p) => ({
+            name: p.Name,
+            isWinned: p.IsWinnedParticipant,
+            winnedDate: p.WinnedDate,
+          }))
+      );
+
+      if (!data) {
+        throw new Error("No data found");
       }
 
-      const winnersList = data.lucky_draw_forms
-        .filter((p) => p.IsWinnedParticipant === true)
-        .map((p) => {
-          const winner =
-            Array.isArray(p.lucky_draw_winners) && p.lucky_draw_winners.length
-              ? p.lucky_draw_winners[p.lucky_draw_winners.length - 1]
-              : null;
-          // ✅ DIRECT ACCESS
+      let winnersList = [];
 
-          return {
+      // 1. First, check if there are winners in the lucky_draw_winners array
+      if (data.lucky_draw_winners && data.lucky_draw_winners.length > 0) {
+        winnersList = data.lucky_draw_winners
+          .map((winner) => {
+            // Check if lucky_draw_form is populated
+            if (winner.lucky_draw_form) {
+              return {
+                ...winner.lucky_draw_form,
+                Cycle_Number: winner.Cycle_Number || null,
+                Cycle_Unit: winner.Cycle_Unit || null,
+                Won_At: winner.Won_At || winner.lucky_draw_form.WinnedDate,
+              };
+            } else {
+              // Fallback: Get participant from lucky_draw_forms
+              const participant = data.lucky_draw_forms?.find(
+                (p) =>
+                  p.id === winner.lucky_draw_form?.id ||
+                  p.documentId === winner.lucky_draw_form?.documentId
+              );
+              return participant
+                ? {
+                    ...participant,
+                    Cycle_Number: winner.Cycle_Number || null,
+                    Cycle_Unit: winner.Cycle_Unit || null,
+                    Won_At: winner.Won_At || participant.WinnedDate,
+                  }
+                : null;
+            }
+          })
+          .filter(Boolean); // Remove null entries
+      }
+      // 2. If no winners in lucky_draw_winners, check participants marked as winners
+      else if (data.lucky_draw_forms && data.lucky_draw_forms.length > 0) {
+        winnersList = data.lucky_draw_forms
+          .filter((p) => p.IsWinnedParticipant === true)
+          .map((p) => ({
             ...p,
-            Cycle_Number: winner?.Cycle_Number ?? null,
-            Cycle_Unit: winner?.Cycle_Unit ?? null,
-            Won_At: winner?.Won_At ?? null,
-          };
-        });
+            Cycle_Number: null, // No cycle info from participants
+            Cycle_Unit: null,
 
-      setWinners(winnersList);
+            Won_At: p.WinnedDate,
+          }));
+      }
 
+      console.log("Final winners list:", winnersList);
+
+      // Remove duplicates by documentId
+      const uniqueWinners = Array.from(
+        new Map(winnersList.map((w) => [w.documentId, w])).values()
+      );
+
+      setWinners(uniqueWinners);
       setStats((prev) => ({
         ...prev,
-        winnersCount: winnersList.length,
-      }));
-
-      setWinners(winnersList);
-      setStats((prev) => ({
-        ...prev,
-        winnersCount: winnersList.length,
+        winnersCount: uniqueWinners.length,
       }));
     } catch (error) {
       console.error("Error fetching winners:", error);
@@ -474,10 +514,35 @@ const LuckyDrawDashboard = () => {
       payment.lucky_draw_form?.Email?.toLowerCase().includes(
         searchQuery.toLowerCase()
       ) ||
-      payment.Payment_Cycle?.toLowerCase().includes(searchQuery.toLowerCase());
+      payment.Payment_Cycle?.toString()
+        .toLowerCase()
+        .includes(searchQuery.toLowerCase());
 
     return matchesCycle && matchesStatus && matchesSearch;
   });
+
+  // Calculate current cycle number
+  const currentCycleNumber = getCycleNumber(timeLeft.label);
+  const receivedAmount = payments
+    .filter((p) => {
+      console.log("🔵 PAYMENT CHECK:", {
+        paymentCycle: p.Payment_Cycle,
+        paymentCycleNumber: getCycleNumber(p.Payment_Cycle),
+        currentCycleNumber,
+        isVerified: p.isVerified,
+      });
+
+      return (
+        p.isVerified === true &&
+        getCycleNumber(p.Payment_Cycle) === currentCycleNumber
+      );
+    })
+    .reduce((sum, p) => sum + Number(p.Amount || 0), 0);
+
+  // Expected amount per cycle
+  const expectedAmount = Number(luckyDrawData?.Amount || 0);
+  const amountProgress =
+    expectedAmount > 0 ? (receivedAmount / expectedAmount) * 100 : 0;
 
   // Loading Animation Component
   const LoadingAnimation = () => (
@@ -675,11 +740,7 @@ const LuckyDrawDashboard = () => {
                           <div className="relative w-full h-full rounded-2xl overflow-hidden border-8 border-white shadow-2xl">
                             {winner.Photo?.url ? (
                               <motion.img
-                                src={
-                                  winner.Photo?.url
-                                    ? `${MEDIA_BASE_URL}${winner.Photo.url}`
-                                    : "/default-avatar.png"
-                                }
+                                src={`${MEDIA_BASE_URL}${winner.Photo.url}`}
                                 alt={winner.Name}
                                 className="w-full h-full object-cover"
                                 initial={{ scale: 1.2 }}
@@ -744,7 +805,6 @@ const LuckyDrawDashboard = () => {
                         <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer"></div>
                         <Crown className="w-4 h-4" />
                         <span className="font-bold text-sm">
-                          {" "}
                           {winner.Cycle_Unit && winner.Cycle_Number
                             ? `${winner.Cycle_Unit} ${winner.Cycle_Number}`
                             : "—"}
@@ -1031,7 +1091,6 @@ const LuckyDrawDashboard = () => {
                 {/* Right side: Filter Tabs */}
                 <div className="flex flex-col">
                   <label className="block text-sm font-medium text-gray-700 mb-2 invisible lg:visible">
-                    {/* Invisible label for alignment */}
                     &nbsp;
                   </label>
                   <div className="flex flex-wrap gap-2">
@@ -1047,7 +1106,7 @@ const LuckyDrawDashboard = () => {
                       >
                         {filter === "paid" ? (
                           <>
-                            <Check className="w-3.5  h-3.5" />
+                            <Check className="w-3.5 h-3.5" />
                             Paid
                           </>
                         ) : filter === "pending" ? (
@@ -1277,6 +1336,7 @@ const LuckyDrawDashboard = () => {
       </AnimatePresence>
     );
   };
+
   if (loading) {
     return <LoadingAnimation />;
   }
@@ -1393,46 +1453,12 @@ const LuckyDrawDashboard = () => {
       </div>
     );
   }
-  const getCycleNumber = (cycle) => {
-    if (cycle == null) return null;
-
-    // If backend already sent number
-    if (typeof cycle === "number") {
-      return cycle;
-    }
-
-    // If backend sent string like "Week 1"
-    if (typeof cycle === "string") {
-      const match = cycle.match(/\d+/);
-      return match ? Number(match[0]) : null;
-    }
-
-    // Any other type (object, boolean, etc.)
-    return null;
-  };
-
-  const currentCycleNumber = getCycleNumber(timeLeft.label);
-
-  const receivedAmount = payments
-    .filter(
-      (p) =>
-        p.isVerified === true &&
-        getCycleNumber(p.Payment_Cycle) === currentCycleNumber
-    )
-    .reduce((sum, p) => sum + Number(p.Amount || 0), 0);
-
-  // ✅ FIXED PER CYCLE AMOUNT (from backend)
-  const expectedAmount = Number(luckyDrawData?.Amount || 0);
-
-  const amountProgress =
-    expectedAmount > 0 ? (receivedAmount / expectedAmount) * 100 : 0;
 
   // Stats Cards with Win Statistics
   const statsCards = [
     {
       key: "totalAmount",
       title: `Amount Collected (${timeLeft.label || ""})`,
-
       value: `${formatCurrency(receivedAmount)}`,
       icon: DollarSign,
       color: "green",
@@ -1722,7 +1748,7 @@ const LuckyDrawDashboard = () => {
               key={stat.key}
               initial={{ opacity: 0, y: 50, scale: 0.9 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
-              transition={{ delay: stat.delay, type: "spring" }}
+              transition={{ delay: stat.delay || 0, type: "spring" }}
               whileHover={{
                 y: -10,
                 transition: { type: "spring", stiffness: 300 },
@@ -1803,7 +1829,10 @@ const LuckyDrawDashboard = () => {
                       className={`h-full bg-gradient-to-r from-${stat.color}-500 to-${stat.color}-600 rounded-full`}
                       initial={{ width: 0 }}
                       animate={{ width: `${stat.progress}%` }}
-                      transition={{ duration: 1, delay: stat.delay + 0.2 }}
+                      transition={{
+                        duration: 1,
+                        delay: (stat.delay || 0) + 0.2,
+                      }}
                     >
                       {/* Shimmer effect */}
                       <motion.div
@@ -1812,7 +1841,7 @@ const LuckyDrawDashboard = () => {
                         transition={{
                           duration: 1.5,
                           repeat: Infinity,
-                          delay: stat.delay,
+                          delay: stat.delay || 0,
                         }}
                         style={{ width: "50%" }}
                       />
@@ -1997,11 +2026,7 @@ const LuckyDrawDashboard = () => {
 
                             {winner.Photo?.url ? (
                               <img
-                                src={
-                                  winner.Photo?.url
-                                    ? `${MEDIA_BASE_URL}${winner.Photo.url}`
-                                    : "/default-avatar.png"
-                                }
+                                src={`${MEDIA_BASE_URL}${winner.Photo.url}`}
                                 alt={winner.Name}
                                 className="relative w-full h-full object-cover z-10"
                                 onError={(e) => {
@@ -2044,7 +2069,9 @@ const LuckyDrawDashboard = () => {
                           {[
                             {
                               bg: "yellow",
-                              text: `${winner.Cycle_Unit} ${winner.Cycle_Number}`,
+                              text: `${winner.Cycle_Unit || "Cycle"} ${
+                                winner.Cycle_Number || "—"
+                              }`,
                             },
                           ].map((tag, tagIndex) => (
                             <motion.span
