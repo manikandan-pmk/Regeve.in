@@ -71,6 +71,7 @@ const RegistrationFormLuckydraw = () => {
   // Animation states
   const [isLoaded, setIsLoaded] = useState(false);
   const [shakeErrors, setShakeErrors] = useState({});
+  const [luckyDrawInfo, setLuckyDrawInfo] = useState(null);
 
   const API_URL = "https://api.regeve.in/api/lucky-draw-forms";
 
@@ -90,8 +91,6 @@ const RegistrationFormLuckydraw = () => {
     const timer = setTimeout(() => setIsLoaded(true), 100);
     return () => clearTimeout(timer);
   }, []);
-
- 
 
   // Scroll handling with animation
   useEffect(() => {
@@ -123,6 +122,7 @@ const RegistrationFormLuckydraw = () => {
         const res = await axios.get(
           `https://api.regeve.in/api/public/lucky-draw-names/${luckydrawDocumentId}`
         );
+        setLuckyDrawInfo(res.data);
         setIsValidLink(true);
       } catch (err) {
         setIsValidLink(false);
@@ -511,20 +511,47 @@ const RegistrationFormLuckydraw = () => {
               </div>
             </div>
 
-            <h1 className="text-2xl md:text-4xl lg:text-5xl font-bold text-gray-900 mb-2 md:mb-3">
-              <span className="bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600 bg-clip-text text-transparent">
-                Lucky Draw Registration
-              </span>
-            </h1>
+            {luckyDrawInfo && (
+              <>
+                {/* Lucky Draw Name */}
+                <h1 className="text-2xl md:text-4xl lg:text-5xl font-extrabold mb-3 text-center">
+                  <span className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
+                    {luckyDrawInfo.Name} Registration
+                  </span>
+                </h1>
 
-            <div className="w-16 md:w-20 h-1 bg-gradient-to-r from-green-400 via-yellow-400 to-red-400 mx-auto mb-3 md:mb-4 rounded-full animate-width-grow"></div>
+                <div className="flex flex-wrap justify-center gap-3 md:gap-6 mt-4">
+                  {/* Participants */}
+                  <div className="flex items-center gap-2 px-4 py-2 bg-white rounded-xl shadow ">
+                    <User className="w-4 h-4 text-blue-600" />
+                    <span className="text-md font-semibold text-gray-800">
+                      {luckyDrawInfo.Number_of_Peoples ??
+                        luckyDrawInfo.lucky_draw_forms?.length ??
+                        0}
+                    </span>
+                    <span className="text-xs font-semibold text-gray-500">Participants</span>
+                  </div>
 
-            <p className="text-gray-600 max-w-2xl mx-auto text-xs md:text-base px-2 md:px-4 leading-relaxed">
-              Register now for a chance to win amazing prizes! Complete all
-              fields to enter the draw.
-            </p>
+                  {/* Duration */}
+                  <div className="flex items-center gap-2 px-4 py-2 bg-white rounded-xl shadow ">
+                    <Calendar className="w-4 h-4 text-purple-600" />
+                    <span className="text-md font-semibold text-gray-800">
+                      {luckyDrawInfo.Duration_Value}{" "}
+                      {luckyDrawInfo.Duration_Unit}
+                    </span>
+                  </div>
+
+                  {/* Amount */}
+                  <div className="flex items-center gap-2 px-4 py-2 bg-white rounded-xl shadow ">
+                    <Gift className="w-4 h-4 text-green-600" />
+                    <span className="text-md font-semibold text-gray-800">
+                      ₹{luckyDrawInfo.Amount}
+                    </span>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
-
 
           {/* Status Messages with Animation */}
           {submitStatus.message && submitStatus.type !== "success" && (
@@ -1183,61 +1210,61 @@ const RegistrationFormLuckydraw = () => {
           <div className="h-4 md:h-8"></div>
         </div>
       </div>
-{/* Success Popup Modal */}
-{showSuccessPopup && (
-  <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-    {/* Backdrop - Centered content with blur */}
-    <div
-      className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-fade-in"
-      onClick={closeSuccessPopup}
-    ></div>
+      {/* Success Popup Modal */}
+      {showSuccessPopup && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          {/* Backdrop - Centered content with blur */}
+          <div
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-fade-in"
+            onClick={closeSuccessPopup}
+          ></div>
 
-    {/* Popup Content */}
-    <div className="relative w-full max-w-sm bg-white rounded-[2.5rem] shadow-2xl overflow-hidden animate-scale-up border border-white/20">
-      {/* Decorative top gradient bar */}
-      <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-green-400 via-emerald-500 to-teal-500"></div>
+          {/* Popup Content */}
+          <div className="relative w-full max-w-sm bg-white rounded-[2.5rem] shadow-2xl overflow-hidden animate-scale-up border border-white/20">
+            {/* Decorative top gradient bar */}
+            <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-green-400 via-emerald-500 to-teal-500"></div>
 
-      <div className="relative p-8 md:p-10 flex flex-col items-center text-center">
-        {/* Animated Success Icon Area */}
-        <div className="mb-6 relative">
-          <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center animate-bounce">
-            <CheckCircle className="w-10 h-10 text-green-600" />
+            <div className="relative p-8 md:p-10 flex flex-col items-center text-center">
+              {/* Animated Success Icon Area */}
+              <div className="mb-6 relative">
+                <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center animate-bounce">
+                  <CheckCircle className="w-10 h-10 text-green-600" />
+                </div>
+                {/* Decorative Sparkles around icon */}
+                <Sparkles className="absolute -top-2 -right-2 text-yellow-500 w-6 h-6 animate-pulse" />
+              </div>
+
+              {/* Text Content with refined alignment */}
+              <div className="space-y-3">
+                <h2 className="text-2xl md:text-3xl font-extrabold text-gray-900 tracking-tight">
+                  Registration <br /> Successful!
+                </h2>
+
+                <div className="space-y-2 px-2">
+                  <p className="text-gray-600 font-medium text-sm md:text-base leading-relaxed">
+                    Congratulations! You've been entered into the lucky draw.
+                  </p>
+                  <p className="text-gray-400 text-xs md:text-sm italic">
+                    Winners will be notified via email and phone.
+                  </p>
+                </div>
+              </div>
+
+              {/* Action Button for better layout closure */}
+              <button
+                onClick={closeSuccessPopup}
+                className="mt-8 w-full py-3 bg-gray-900 text-white rounded-2xl font-bold hover:bg-gray-800 transition-all active:scale-95 shadow-lg"
+              >
+                Got it!
+              </button>
+            </div>
+
+            {/* Background Decorative Blur Blobs */}
+            <div className="absolute -top-10 -right-10 w-32 h-32 bg-green-200/30 rounded-full blur-2xl -z-10"></div>
+            <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-blue-200/30 rounded-full blur-2xl -z-10"></div>
           </div>
-          {/* Decorative Sparkles around icon */}
-          <Sparkles className="absolute -top-2 -right-2 text-yellow-500 w-6 h-6 animate-pulse" />
         </div>
-
-        {/* Text Content with refined alignment */}
-        <div className="space-y-3">
-          <h2 className="text-2xl md:text-3xl font-extrabold text-gray-900 tracking-tight">
-            Registration <br /> Successful!
-          </h2>
-          
-          <div className="space-y-2 px-2">
-            <p className="text-gray-600 font-medium text-sm md:text-base leading-relaxed">
-              Congratulations! You've been entered into the lucky draw.
-            </p>
-            <p className="text-gray-400 text-xs md:text-sm italic">
-              Winners will be notified via email and phone.
-            </p>
-          </div>
-        </div>
-
-        {/* Action Button for better layout closure */}
-        <button
-          onClick={closeSuccessPopup}
-          className="mt-8 w-full py-3 bg-gray-900 text-white rounded-2xl font-bold hover:bg-gray-800 transition-all active:scale-95 shadow-lg"
-        >
-          Got it!
-        </button>
-      </div>
-
-      {/* Background Decorative Blur Blobs */}
-      <div className="absolute -top-10 -right-10 w-32 h-32 bg-green-200/30 rounded-full blur-2xl -z-10"></div>
-      <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-blue-200/30 rounded-full blur-2xl -z-10"></div>
-    </div>
-  </div>
-)}
+      )}
 
       {/* Add custom animations */}
       <style>{`

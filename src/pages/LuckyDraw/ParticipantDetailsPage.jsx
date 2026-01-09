@@ -534,7 +534,7 @@ const QRCodeModal = ({
           {/* QR Code Section */}
           <div className="flex flex-col items-center mb-3">
             <div className="relative mb-2">
-              <div className="w-[180px] h-[180px] max-w-[45vw] max-h-[45vw] bg-white rounded-lg p-2 border-2 border-slate-100">
+              <div className="w-[260px] h-[260px] max-w-[80vw] max-h-[80vw] bg-white rounded-xl p-3 border-2 border-slate-100 shadow-lg">
                 {qrImageUrl ? (
                   <img
                     src={qrImageUrl}
@@ -542,11 +542,12 @@ const QRCodeModal = ({
                     className="w-full h-full object-contain"
                   />
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 rounded">
-                    <QrCode size={48} className="text-slate-300" />
+                  <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 rounded-xl">
+                    <QrCode size={72} className="text-slate-300" />
                   </div>
                 )}
               </div>
+
               <div className="absolute -top-1 -right-1 w-5 h-5 bg-indigo-500 rounded-full flex items-center justify-center shadow-md">
                 <CheckCircle size={10} className="text-white" />
               </div>
@@ -703,8 +704,11 @@ const UploadScreenshotModal = ({
 
         if (luckyDraw.Amount) {
           const totalAmount = Number(luckyDraw.Amount);
-          const participants = luckyDraw.lucky_draw_forms?.length || 1;
-          const perParticipantAmount = Math.floor(totalAmount / participants);
+          const totalPeople = Number(luckyDraw.Number_of_Peoples || 0);
+
+          const perParticipantAmount =
+            totalPeople > 0 ? Math.round(totalAmount / totalPeople) : 0;
+
           setPaymentAmount(perParticipantAmount.toString());
         }
       }
@@ -1260,7 +1264,6 @@ const PaymentHistoryModal = ({
   onImageClick,
   showToast,
 }) => {
-
   if (!isOpen || !participant) return null;
 
   const handleViewProof = (imageUrl, cycleName) => {
@@ -1351,7 +1354,10 @@ const PaymentHistoryModal = ({
                             } flex-shrink-0`}
                           />
                           <p className="font-bold text-slate-800 text-sm truncate">
-                            {formatPaymentCycle(payment.Payment_Cycle, cycleUnit)}
+                            {formatPaymentCycle(
+                              payment.Payment_Cycle,
+                              cycleUnit
+                            )}
                           </p>
                         </div>
                         <p className="text-xs text-slate-500 ml-3.5">
@@ -1672,12 +1678,12 @@ export default function ParticipantDetailsPage() {
         setLuckyDrawQR(qr ? `${API_BASE_URL}${qr}` : null);
 
         // ✅ AMOUNT PER PARTICIPANT
+        // ✅ AMOUNT PER PARTICIPANT (USING Number_of_Peoples)
         const totalAmount = Number(data?.Amount || 0);
-        const totalParticipants = participantsList.length || 0;
+        const totalPeople = Number(data?.Number_of_Peoples || 0);
+
         const perParticipantAmount =
-          totalParticipants > 0
-            ? Math.floor(totalAmount / totalParticipants)
-            : 0;
+          totalPeople > 0 ? Math.round(totalAmount / totalPeople) : 0;
 
         setLuckyDrawAmount(perParticipantAmount);
       } catch (error) {
@@ -1806,8 +1812,8 @@ export default function ParticipantDetailsPage() {
                   size={14}
                   className="group-hover:scale-110 transition-transform sm:w-4 sm:h-4"
                 />
-                <span className="hidden sm:inline">QR Code</span>
-                <span className="inline sm:hidden">QR</span>
+                <span className="hidden sm:inline">Make Your Payment</span>
+                <span className="inline sm:hidden">Make Your Payment</span>
               </button>
               <button
                 onClick={() => openModal("upload", null)}
