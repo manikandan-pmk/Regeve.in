@@ -80,14 +80,14 @@ axiosWithAuth.interceptors.request.use(
 const getCycleLabel = (payment, durationUnit) => {
   if (!payment) return "N/A";
 
-  const unit = payment.Cycle_Unit || 
-                payment.lucky_draw_name?.Duration_Unit || 
-                durationUnit || 
-                "Cycle";
+  const unit =
+    payment.Cycle_Unit ||
+    payment.lucky_draw_name?.Duration_Unit ||
+    durationUnit ||
+    "Cycle";
 
-  const number = payment.Cycle_Number || 
-                 payment.Payment_Cycle || 
-                 payment.cycle_number;
+  const number =
+    payment.Cycle_Number || payment.Payment_Cycle || payment.cycle_number;
 
   if (!number) return unit || "N/A";
 
@@ -155,6 +155,10 @@ const LuckyDrawDashboard = () => {
   // Cycle states
   const [selectedCycle, setSelectedCycle] = useState("all");
   const [cycleStats, setCycleStats] = useState({});
+  const [cycleProgress, setCycleProgress] = useState({
+    progress: 0, // % completed
+    remaining: 100, // % remaining
+  });
 
   const refetchAll = async () => {
     await Promise.all([fetchLuckyDrawData(), fetchWinners(), fetchPayments()]);
@@ -174,13 +178,13 @@ const LuckyDrawDashboard = () => {
   // Helper function to format payment cycle label
   const getPaymentCycleLabel = (cycleNumber) => {
     if (!cycleNumber || cycleNumber === "all") return "All Cycles";
-    
+
     const durationUnit = luckyDrawData?.Duration_Unit || "Cycle";
-    
+
     if (!isNaN(cycleNumber)) {
       return `${durationUnit} ${cycleNumber}`;
     }
-    
+
     // If it's already formatted, return as is
     return cycleNumber;
   };
@@ -212,7 +216,21 @@ const LuckyDrawDashboard = () => {
       );
       const cycleEnd = new Date(cycleStart.getTime() + cycleDays * MS_PER_DAY);
 
+      const elapsedMs = Math.max(now - cycleStart, 0);
       const remainingMs = Math.max(cycleEnd - now, 0);
+      const cycleDurationMs = cycleDays * MS_PER_DAY;
+
+      // ✅ ADD THIS (progress calculation)
+      const progressPercent = Math.min(
+        (elapsedMs / cycleDurationMs) * 100,
+        100
+      );
+
+      setCycleProgress({
+        progress: Math.round(progressPercent),
+        remaining: Math.round(100 - progressPercent),
+      });
+
       const totalSeconds = Math.floor(remainingMs / 1000);
 
       setTimeLeft({
@@ -1548,7 +1566,10 @@ const LuckyDrawDashboard = () => {
       value: `${timeLeft.days}d`,
       icon: Calendar,
       color: "amber",
+
       subTitle: `${timeLeft.hours}h : ${timeLeft.minutes}m : ${timeLeft.seconds}s`,
+      progress: cycleProgress.progress,
+      progressPercent: cycleProgress.progress,
     },
   ];
 
