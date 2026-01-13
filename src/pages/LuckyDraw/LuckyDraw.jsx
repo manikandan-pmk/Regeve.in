@@ -283,44 +283,9 @@ const LuckyDraw = () => {
       );
 
       const data = res.data?.data || res.data;
-      const payments = data?.payments || [];
 
-      const currentCycle = calculateCurrentCycleFromPC();
-
-      console.log("📊 PARTICIPANT FILTERING:");
-      console.log("Total payments:", payments.length);
-      console.log("Looking for cycle:", currentCycle);
-      console.log("Duration Value (max cycles):", durationValue);
-
-      // ✅ FILTER BY CURRENT CYCLE
-      const eligible = payments
-        .filter((p) => {
-          const paymentCycle = Number(p.Payment_Cycle);
-          const isEligible =
-            p.isVerified &&
-            paymentCycle === currentCycle && // MUST match current cycle
-            p.lucky_draw_form?.isVerified &&
-            !p.lucky_draw_form?.IsWinnedParticipant;
-
-          if (p.isVerified) {
-            console.log(`Payment ${p.documentId}:`, {
-              paymentCycle,
-              currentCycle,
-              matches: paymentCycle === currentCycle,
-              participantVerified: p.lucky_draw_form?.isVerified,
-              isWinner: p.lucky_draw_form?.IsWinnedParticipant,
-            });
-          }
-
-          return isEligible;
-        })
-        .map((p) => p.lucky_draw_form);
-
-      console.log(
-        "✅ Eligible participants for cycle",
-        currentCycle,
-        ":",
-        eligible.length
+      const eligible = (data.lucky_draw_forms || []).filter(
+        (p) => p.isVerified === true && !p.IsWinnedParticipant
       );
 
       setParticipants(eligible);
@@ -490,6 +455,22 @@ const LuckyDraw = () => {
     }, 300);
   };
 
+  const getStrapiImageUrl = (photo) => {
+    if (!photo) return null;
+
+    // ✅ YOUR API FORMAT (confirmed)
+    if (photo.url) {
+      return `https://api.regeve.in${photo.url}`;
+    }
+
+    // fallback (future safe)
+    if (photo.data?.attributes?.url) {
+      return `https://api.regeve.in${photo.data.attributes.url}`;
+    }
+
+    return null;
+  };
+
   // Update current values during spinning
   useEffect(() => {
     let interval;
@@ -560,11 +541,10 @@ const LuckyDraw = () => {
                   <div className="w-48 h-48 mb-6 rounded-xl overflow-hidden border-4 border-yellow-400 shadow-lg">
                     <img
                       src={
-                        result.winner.Photo?.url
-                          ? `https://api.regeve.in${result.winner.Photo.url}`
-                          : "/default-avatar.png"
+                        getStrapiImageUrl(result?.winner?.Photo) ||
+                        "/default-avatar.png"
                       }
-                      alt={result.winner.Name}
+                      alt={result?.winner?.Name}
                       className="w-full h-full object-cover"
                     />
                   </div>
