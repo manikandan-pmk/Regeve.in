@@ -892,7 +892,9 @@ const LuckyDraw = () => {
           {/* ✅ UPDATED CYCLE DISPLAY */}
           {drawStartDate && (
             <p className="text-sm text-yellow-400 mt-2">
-              Current Cycle: {durationUnit} {currentCycle}
+              {currentCycle === 2
+                ? "Current Cycle: Management Winner"
+                : `Current Cycle: ${durationUnit} ${currentCycle}`}
             </p>
           )}
         </motion.div>
