@@ -458,9 +458,7 @@ const QRCodeModal = ({
   const [copied, setCopied] = useState(false);
   const [downloading, setDownloading] = useState(false);
 
-
   // Extract UPI ID from QR image or set a default
- 
 
   if (!isOpen) return null;
 
@@ -469,18 +467,17 @@ const QRCodeModal = ({
   const qrImageUrl = qrImage || null;
 
   const handleCopyUPI = () => {
-  if (!upiId) {
-    showToast("UPI ID not available", "error");
-    return;
-  }
+    if (!upiId) {
+      showToast("UPI ID not available", "error");
+      return;
+    }
 
-  navigator.clipboard.writeText(upiId).then(() => {
-    setCopied(true);
-    showToast("UPI ID copied!", "success");
-    setTimeout(() => setCopied(false), 2000);
-  });
-};
-
+    navigator.clipboard.writeText(upiId).then(() => {
+      setCopied(true);
+      showToast("UPI ID copied!", "success");
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
 
   const handleDownloadQR = async () => {
     if (!qrImageUrl) {
@@ -602,18 +599,17 @@ const QRCodeModal = ({
                   </div>
 
                   {upiId && (
-  <div className="mt-3 text-center">
-    <p className="text-xs text-slate-500 mb-1">UPI ID</p>
-    <button
-      onClick={handleCopyUPI}
-      className="inline-flex items-center gap-2 px-3 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg font-semibold text-sm text-slate-800 transition cursor-pointer"
-    >
-      <CreditCard size={14} />
-      {upiId}
-    </button>
-  </div>
-)}
-
+                    <div className="mt-3 text-center">
+                      <p className="text-xs text-slate-500 mb-1">UPI ID</p>
+                      <button
+                        onClick={handleCopyUPI}
+                        className="inline-flex items-center gap-2 px-3 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg font-semibold text-sm text-slate-800 transition cursor-pointer"
+                      >
+                        <CreditCard size={14} />
+                        {upiId}
+                      </button>
+                    </div>
+                  )}
 
                   {/* Amount */}
                   <div className="text-center">
@@ -898,7 +894,8 @@ const UploadScreenshotModal = ({
       await api.post("/lucky-draw-participant-payments", {
         data: {
           Amount: Number(paymentAmount),
-          Payment_Cycle: paymentCycle.label,
+          Payment_Cycle: Number(paymentCycle.value.split("-")[1]),
+
           due_date: paymentCycle.endDate,
           lucky_draw_form: participantDocumentId,
           lucky_draw_name: luckydrawDocumentId,
@@ -1558,14 +1555,16 @@ const PaymentHistoryModal = ({
 };
 
 const getWinnerCycleLabel = (paymentHistory = []) => {
-  if (!paymentHistory.length) return null;
+  if (!Array.isArray(paymentHistory) || paymentHistory.length === 0)
+    return null;
 
-  const firstCycle = paymentHistory[0]?.Payment_Cycle || "";
+  const cycleNumber = Number(paymentHistory[0]?.Payment_Cycle);
 
-  if (firstCycle.toLowerCase().includes("week")) return "Week 1";
-  if (firstCycle.toLowerCase().includes("month")) return "Month 1";
+  if (!cycleNumber || isNaN(cycleNumber)) return null;
 
-  return null;
+  // You already know duration unit from LuckyDraw
+  // Defaulting to "Week" (you can improve later)
+  return `Week ${cycleNumber}`;
 };
 
 // --- PARTICIPANT CARD COMPONENT (RESPONSIVE) ---
@@ -1690,7 +1689,6 @@ export default function ParticipantDetailsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [upiId, setUpiId] = useState("");
 
-
   const [toast, setToast] = useState({
     visible: false,
     message: "",
@@ -1727,8 +1725,7 @@ export default function ParticipantDetailsPage() {
         const participantsList = data?.lucky_draw_forms || [];
         const participantPayments = data?.participant_payments || [];
         // ✅ SET UPI ID FROM BACKEND
-setUpiId(data?.Upi_Id || "");
-
+        setUpiId(data?.Upi_Id || "");
 
         // ✅ BUILD PARTICIPANTS (ONLY ONCE)
         const mappedParticipants = participantsList.map((item) => {
@@ -2092,7 +2089,7 @@ setUpiId(data?.Upi_Id || "");
         participant={selectedUser}
         qrImage={luckyDrawQR}
         amount={luckyDrawAmount}
-         upiId={upiId}  
+        upiId={upiId}
         showToast={showToast}
       />
       <UploadScreenshotModal

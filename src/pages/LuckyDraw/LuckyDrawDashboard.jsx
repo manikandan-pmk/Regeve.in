@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { useNavigate, useParams } from "react-router-dom";
+import { useRef } from "react";
 import {
   Users,
   DollarSign,
@@ -91,6 +92,24 @@ const LuckyDrawDashboard = () => {
   const [showWinnerModal, setShowWinnerModal] = useState(false);
   const [showPaymentsModal, setShowPaymentsModal] = useState(false);
   const [cycleInfo, setCycleInfo] = useState(null);
+  const [timeLeft, setTimeLeft] = useState({
+    label: "",
+    days: 0,
+    hours: 0,
+    minutes: 0,
+    seconds: 0,
+  });
+
+  const hasFetchedRef = useRef(false);
+
+  useEffect(() => {
+    if (!luckydrawDocumentId || hasFetchedRef.current) return;
+
+    hasFetchedRef.current = true;
+    fetchLuckyDrawData();
+    fetchWinners();
+    fetchPayments();
+  }, [luckydrawDocumentId]);
 
   const [stats, setStats] = useState({
     totalParticipants: 0,
@@ -125,17 +144,65 @@ const LuckyDrawDashboard = () => {
   const refetchAll = async () => {
     await Promise.all([fetchLuckyDrawData(), fetchWinners(), fetchPayments()]);
   };
-
   useEffect(() => {
-    if (!luckydrawDocumentId) {
-      setError("Lucky Draw ID missing in URL");
-      setLoading(false);
+    if (
+      !cycleInfo?.startAt ||
+      !luckyDrawData ||
+      showPaymentsModal ||
+      showWinnerModal
+    )
       return;
-    }
-    fetchLuckyDrawData();
-    fetchWinners();
-    fetchPayments();
-  }, [luckydrawDocumentId]);
+
+    const calculateCycle = () => {
+      const now = new Date();
+      const start = new Date(cycleInfo.startAt);
+
+      const unit = luckyDrawData.Duration_Unit;
+      const cycleDays = unit === "Week" ? 7 : unit === "Month" ? 30 : 1;
+
+      const MS_PER_DAY = 24 * 60 * 60 * 1000;
+      if (now < start) return;
+
+      const daysPassed = Math.floor((now - start) / MS_PER_DAY);
+      const currentCycle = Math.floor(daysPassed / cycleDays) + 1;
+
+      const cycleStart = new Date(
+        start.getTime() + (currentCycle - 1) * cycleDays * MS_PER_DAY
+      );
+      const cycleEnd = new Date(cycleStart.getTime() + cycleDays * MS_PER_DAY);
+
+      const remainingMs = Math.max(cycleEnd - now, 0);
+      const totalSeconds = Math.floor(remainingMs / 1000);
+
+      setTimeLeft({
+        label: `${unit} ${currentCycle}`,
+        days: Math.floor(totalSeconds / 86400),
+        hours: Math.floor((totalSeconds % 86400) / 3600),
+        minutes: Math.floor((totalSeconds % 3600) / 60),
+        seconds: totalSeconds % 60,
+      });
+    };
+
+    calculateCycle();
+    const interval = setInterval(calculateCycle, 1000);
+    return () => clearInterval(interval);
+  }, [
+    cycleInfo?.startAt,
+    luckyDrawData?.Duration_Unit,
+    showPaymentsModal,
+    showWinnerModal,
+  ]);
+
+  // useEffect(() => {
+  //   if (!luckydrawDocumentId) {
+  //     setError("Lucky Draw ID missing in URL");
+  //     setLoading(false);
+  //     return;
+  //   }
+  //   fetchLuckyDrawData();
+  //   fetchWinners();
+  //   fetchPayments();
+  // }, [luckydrawDocumentId]);
 
   const fetchLuckyDrawData = async () => {
     try {
@@ -189,24 +256,28 @@ const LuckyDrawDashboard = () => {
       }
 
       const winnersList = data.lucky_draw_forms
-        .filter((participant) => participant.IsWinnedParticipant === true)
-        .map((participant) => {
-          // 🔥 find last verified payment of this participant
-          const participantPayments =
-            data.payments?.filter(
-              (p) =>
-                p.lucky_draw_form?.documentId === participant.documentId &&
-                p.isVerified === true
-            ) || [];
-
-          const latestPayment =
-            participantPayments[participantPayments.length - 1];
+        .filter((p) => p.IsWinnedParticipant === true)
+        .map((p) => {
+          const winner =
+            Array.isArray(p.lucky_draw_winners) && p.lucky_draw_winners.length
+              ? p.lucky_draw_winners[p.lucky_draw_winners.length - 1]
+              : null;
+          // ✅ DIRECT ACCESS
 
           return {
-            ...participant,
-            winPaymentCycle: latestPayment?.Payment_Cycle || "Unknown Cycle",
+            ...p,
+            Cycle_Number: winner?.Cycle_Number ?? null,
+            Cycle_Unit: winner?.Cycle_Unit ?? null,
+            Won_At: winner?.Won_At ?? null,
           };
         });
+
+      setWinners(winnersList);
+
+      setStats((prev) => ({
+        ...prev,
+        winnersCount: winnersList.length,
+      }));
 
       setWinners(winnersList);
       setStats((prev) => ({
@@ -224,33 +295,28 @@ const LuckyDrawDashboard = () => {
   const fetchPayments = async () => {
     try {
       setPaymentsLoading(true);
+
       const response = await axiosWithAuth.get(
-        `/lucky-draw-names/${luckydrawDocumentId}?populate[payments][populate][lucky_draw_form][populate]=Photo`
+        `/lucky-draw-names/${luckydrawDocumentId}`
       );
 
       const data = response.data;
       const paymentsData = data.payments || [];
 
-      // Process payments data
       let paidAmount = 0;
       let pendingAmount = 0;
       let paidCount = 0;
       let pendingCount = 0;
 
-      // Calculate cycle-wise statistics
       const cycleData = {};
       const allCycles = [];
 
       paymentsData.forEach((payment) => {
-        const amount = parseFloat(payment.Amount) || 0;
+        const amount = Number(payment.Amount) || 0;
         const cycle = payment.Payment_Cycle || "Unknown";
 
-        // Add to all cycles list
-        if (!allCycles.includes(cycle)) {
-          allCycles.push(cycle);
-        }
+        if (!allCycles.includes(cycle)) allCycles.push(cycle);
 
-        // Initialize cycle data if not exists
         if (!cycleData[cycle]) {
           cycleData[cycle] = {
             total: 0,
@@ -262,7 +328,6 @@ const LuckyDrawDashboard = () => {
           };
         }
 
-        // Update cycle data
         cycleData[cycle].total++;
         cycleData[cycle].totalAmount += amount;
 
@@ -284,8 +349,8 @@ const LuckyDrawDashboard = () => {
         ...prev,
         totalPaidAmount: paidAmount,
         totalPendingAmount: pendingAmount,
-        paidCount: paidCount,
-        pendingCount: pendingCount,
+        paidCount,
+        pendingCount,
       }));
 
       setPaymentStats({
@@ -294,14 +359,13 @@ const LuckyDrawDashboard = () => {
         totalAmount: paidAmount + pendingAmount,
       });
 
-      // Store cycle statistics
       setCycleStats({
         cycles: allCycles.sort(),
         data: cycleData,
       });
     } catch (error) {
       console.error("Error fetching payments:", error);
-      setError(error.message || "Failed to fetch payments");
+      setError("Failed to fetch payments");
     } finally {
       setPaymentsLoading(false);
     }
@@ -339,13 +403,6 @@ const LuckyDrawDashboard = () => {
       setVerifyingPaymentId(null);
     }
   };
-  const getWeekLabel = (cycle) => {
-  if (!cycle) return "Week";
-
-  const match = cycle.match(/Week\s*\d+/i);
-  return match ? match[0] : cycle;
-};
-
 
   const getStatusColor = (status) => {
     const colors = {
@@ -686,7 +743,12 @@ const LuckyDrawDashboard = () => {
                       >
                         <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer"></div>
                         <Crown className="w-4 h-4" />
-                        <span className="font-bold text-sm">  {getWeekLabel(winner.winPaymentCycle)}</span>
+                        <span className="font-bold text-sm">
+                          {" "}
+                          {winner.Cycle_Unit && winner.Cycle_Number
+                            ? `${winner.Cycle_Unit} ${winner.Cycle_Number}`
+                            : "—"}
+                        </span>
                       </motion.div>
                     </div>
                   </div>
@@ -954,9 +1016,7 @@ const LuckyDrawDashboard = () => {
                                   : "text-gray-700"
                               }`}
                             >
-                              <div className="font-medium text-sm">
-                                Cycle {cycle}
-                              </div>
+                              <div className="font-medium text-sm">{cycle}</div>
                               <div className="text-xs text-gray-500">
                                 {cycleStats.data[cycle]?.total || 0} payments
                               </div>
@@ -1333,8 +1393,33 @@ const LuckyDrawDashboard = () => {
       </div>
     );
   }
+  const getCycleNumber = (cycle) => {
+    if (cycle == null) return null;
 
-  const receivedAmount = Number(cycleInfo?.totalAmount || 0);
+    // If backend already sent number
+    if (typeof cycle === "number") {
+      return cycle;
+    }
+
+    // If backend sent string like "Week 1"
+    if (typeof cycle === "string") {
+      const match = cycle.match(/\d+/);
+      return match ? Number(match[0]) : null;
+    }
+
+    // Any other type (object, boolean, etc.)
+    return null;
+  };
+
+  const currentCycleNumber = getCycleNumber(timeLeft.label);
+
+  const receivedAmount = payments
+    .filter(
+      (p) =>
+        p.isVerified === true &&
+        getCycleNumber(p.Payment_Cycle) === currentCycleNumber
+    )
+    .reduce((sum, p) => sum + Number(p.Amount || 0), 0);
 
   // ✅ FIXED PER CYCLE AMOUNT (from backend)
   const expectedAmount = Number(luckyDrawData?.Amount || 0);
@@ -1346,7 +1431,8 @@ const LuckyDrawDashboard = () => {
   const statsCards = [
     {
       key: "totalAmount",
-      title: `Amount Collected (${cycleInfo?.currentCycle || ""})`,
+      title: `Amount Collected (${timeLeft.label || ""})`,
+
       value: `${formatCurrency(receivedAmount)}`,
       icon: DollarSign,
       color: "green",
@@ -1398,11 +1484,11 @@ const LuckyDrawDashboard = () => {
     },
     {
       key: "remainingCycle",
-      title: "Current Cycle",
-      value: cycleInfo?.remainingDays || 0,
+      title: timeLeft.label || "Current Cycle",
+      value: `${timeLeft.days}d`,
       icon: Calendar,
       color: "amber",
-      subTitle: cycleInfo?.remainingText || "",
+      subTitle: `${timeLeft.hours}h : ${timeLeft.minutes}m : ${timeLeft.seconds}s`,
     },
   ];
 
@@ -1887,7 +1973,6 @@ const LuckyDrawDashboard = () => {
                         transition={{ duration: 0.5 }}
                         className="relative"
                       >
-
                         <motion.div
                           animate={{ scale: [1, 1.2, 1] }}
                           transition={{ duration: 1.5, repeat: Infinity }}
@@ -1957,11 +2042,10 @@ const LuckyDrawDashboard = () => {
                         {/* Animated Stats */}
                         <div className="flex items-center justify-center gap-2 flex-wrap">
                           {[
-                           
                             {
                               bg: "yellow",
-                              text: getWeekLabel(winner.winPaymentCycle),
-                            }
+                              text: `${winner.Cycle_Unit} ${winner.Cycle_Number}`,
+                            },
                           ].map((tag, tagIndex) => (
                             <motion.span
                               key={tagIndex}
@@ -2014,7 +2098,6 @@ const LuckyDrawDashboard = () => {
         <PaymentTrackingModal
           onClose={() => {
             setShowPaymentsModal(false);
-            refetchAll();
           }}
         />
       )}

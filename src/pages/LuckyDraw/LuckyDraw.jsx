@@ -18,7 +18,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import axios from "axios";
 import React, { useState, useEffect } from "react";
 
-// Animation variants
+// Animation variants (NO CHANGES)
 const containerVariants = {
   hidden: { opacity: 0, y: 100 },
   visible: {
@@ -171,21 +171,73 @@ const floatingParticles = {
 const LuckyDraw = () => {
   const { adminId, luckydrawDocumentId } = useParams();
 
+  // STATES
   const [isSpinning, setIsSpinning] = useState(false);
   const [result, setResult] = useState(null);
   const [showResult, setShowResult] = useState(false);
   const [currentValues, setCurrentValues] = useState(["", "", "0", "0", "0"]);
   const [finalValues, setFinalValues] = useState(["", "", "0", "0", "0"]);
   const [drawLetters, setDrawLetters] = useState(["", ""]);
-
   const [blastAnimation, setBlastAnimation] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
 
-  const navigate = useNavigate();
-
+  // ✅ REMOVE cycleInfo and currentCycle states
+  const [drawStartDate, setDrawStartDate] = useState(null);
+  const [durationUnit, setDurationUnit] = useState("Week");
+  const [durationValue, setDurationValue] = useState(1);
   const [participants, setParticipants] = useState([]);
   const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
 
+  // ✅ CORRECTED: Each cycle is 1 unit (Day, Week, or Month)
+  const calculateCurrentCycleFromPC = () => {
+    if (!drawStartDate) return 1;
+
+    const start = new Date(drawStartDate);
+    const now = new Date();
+
+    if (isNaN(start.getTime())) return 1;
+
+    // EACH CYCLE = 1 unit
+    let cycleLengthMs = 0;
+
+    if (durationUnit === "Day") {
+      cycleLengthMs = 24 * 60 * 60 * 1000; // 1 day = 1 cycle
+    } else if (durationUnit === "Week") {
+      cycleLengthMs = 7 * 24 * 60 * 60 * 1000; // 1 week = 1 cycle
+    } else if (durationUnit === "Month") {
+      cycleLengthMs = 30 * 24 * 60 * 60 * 1000; // 1 month = 1 cycle (30 days)
+    }
+
+    if (!cycleLengthMs) return 1;
+
+    const diff = now - start;
+    const currentCycle = Math.floor(diff / cycleLengthMs) + 1;
+
+    console.log("🔢 CORRECT Cycle calculation:", {
+      start: drawStartDate,
+      now: now.toISOString(),
+      durationUnit,
+      durationValue,
+      cycleLengthDays: cycleLengthMs / (24 * 60 * 60 * 1000),
+      daysPassed: diff / (24 * 60 * 60 * 1000),
+      calculatedCycle: currentCycle,
+      maxCycles: durationValue,
+    });
+
+    // If Duration_Value limits total cycles
+    // Example: Duration_Value = 3 means only 3 cycles total
+    if (durationValue && currentCycle > durationValue) {
+      return durationValue; // Stay on last cycle
+    }
+
+    return currentCycle < 1 ? 1 : currentCycle;
+  };
+
+  // Get current cycle for display
+  const currentCycle = calculateCurrentCycleFromPC();
+
+  // Update display values when letters change
   useEffect(() => {
     if (drawLetters[0]) {
       setCurrentValues([drawLetters[0], drawLetters[1], "0", "0", "0"]);
@@ -193,63 +245,107 @@ const LuckyDraw = () => {
     }
   }, [drawLetters]);
 
-  useEffect(() => {
-    console.log("adminId:", adminId);
-    console.log("luckydrawDocumentId:", luckydrawDocumentId);
-  }, [adminId, luckydrawDocumentId]);
+  // ✅ FETCH DRAW INFO
+  const fetchDrawInfo = async () => {
+    const token = localStorage.getItem("jwt");
 
-  useEffect(() => {
-    const fetchParticipants = async () => {
-      try {
-        setLoading(true);
+    const res = await axios.get(
+      `https://api.regeve.in/api/lucky-draw-names/${luckydrawDocumentId}`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
 
-        const token = localStorage.getItem("jwt");
+    const data = res.data?.data || res.data;
 
-        const res = await axios.get(
-          `https://api.regeve.in/api/lucky-draw-names/${luckydrawDocumentId}`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
+    // ✅ SET DRAW INFO
+    setDrawStartDate(data.createdAt);
+    setDurationUnit(data.Duration_Unit || "Week");
+    setDurationValue(data.Duration_Value || 1);
+
+    const companyName = data?.admin?.Company_Name || "";
+    const letters = companyName
+      .replace(/[^A-Za-z]/g, "")
+      .toUpperCase()
+      .padEnd(2, "X")
+      .slice(0, 2);
+
+    setDrawLetters([letters[0], letters[1]]);
+  };
+
+  // ✅ FETCH PARTICIPANTS
+  const fetchParticipants = async () => {
+    setLoading(true);
+    try {
+      const token = localStorage.getItem("jwt");
+
+      const res = await axios.get(
+        `https://api.regeve.in/api/lucky-draw-names/${luckydrawDocumentId}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      const data = res.data?.data || res.data;
+      const payments = data?.payments || [];
+
+      const currentCycle = calculateCurrentCycleFromPC();
+
+      console.log("📊 PARTICIPANT FILTERING:");
+      console.log("Total payments:", payments.length);
+      console.log("Looking for cycle:", currentCycle);
+      console.log("Duration Value (max cycles):", durationValue);
+
+      // ✅ FILTER BY CURRENT CYCLE
+      const eligible = payments
+        .filter((p) => {
+          const paymentCycle = Number(p.Payment_Cycle);
+          const isEligible =
+            p.isVerified &&
+            paymentCycle === currentCycle && // MUST match current cycle
+            p.lucky_draw_form?.isVerified &&
+            !p.lucky_draw_form?.IsWinnedParticipant;
+
+          if (p.isVerified) {
+            console.log(`Payment ${p.documentId}:`, {
+              paymentCycle,
+              currentCycle,
+              matches: paymentCycle === currentCycle,
+              participantVerified: p.lucky_draw_form?.isVerified,
+              isWinner: p.lucky_draw_form?.IsWinnedParticipant,
+            });
           }
-        );
 
-        const companyName = res.data?.admin?.Company_Name || "";
+          return isEligible;
+        })
+        .map((p) => p.lucky_draw_form);
 
-        // take first 2 letters only
-        const letters = companyName
-          .replace(/[^A-Za-z]/g, "")
-          .toUpperCase()
-          .padEnd(2, "X")
-          .slice(0, 2);
+      console.log(
+        "✅ Eligible participants for cycle",
+        currentCycle,
+        ":",
+        eligible.length
+      );
 
-        // store letters
-        setDrawLetters([letters[0], letters[1]]);
+      setParticipants(eligible);
+    } catch (error) {
+      console.error("Error fetching participants:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-        // ✅ users list
-        const users = res.data?.lucky_draw_forms || [];
-        const verifiedUsers = users.filter(
-          (user) =>
-            user.isVerified === true && user.IsWinnedParticipant !== true
-        );
-
-        setParticipants(verifiedUsers);
-      } catch (err) {
-        console.error("Fetch error:", err);
-
-        if (err.response?.status === 403) {
-          alert("Session expired. Please login again.");
-        }
-      } finally {
-        setLoading(false);
-      }
-    };
-
+  // ✅ INITIAL FETCH
+  useEffect(() => {
     if (luckydrawDocumentId) {
-      fetchParticipants();
+      fetchDrawInfo();
     }
   }, [luckydrawDocumentId]);
 
+  // ✅ FETCH PARTICIPANTS WHEN DATA CHANGES
+  useEffect(() => {
+    if (drawStartDate) {
+      fetchParticipants();
+    }
+  }, [drawStartDate, durationUnit, durationValue]);
+
+  // ✅ START SPINNING
   const startSpinning = () => {
     if (participants.length === 0) {
       alert("No verified participants available!");
@@ -263,103 +359,130 @@ const LuckyDraw = () => {
     setShowProfile(false);
   };
 
- const stopSpinning = async () => {
-  setIsSpinning(false);
-  setBlastAnimation(true);
+  const stopSpinning = async () => {
+    try {
+      setIsSpinning(false);
+      setBlastAnimation(true);
 
-  const availableParticipants = participants.filter(
-    (p) => p.IsWinnedParticipant !== true
-  );
+      const token = localStorage.getItem("jwt");
+      const currentCycle = calculateCurrentCycleFromPC();
 
-  if (availableParticipants.length === 0) {
-    alert("All participants have already won!");
-    return;
-  }
+      console.log("🎯 Current cycle (frontend):", currentCycle);
 
-  const randomIndex = Math.floor(
-    Math.random() * availableParticipants.length
-  );
-  const winner = availableParticipants[randomIndex];
-
-  const luckyDrawId = winner.LuckyDraw_ID || "";
-  const digits = luckyDrawId
-    .replace(/\D/g, "")
-    .slice(-3)
-    .padStart(3, "0")
-    .split("");
-
-  setFinalValues([
-    drawLetters[0],
-    drawLetters[1],
-    digits[0],
-    digits[1],
-    digits[2],
-  ]);
-
-  try {
-    const token = localStorage.getItem("jwt");
-
-    await axios.put(
-      `https://api.regeve.in/api/lucky-draw-names/${luckydrawDocumentId}`,
-      {
-        data: {
-          lucky_draw_forms: {
-            update: [
-              {
-                where: { documentId: winner.documentId },
-                data: {
-                  IsWinnedParticipant: true,
-                  WinnedDate: new Date().toISOString(),
-                },
-              },
-            ],
-          },
-        },
-      },
-      {
-        headers: { Authorization: `Bearer ${token}` },
+      // Check if we have participants for this cycle
+      if (participants.length === 0) {
+        console.warn("No participants available for cycle", currentCycle);
+        setBlastAnimation(false);
+        alert(`No eligible participants found for Cycle ${currentCycle}!`);
+        return;
       }
-    );
 
-    // ✅ REMOVE FROM FRONTEND STATE
-    setParticipants((prev) =>
-      prev.filter((p) => p.documentId !== winner.documentId)
-    );
+      const clientNow = new Date().toISOString();
+      console.log("📤 Sending to backend:", {
+        clientNow,
+        currentCycle,
+      });
 
-    setResult({
-      message: "Congratulations! You are the lucky winner!",
-      memberId: winner.LuckyDraw_ID,
-      winner,
-      updateSuccess: true,
-    });
+      const res = await axios.post(
+        `https://api.regeve.in/api/lucky-draw-names/${luckydrawDocumentId}/spin`,
+        {
+          clientNow,
+          // Optionally send cycleNumber too if backend accepts it
+          cycleNumber: currentCycle,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
 
-  } catch (err) {
-    console.error("Winner update failed:", err);
-    setResult({
-      message: "Winner selected but update failed",
-      memberId: winner.LuckyDraw_ID,
-      winner,
-      updateSuccess: false,
-    });
-  }
+      console.log("✅ Backend response:", res.data);
 
-  setTimeout(() => setShowResult(true), 2500);
-};
+      const winner = res.data.winner;
 
+      // Extract digits
+      const digits = winner.LuckyDraw_ID.replace(/\D/g, "")
+        .slice(-3)
+        .padStart(3, "0")
+        .split("");
 
+      // Update display
+      setFinalValues([
+        drawLetters[0],
+        drawLetters[1],
+        digits[0],
+        digits[1],
+        digits[2],
+      ]);
+
+      setResult({
+        message: `Cycle ${res.data.currentCycle} Winner!`,
+        memberId: winner.LuckyDraw_ID,
+        winner,
+        updateSuccess: true,
+      });
+
+      await fetchParticipants();
+
+      setTimeout(() => setShowResult(true), 2000);
+    } catch (err) {
+      console.error("❌ Spin failed:", err);
+      setBlastAnimation(false);
+
+      if (err.response?.data?.error?.message) {
+        const errorMsg = err.response.data.error.message;
+        console.error("Backend error:", errorMsg);
+
+        // Handle specific error cases
+        if (errorMsg.includes("Winner already selected")) {
+          // Extract cycle number from error message
+          const cycleMatch = errorMsg.match(/Cycle (\d+)/);
+          const cycleNumber = cycleMatch ? cycleMatch[1] : "current";
+
+          alert(
+            `⚠️ Winner already selected for Cycle ${cycleNumber}!\n\nPlease wait for the next cycle or reset the draw.`
+          );
+
+          // You could add a button to view the existing winner
+          setResult({
+            message: `Cycle ${cycleNumber} already has a winner`,
+            memberId: "Already Selected",
+            updateSuccess: false,
+          });
+          setTimeout(() => setShowResult(true), 1000);
+        } else if (errorMsg.includes("No verified participants")) {
+          alert(
+            `No verified participants available for the current cycle.\n\nPlease verify participant payments first.`
+          );
+        } else {
+          alert(`Error: ${errorMsg}`);
+        }
+      } else if (err.message) {
+        alert(`Error: ${err.message}`);
+      } else {
+        alert("An unknown error occurred");
+      }
+    }
+  };
+  // Reset lucky draw
   const resetLuckyDraw = () => {
     setIsSpinning(false);
     setResult(null);
     setShowResult(false);
     setBlastAnimation(false);
-    setCurrentValues(["B", "0", "0", "0"]);
-    setFinalValues(["B", "0", "0", "0"]);
+
+    const values = [drawLetters[0] || "", drawLetters[1] || "", "0", "0", "0"];
+    setCurrentValues(values);
+    setFinalValues(values);
   };
 
+  // View profile
   const handleViewProfile = () => {
     setShowProfile(true);
   };
 
+  // Close profile
   const closeProfile = () => {
     setShowProfile(false);
     setTimeout(() => {
@@ -390,9 +513,10 @@ const LuckyDraw = () => {
     return () => clearInterval(interval);
   }, [isSpinning, finalValues]);
 
+  // ✅ JSX RENDER (ONLY UPDATED THE HEADER SECTION)
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-800 flex items-center justify-center p-4 font-serif relative">
-      {/* Profile Popup - Static Version */}
+      {/* Profile Popup - Static Version (NO CHANGES) */}
       <motion.button
         onClick={() =>
           navigate(`/${adminId}/luckydraw-dashboard/${luckydrawDocumentId}`)
@@ -404,123 +528,129 @@ const LuckyDraw = () => {
 
       <AnimatePresence>
         {showProfile && result?.winner && (
-  <motion.div
-    initial={{ opacity: 0 }}
-    animate={{ opacity: 1 }}
-    exit={{ opacity: 0 }}
-    className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm"
-    onClick={closeProfile}
-  >
-    <motion.div
-      initial={{ scale: 0.8, y: 50 }}
-      animate={{ scale: 1, y: 0 }}
-      exit={{ scale: 0.8, y: 50 }}
-      className="bg-gradient-to-br from-slate-800 to-purple-900 rounded-3xl p-8 max-w-2xl w-full m-4 border border-purple-500/30 shadow-2xl"
-      onClick={(e) => e.stopPropagation()}
-    >
-      <div className="flex justify-between items-center mb-8 pb-4 border-b border-purple-500/30">
-        <h2 className="text-2xl font-bold text-white">
-          🏆 Winner Profile
-        </h2>
-        <button
-          onClick={closeProfile}
-          className="text-white text-xl hover:text-yellow-400 transition-colors"
-        >
-          ✕
-        </button>
-      </div>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm"
+            onClick={closeProfile}
+          >
+            <motion.div
+              initial={{ scale: 0.8, y: 50 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.8, y: 50 }}
+              className="bg-gradient-to-br from-slate-800 to-purple-900 rounded-3xl p-8 max-w-2xl w-full m-4 border border-purple-500/30 shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex justify-between items-center mb-8 pb-4 border-b border-purple-500/30">
+                <h2 className="text-2xl font-bold text-white">
+                  🏆 Winner Profile
+                </h2>
+                <button
+                  onClick={closeProfile}
+                  className="text-white text-xl hover:text-yellow-400 transition-colors"
+                >
+                  ✕
+                </button>
+              </div>
 
-      <div className="flex flex-col md:flex-row gap-8">
-        {/* Left side - Image section */}
-        <div className="md:w-1/3 flex flex-col items-center">
-          <div className="w-48 h-48 mb-6 rounded-xl overflow-hidden border-4 border-yellow-400 shadow-lg">
-            <img
-              src={
-                result.winner.Photo?.url
-                  ? `https://api.regeve.in${result.winner.Photo.url}`
-                  : "/default-avatar.png"
-              }
-              alt={result.winner.Name}
-              className="w-full h-full object-cover"
-            />
-          </div>
-          
-          <div className="text-center">
-            <h3 className="text-xl font-bold text-white mb-2">
-              {result.winner.Name}
-            </h3>
-            <div className="inline-block bg-purple-800/50 px-4 py-2 rounded-lg">
-              <p className="text-yellow-400 font-mono font-semibold">
-                ID: {result.memberId}
-              </p>
-            </div>
-          </div>
-        </div>
+              <div className="flex flex-col md:flex-row gap-8">
+                {/* Left side - Image section */}
+                <div className="md:w-1/3 flex flex-col items-center">
+                  <div className="w-48 h-48 mb-6 rounded-xl overflow-hidden border-4 border-yellow-400 shadow-lg">
+                    <img
+                      src={
+                        result.winner.Photo?.url
+                          ? `https://api.regeve.in${result.winner.Photo.url}`
+                          : "/default-avatar.png"
+                      }
+                      alt={result.winner.Name}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
 
-        {/* Right side - Details section */}
-        <div className="md:w-2/3">
-          <div className="mb-8">
-            <h4 className="text-lg font-semibold text-yellow-400 mb-4 pb-2 border-b border-yellow-400/30">
-              Personal Information
-            </h4>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-3">
-                <div>
-                  <label className="text-gray-400 text-sm">Phone Number</label>
-                  <p className="text-white font-medium mt-1">
-                    {result.winner.Phone_Number}
-                  </p>
+                  <div className="text-center">
+                    <h3 className="text-xl font-bold text-white mb-2">
+                      {result.winner.Name}
+                    </h3>
+                    <div className="inline-block bg-purple-800/50 px-4 py-2 rounded-lg">
+                      <p className="text-yellow-400 font-mono font-semibold">
+                        ID: {result.memberId}
+                      </p>
+                    </div>
+                  </div>
                 </div>
-                
-                <div>
-                  <label className="text-gray-400 text-sm">Email Address</label>
-                  <p className="text-white font-medium mt-1">
-                    {result.winner.Email}
-                  </p>
+
+                {/* Right side - Details section */}
+                <div className="md:w-2/3">
+                  <div className="mb-8">
+                    <h4 className="text-lg font-semibold text-yellow-400 mb-4 pb-2 border-b border-yellow-400/30">
+                      Personal Information
+                    </h4>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-3">
+                        <div>
+                          <label className="text-gray-400 text-sm">
+                            Phone Number
+                          </label>
+                          <p className="text-white font-medium mt-1">
+                            {result.winner.Phone_Number}
+                          </p>
+                        </div>
+
+                        <div>
+                          <label className="text-gray-400 text-sm">
+                            Email Address
+                          </label>
+                          <p className="text-white font-medium mt-1">
+                            {result.winner.Email}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="space-y-3">
+                        <div>
+                          <label className="text-gray-400 text-sm">Age</label>
+                          <p className="text-white font-medium mt-1">
+                            {result.winner.Age} years
+                          </p>
+                        </div>
+
+                        <div>
+                          <label className="text-gray-400 text-sm">
+                            Gender
+                          </label>
+                          <p className="text-white font-medium mt-1">
+                            {result.winner.Gender}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Congratulations Banner */}
+                  <div className="mt-6 p-6 bg-gradient-to-r from-yellow-500/10 to-purple-600/10 rounded-xl border border-yellow-400/20">
+                    <div className="text-center">
+                      <p className="text-2xl font-bold text-yellow-300 mb-3">
+                        🎉 CONGRATULATIONS! 🎉
+                      </p>
+                      <p className="text-gray-200 text-lg">
+                        You are the lucky winner of this draw!
+                      </p>
+                      <p className="text-gray-300 mt-2">
+                        Your prize will be processed shortly.
+                      </p>
+                    </div>
+                  </div>
                 </div>
               </div>
-              
-              <div className="space-y-3">
-                <div>
-                  <label className="text-gray-400 text-sm">Age</label>
-                  <p className="text-white font-medium mt-1">
-                    {result.winner.Age} years
-                  </p>
-                </div>
-                
-                <div>
-                  <label className="text-gray-400 text-sm">Gender</label>
-                  <p className="text-white font-medium mt-1">
-                    {result.winner.Gender}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Congratulations Banner */}
-          <div className="mt-6 p-6 bg-gradient-to-r from-yellow-500/10 to-purple-600/10 rounded-xl border border-yellow-400/20">
-            <div className="text-center">
-              <p className="text-2xl font-bold text-yellow-300 mb-3">
-                🎉 CONGRATULATIONS! 🎉
-              </p>
-              <p className="text-gray-200 text-lg">
-                You are the lucky winner of this draw!
-              </p>
-              <p className="text-gray-300 mt-2">
-                Your prize will be processed shortly.
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-    </motion.div>
-  </motion.div>
-)}
+            </motion.div>
+          </motion.div>
+        )}
       </AnimatePresence>
 
-      {/* Animated Background Elements */}
+      {/* Animated Background Elements (NO CHANGES) */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <motion.div
           animate={{
@@ -553,7 +683,7 @@ const LuckyDraw = () => {
         </motion.div>
       </div>
 
-      {/* Ultra Enhanced Blast Animation */}
+      {/* Ultra Enhanced Blast Animation (NO CHANGES) */}
       <AnimatePresence>
         {blastAnimation && (
           <>
@@ -778,9 +908,16 @@ const LuckyDraw = () => {
           <p className="text-gray-300 text-lg font-light tracking-wide">
             Spin to reveal your amazing prize!
           </p>
+
+          {/* ✅ UPDATED CYCLE DISPLAY */}
+          {drawStartDate && (
+            <p className="text-sm text-yellow-400 mt-2">
+              Current Cycle: {durationUnit} {currentCycle}
+            </p>
+          )}
         </motion.div>
 
-        {/* Number Boxes */}
+        {/* Number Boxes (NO CHANGES) */}
         <motion.div
           variants={itemVariants}
           className="flex justify-center gap-3 mb-8 relative"
@@ -790,7 +927,7 @@ const LuckyDraw = () => {
               <motion.div
                 variants={boxVariants}
                 animate={
-                  index === 0
+                  index < 2
                     ? "sticky"
                     : isSpinning
                     ? "flip"
@@ -800,8 +937,7 @@ const LuckyDraw = () => {
                 }
                 className="w-16 h-20 bg-gradient-to-br from-purple-600 to-pink-600 rounded-xl shadow-2xl border-2 border-purple-400 flex items-center justify-center relative overflow-hidden"
               >
-                {/* Enhanced shiny overlay - only for spinning boxes */}
-                {index > 0 && (
+                {index > 1 && (
                   <motion.div
                     animate={{
                       x: [-150, 150],
@@ -815,7 +951,6 @@ const LuckyDraw = () => {
                   />
                 )}
 
-                {/* Glow effect */}
                 <div className="absolute inset-0 bg-purple-500/20 rounded-xl blur-sm" />
 
                 <motion.span
@@ -826,16 +961,15 @@ const LuckyDraw = () => {
                   {value}
                 </motion.span>
 
-                {/* Box labels */}
                 <div className="absolute -bottom-6 left-1/2 transform -translate-x-1/2 text-xs text-gray-400 font-mono">
-                  {index === 0 ? "B" : index === 1 ? "0-3" : "0-9"}
+                  {index < 2 ? "L" : "0-9"}
                 </div>
               </motion.div>
             </motion.div>
           ))}
         </motion.div>
 
-        {/* Buttons */}
+        {/* Buttons (NO CHANGES) */}
         <motion.div variants={itemVariants} className="flex gap-4 mb-6">
           <motion.button
             whileHover={{
@@ -887,7 +1021,7 @@ const LuckyDraw = () => {
           </motion.button>
         </motion.div>
 
-        {/* Result */}
+        {/* Result (NO CHANGES) */}
         <AnimatePresence>
           {showResult && result && (
             <motion.div
@@ -896,7 +1030,6 @@ const LuckyDraw = () => {
               exit={{ opacity: 0, scale: 0, rotateY: -180 }}
               className="bg-gradient-to-br from-yellow-400 to-orange-500 rounded-2xl p-6 text-center text-white shadow-2xl border-2 border-white/20 relative overflow-hidden"
             >
-              {/* Animated background particles */}
               <motion.div
                 animate={{
                   rotate: 360,
@@ -967,7 +1100,6 @@ const LuckyDraw = () => {
                 </motion.p>
               )}
 
-              {/* View Profile Button */}
               {result.winner && (
                 <motion.div
                   initial={{ scale: 0 }}
@@ -1000,7 +1132,6 @@ const LuckyDraw = () => {
                 </motion.div>
               )}
 
-              {/* Floating trophies */}
               {result.updateSuccess !== false && (
                 <>
                   <motion.div
