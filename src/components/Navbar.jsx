@@ -386,7 +386,7 @@ const Navbar = () => {
                 >
                   <motion.button
                     onClick={openLogin}
-                    className="px-6 py-2.5 bg-gradient-to-r from-blue-600 to-cyan-500 text-white rounded-lg font-medium shadow-sm hover:shadow-md transition-all duration-200 flex items-center space-x-2"
+                    className="px-6 cursor-pointer py-2.5 bg-gradient-to-r from-blue-600 to-cyan-500 text-white rounded-lg font-medium shadow-sm hover:shadow-md transition-all duration-200 flex items-center space-x-2"
                     variants={itemVariants}
                     whileHover="hover"
                     whileTap="tap"

@@ -196,9 +196,9 @@ const Login = ({ onClose, onSwitchToRegister, onLoginSuccess }) => {
               <button
                 onClick={onClose}
                 disabled={isLoading}
-                className="p-2 hover:bg-gray-100 rounded-lg"
+                className="p-2 cursor-pointer  rounded-lg"
               >
-                <X className="w-5 h-5 text-gray-600" />
+                <X className="w-5 h-5 hover:bg-red-800  hover:bg-white" />
               </button>
             </div>
 
@@ -264,7 +264,7 @@ const Login = ({ onClose, onSwitchToRegister, onLoginSuccess }) => {
                         type="button"
                         onClick={() => setShowPassword(!showPassword)}
                         disabled={isLoading}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"
+                        className="absolute cursor-pointer right-3 top-1/2 -translate-y-1/2 text-gray-400"
                       >
                         {showPassword ? <EyeOff /> : <Eye />}
                       </button>
@@ -278,7 +278,7 @@ const Login = ({ onClose, onSwitchToRegister, onLoginSuccess }) => {
                   <button
                     type="submit"
                     disabled={isLoading}
-                    className="w-full bg-blue-600 text-white py-3 rounded-lg font-medium hover:bg-blue-700"
+                    className="w-full cursor-pointer bg-blue-600 text-white py-3 rounded-lg font-medium hover:bg-blue-700"
                   >
                     {isLoading ? "Signing in..." : "Sign In"}
                   </button>

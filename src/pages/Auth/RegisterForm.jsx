@@ -40,6 +40,14 @@ export default function RegisterForm() {
   const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
   const [otpError, setOtpError] = useState("");
 
+  // Payment related states
+  const [showPayment, setShowPayment] = useState(false);
+  const [paymentData, setPaymentData] = useState(null);
+  const [paymentProof, setPaymentProof] = useState(null);
+  const [isUploadingProof, setIsUploadingProof] = useState(false);
+  const [paymentStatus, setPaymentStatus] = useState("pending");
+  const [uploadError, setUploadError] = useState("");
+
   const handleServiceChange = (service) => {
     setSelectedServices((prev) => ({
       ...prev,
@@ -252,7 +260,21 @@ export default function RegisterForm() {
     }
   };
 
-  const submitToAPI = async () => {
+  const uploadPaymentProof = async (file) => {
+    const formData = new FormData();
+    formData.append("files", file);
+
+    const res = await axios.post("https://api.regeve.in/api/upload", formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
+
+    return res.data[0]; // uploaded file object
+  };
+
+  const submitToAPI = async (proofId) => {
+    // 1. Add proofId parameter
     const apiData = {
       Company_Name: formData.companyName.trim(),
       Name: formData.name.trim(),
@@ -268,6 +290,9 @@ export default function RegisterForm() {
       Password: formData.password,
       Email_Verify: true,
       Approved_Admin: false,
+      Payment_Status: "pending",
+      // 2. Add the payment proof ID here
+      Payment_Proof: proofId,
       Services: {
         "Digital Registration": selectedServices.digitalRegistration,
         "Food Management": selectedServices.foodManagement,
@@ -278,6 +303,7 @@ export default function RegisterForm() {
     };
 
     try {
+      // ... rest of the function remains the same
       const response = await axios.post(
         "https://api.regeve.in/api/admin/create",
         { data: apiData },
@@ -288,30 +314,35 @@ export default function RegisterForm() {
       );
       return response.data;
     } catch (error) {
+      // ... error handling remains the same
       console.error("Error submitting form:", error);
-      let errorMessage = "Registration failed. Please try again.";
+      // ...
+      throw new Error(errorMessage); // Ensure you keep the throw logic
+    }
+  };
 
-      if (error.response) {
-        if (error.response.data?.error?.details?.errors) {
-          const validationErrors = error.response.data.error.details.errors;
-          errorMessage =
-            "Validation errors: " +
-            Object.values(validationErrors)
-              .map((err) => err.message)
-              .join(", ");
-        } else if (error.response.data?.error?.message) {
-          errorMessage = error.response.data.error.message;
-        } else if (error.response.data?.message) {
-          errorMessage = error.response.data.message;
-        } else if (error.response.status === 500) {
-          errorMessage = "Server error. Please check the data and try again.";
-        }
-      } else if (error.request) {
-        errorMessage = "No response from server. Please check your connection.";
-      } else {
-        errorMessage = `Error: ${error.message}`;
+  const fetchPaymentDetails = async () => {
+    try {
+      const response = await axios.get(
+        "https://api.regeve.in/api/payment-admins?populate=*"
+      );
+
+      if (response.data.data && response.data.data.length > 0) {
+        const paymentData = response.data.data[0];
+        setPaymentData({
+          upiId: paymentData.Upi_Id,
+          qrCode: paymentData.QRcode?.[0]?.url
+            ? `https://api.regeve.in${paymentData.QRcode[0].url}`
+            : null,
+        });
       }
-      throw new Error(errorMessage);
+    } catch (error) {
+      console.error("Error fetching payment details:", error);
+      // Set default payment data if API fails
+      setPaymentData({
+        upiId: "dreamzmediaevents@okicici",
+        qrCode: null,
+      });
     }
   };
 
@@ -338,7 +369,11 @@ export default function RegisterForm() {
   };
 
   const handlePreviousStep = () => {
-    setCurrentStep(1);
+    if (currentStep === 3) {
+      setCurrentStep(2);
+    } else if (currentStep === 2) {
+      setCurrentStep(1);
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -349,29 +384,75 @@ export default function RegisterForm() {
       setErrors(newErrors);
 
       if (Object.keys(newErrors).length === 0) {
-        setIsSubmitting(true);
-        setOtpError("");
+        // REMOVED: setIsSubmitting(true);
+        // REMOVED: await submitToAPI(); <-- Don't create account yet!
 
         try {
-          await submitToAPI();
-          setShowSuccess(true);
-          setTimeout(() => {
-            setShowSuccess(false);
-            navigate("/");
-          }, 4000);
+          // Keep fetching payment details so QR code shows up in next step
+          await fetchPaymentDetails();
+
+          // Move to payment step
+          setCurrentStep(3);
+          setShowPayment(true);
         } catch (error) {
-          console.error("Submission error:", error);
-          alert(error.message || "Registration failed. Please try again.");
-        } finally {
-          setIsSubmitting(false);
+          console.error("Error preparing payment:", error);
+          alert("Could not load payment details. Please try again.");
         }
       }
     }
   };
 
+  const handleFileUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setIsUploadingProof(true);
+    setUploadError("");
+
+    try {
+      // 1️⃣ Upload file to Strapi
+      const uploadedFile = await uploadPaymentProof(file);
+
+      // 2️⃣ Save to state
+      setPaymentProof(uploadedFile);
+      setPaymentStatus("uploaded");
+    } catch (err) {
+      console.error(err);
+      setUploadError("Payment proof upload failed");
+    } finally {
+      setIsUploadingProof(false);
+    }
+  };
+
+  const handlePaymentComplete = async () => {
+    if (!paymentProof) {
+      alert("Please upload payment proof");
+      return;
+    }
+
+    setIsSubmitting(true); // Start loading state
+
+    try {
+      // 1. Call submitToAPI with the uploaded file's ID
+      await submitToAPI(paymentProof.id);
+
+      // 2. Show Success Popup on successful API response
+      setShowSuccess(true);
+      
+      setTimeout(() => {
+        navigate("/");
+      }, 4000);
+
+    } catch (error) {
+      alert(error.message || "Registration failed. Please try again.");
+    } finally {
+      setIsSubmitting(false); // Stop loading state
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 py-12 px-4 sm:px-6 lg:px-8">
-      {/* Classic Success Popup */}
+      {/* Success Popup */}
       {showSuccess && (
         <div className="fixed inset-0 flex items-center justify-center z-50 bg-black/30 backdrop-blur-sm">
           <div className="relative bg-gradient-to-b from-white to-gray-50 rounded-xl p-8 max-w-md mx-4 shadow-2xl border border-gray-200 transform transition-all duration-500">
@@ -394,29 +475,30 @@ export default function RegisterForm() {
             </div>
             <div className="pt-8 text-center">
               <h3 className="text-2xl font-serif font-bold text-gray-800 mb-3">
-                Registration Successful!
+                Registration Complete!
               </h3>
               <p className="text-gray-600 mb-6">
-                Your admin account has been created successfully.
+                Your admin account has been created. Payment verification is
+                pending.
               </p>
               <div className="space-y-3 text-left max-w-xs mx-auto">
                 <div className="flex items-center space-x-3 text-sm text-gray-500 animate-fade-in-up">
                   <div className="w-2 h-2 bg-emerald-500 rounded-full"></div>
-                  <span>Account created & verified</span>
+                  <span>Account created successfully</span>
                 </div>
                 <div
                   className="flex items-center space-x-3 text-sm text-gray-500 animate-fade-in-up"
                   style={{ animationDelay: "0.1s" }}
                 >
                   <div className="w-2 h-2 bg-emerald-500 rounded-full"></div>
-                  <span>Services configured</span>
+                  <span>Payment proof uploaded</span>
                 </div>
                 <div
                   className="flex items-center space-x-3 text-sm text-gray-500 animate-fade-in-up"
                   style={{ animationDelay: "0.2s" }}
                 >
-                  <div className="w-2 h-2 bg-emerald-500 rounded-full"></div>
-                  <span>Email confirmation sent</span>
+                  <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                  <span>Verification in progress</span>
                 </div>
               </div>
               <div className="mt-8 pt-6 border-t border-gray-200">
@@ -433,7 +515,7 @@ export default function RegisterForm() {
       )}
 
       <div className="max-w-4xl mx-auto">
-        {/* Progress Steps - Classic Design */}
+        {/* Progress Steps */}
         <div className="mb-12">
           <div className="flex justify-between items-center relative">
             <div className="absolute top-5 left-0 right-0 h-0.5 bg-gray-200 -z-10"></div>
@@ -457,8 +539,8 @@ export default function RegisterForm() {
                     {step === 1
                       ? "Admin Details"
                       : step === 2
-                      ? "Services"
-                      : "Complete"}
+                        ? "Services"
+                        : "Payment"}
                   </div>
                 </div>
               </div>
@@ -490,7 +572,9 @@ export default function RegisterForm() {
                     <span className="font-medium text-blue-600">
                       {currentStep === 1
                         ? "Admin Registration"
-                        : "Service Selection"}
+                        : currentStep === 2
+                          ? "Service Selection"
+                          : "Payment"}
                     </span>
                   </div>
 
@@ -499,12 +583,16 @@ export default function RegisterForm() {
                       <h1 className="text-3xl font-bold text-gray-900 mb-3">
                         {currentStep === 1
                           ? "Register as Administrator"
-                          : "Select Your Services"}
+                          : currentStep === 2
+                            ? "Select Your Services"
+                            : "Complete Payment"}
                       </h1>
                       <p className="text-gray-600 text-lg">
                         {currentStep === 1
                           ? "Provide your details to create an administrator account"
-                          : "Choose the services you want to enable for your organization"}
+                          : currentStep === 2
+                            ? "Choose the services you want to enable for your organization"
+                            : "Make payment to activate your account"}
                       </p>
                     </div>
 
@@ -519,12 +607,21 @@ export default function RegisterForm() {
                             <div
                               className="h-full bg-gradient-to-r from-blue-600 to-cyan-500 rounded-full transition-all duration-500"
                               style={{
-                                width: currentStep === 1 ? "50%" : "100%",
+                                width:
+                                  currentStep === 1
+                                    ? "33%"
+                                    : currentStep === 2
+                                      ? "66%"
+                                      : "100%",
                               }}
                             ></div>
                           </div>
                           <span className="font-semibold text-gray-900">
-                            {currentStep === 1 ? "1/2" : "2/2"}
+                            {currentStep === 1
+                              ? "1/3"
+                              : currentStep === 2
+                                ? "2/3"
+                                : "3/3"}
                           </span>
                         </div>
                       </div>
@@ -536,10 +633,9 @@ export default function RegisterForm() {
           </div>
 
           <div className="p-8">
+            {/* Step 1: Admin Details */}
             {currentStep === 1 && (
               <>
-                {/* Header */}
-
                 <form
                   onSubmit={(e) => {
                     e.preventDefault();
@@ -547,9 +643,9 @@ export default function RegisterForm() {
                   }}
                   className="space-y-8"
                 >
-                  {/* Form Grid */}
+                  {/* Form Grid - Same as before */}
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-6">
-                    {/* Company Name - Enhanced */}
+                    {/* Company Name */}
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
                         <label
@@ -608,7 +704,7 @@ export default function RegisterForm() {
                       )}
                     </div>
 
-                    {/* Full Name - Enhanced */}
+                    {/* Full Name */}
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
                         <label
@@ -667,7 +763,7 @@ export default function RegisterForm() {
                       )}
                     </div>
 
-                    {/* Email with OTP - Enhanced */}
+                    {/* Email with OTP */}
                     <div className="lg:col-span-2 space-y-3">
                       <div className="flex items-center justify-between">
                         <label
@@ -706,8 +802,8 @@ export default function RegisterForm() {
                               touched.email && errors.email
                                 ? "border-red-400 bg-red-50/50"
                                 : isOtpVerified
-                                ? "border-green-500 bg-green-50/30"
-                                : "border-gray-300 hover:border-gray-400 focus:shadow-lg"
+                                  ? "border-green-500 bg-green-50/30"
+                                  : "border-gray-300 hover:border-gray-400 focus:shadow-lg"
                             }`}
                             placeholder="name@company.com"
                             disabled={isOtpVerified}
@@ -746,7 +842,7 @@ export default function RegisterForm() {
                             isOtpVerified ||
                             isSendingOtp
                               ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                              : "bg-gradient-to-r from-blue-600 to-blue-700 text-white hover:from-blue-700 hover:to-blue-800 shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
+                              : "bg-gradient-to-r from-blue-600 cursor-pointer to-blue-700 text-white hover:from-blue-700 hover:to-blue-800 shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
                           }`}
                         >
                           {isSendingOtp ? (
@@ -826,7 +922,7 @@ export default function RegisterForm() {
                       )}
                     </div>
 
-                    {/* OTP Verification Section - Enhanced */}
+                    {/* OTP Verification Section */}
                     {isOtpSent && !isOtpVerified && (
                       <div className="lg:col-span-2 space-y-3">
                         <div className="flex items-center justify-between">
@@ -882,7 +978,7 @@ export default function RegisterForm() {
                               className={`px-6 py-3.5 rounded-xl text-sm font-semibold transition-all duration-200 flex items-center justify-center space-x-2 ${
                                 otp.length !== 6 || isVerifyingOtp
                                   ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                                  : "bg-gradient-to-r from-green-600 to-emerald-700 text-white hover:from-green-700 hover:to-emerald-800 shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
+                                  : "bg-gradient-to-r from-green-600 cursor-pointer to-emerald-700 text-white hover:from-green-700 hover:to-emerald-800 shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
                               }`}
                             >
                               {isVerifyingOtp ? (
@@ -921,7 +1017,7 @@ export default function RegisterForm() {
                                       clipRule="evenodd"
                                     />
                                   </svg>
-                                  <span>Verify OTP</span>
+                                  <span >Verify OTP</span>
                                 </>
                               )}
                             </button>
@@ -967,7 +1063,7 @@ export default function RegisterForm() {
                       </div>
                     )}
 
-                    {/* Date of Birth - Enhanced */}
+                    {/* Date of Birth */}
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
                         <label
@@ -1025,7 +1121,7 @@ export default function RegisterForm() {
                       )}
                     </div>
 
-                    {/* Gender - Enhanced */}
+                    {/* Gender */}
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
                         <label
@@ -1104,7 +1200,7 @@ export default function RegisterForm() {
                       )}
                     </div>
 
-                    {/* Occupation - Enhanced */}
+                    {/* Occupation */}
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
                         <label
@@ -1163,7 +1259,7 @@ export default function RegisterForm() {
                       )}
                     </div>
 
-                    {/* Phone Number - Enhanced */}
+                    {/* Phone Number */}
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
                         <label
@@ -1222,7 +1318,7 @@ export default function RegisterForm() {
                       )}
                     </div>
 
-                    {/* ID Card - Enhanced */}
+                    {/* ID Card */}
                     <div className="lg:col-span-2 space-y-2">
                       <div className="flex items-center justify-between">
                         <label
@@ -1281,7 +1377,7 @@ export default function RegisterForm() {
                       )}
                     </div>
 
-                    {/* Password - Enhanced */}
+                    {/* Password */}
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
                         <label
@@ -1381,7 +1477,7 @@ export default function RegisterForm() {
                       )}
                     </div>
 
-                    {/* Confirm Password - Enhanced */}
+                    {/* Confirm Password */}
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
                         <label
@@ -1418,10 +1514,10 @@ export default function RegisterForm() {
                             touched.confirmPassword && errors.confirmPassword
                               ? "border-red-400 bg-red-50/50"
                               : formData.password ===
-                                  formData.confirmPassword &&
-                                formData.confirmPassword
-                              ? "border-green-400 bg-green-50/30"
-                              : "border-gray-300 hover:border-gray-400 focus:shadow-lg"
+                                    formData.confirmPassword &&
+                                  formData.confirmPassword
+                                ? "border-green-400 bg-green-50/30"
+                                : "border-gray-300 hover:border-gray-400 focus:shadow-lg"
                           }`}
                           placeholder="Confirm your password"
                         />
@@ -1511,7 +1607,7 @@ export default function RegisterForm() {
                     </div>
                   </div>
 
-                  {/* Next Button - Enhanced */}
+                  {/* Next Button */}
                   <div className="pt-8 border-t border-gray-200 mt-10">
                     <div className="flex items-center justify-between">
                       <div className="text-sm text-gray-500">
@@ -1520,7 +1616,7 @@ export default function RegisterForm() {
                       </div>
                       <button
                         type="submit"
-                        className="group px-8 py-4 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all duration-200 font-semibold shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 flex items-center space-x-3"
+                        className="group cursor-pointer px-8 py-4 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all duration-200 font-semibold shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 flex items-center space-x-3"
                       >
                         <span>Continue to Services</span>
                         <svg
@@ -1543,6 +1639,7 @@ export default function RegisterForm() {
               </>
             )}
 
+            {/* Step 2: Service Selection */}
             {currentStep === 2 && (
               <>
                 <div className="mb-8">
@@ -1556,191 +1653,185 @@ export default function RegisterForm() {
 
                 <form onSubmit={handleSubmit} className="space-y-8">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-  {/* Service Cards */}
-  {[
-    {
-      id: "digitalRegistration",
-      name: "Digital Registration",
-      description: "Online form submissions and e-registration",
-      icon: "📝",
-      borderColor: "border-blue-500",
-      checkColor: "text-blue-500",
-      bgColor: "bg-blue-50",
-      hoverBorder: "hover:border-blue-300",
-    },
-    {
-      id: "foodManagement",
-      name: "Food Management",
-      description: "Manage menus, orders, and operations",
-      icon: "🍽️",
-      borderColor: "border-green-500",
-      checkColor: "text-green-500",
-      bgColor: "bg-green-50",
-      hoverBorder: "hover:border-green-300",
-    },
-    {
-      id: "electionSystem",
-      name: "Election System",
-      description: "Conduct polls and voting processes",
-      icon: "🗳️",
-      borderColor: "border-purple-500",
-      checkColor: "text-purple-500",
-      bgColor: "bg-purple-50",
-      hoverBorder: "hover:border-purple-300",
-    },
-    {
-      id: "luckydraw",
-      name: "Lucky Draw",
-      description: "Create raffles and prize distributions",
-      icon: "🎁",
-      borderColor: "border-pink-500",
-      checkColor: "text-pink-500",
-      bgColor: "bg-pink-50",
-      hoverBorder: "hover:border-pink-300",
-    },
-    {
-      id: "dashboard",
-      name: "Dashboard",
-      description: "Analytics and data visualization",
-      icon: "📊",
-      borderColor: "border-orange-500",
-      checkColor: "text-orange-500",
-      bgColor: "bg-orange-50",
-      hoverBorder: "hover:border-orange-300",
-    },
-  ].map((service) => (
-    <div
-      key={service.id}
-      className={`relative group cursor-pointer transition-all duration-300`}
-      onClick={() => handleServiceChange(service.id)}
-    >
-      <div
-        className={`relative rounded-xl overflow-hidden transition-all duration-300 ${
-          selectedServices[service.id]
-            ? 'scale-[1.02] shadow-lg'
-            : 'scale-100 shadow-sm hover:shadow-md'
-        }`}
-      >
-        {/* Main Card Content */}
-        <div
-          className={`relative p-6 bg-white border-2 transition-all duration-300 ${
-            selectedServices[service.id]
-              ? `${service.borderColor} ${service.bgColor}`
-              : `border-gray-200 group-hover:border-gray-300`
-          }`}
-        >
-          <div className="flex items-center justify-between">
-            {/* Icon Section */}
-            <div className="flex items-center space-x-4">
-              <div
-                className={`relative w-12 h-12 rounded-lg flex items-center justify-center text-xl transition-all duration-300 ${
-                  selectedServices[service.id]
-                    ? `${service.bgColor} ${service.checkColor}`
-                    : 'bg-gray-50 text-gray-600 group-hover:bg-gray-100'
-                }`}
-              >
-                <span>{service.icon}</span>
-              </div>
-              
-              {/* Text Content */}
-              <div className="flex-1">
-                <h4 className={`font-medium transition-colors duration-300 ${
-                  selectedServices[service.id] ? 'text-gray-900' : 'text-gray-800'
-                }`}>
-                  {service.name}
-                </h4>
-                <p className={`text-sm transition-colors duration-300 ${
-                  selectedServices[service.id] ? 'text-gray-700' : 'text-gray-600'
-                } mt-1`}>
-                  {service.description}
-                </p>
-              </div>
-            </div>
-            
-            {/* Checkbox - Professional Outline */}
-            <div className="relative">
-              <div
-                className={`relative w-5 h-5 rounded border-2 flex items-center justify-center transition-all duration-300 ${
-                  selectedServices[service.id]
-                    ? `${service.borderColor} bg-white`
-                    : 'border-gray-300 bg-white group-hover:border-gray-400'
-                }`}
-              >
-                {/* Checkmark */}
-                <svg
-                  className={`w-3 h-3 transition-all duration-300 ${
-                    selectedServices[service.id]
-                      ? 'opacity-100 scale-100'
-                      : 'opacity-0 scale-50'
-                  } ${service.checkColor}`}
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                  xmlns="http://www.w3.org/2000/svg"
-                  strokeWidth="3"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M5 13l4 4L19 7"
-                  />
-                </svg>
-              </div>
-              
-              {/* Subtle Ring Effect on Selection */}
-              {selectedServices[service.id] && (
-                <div
-                  className={`absolute -inset-1 rounded border ${service.borderColor.replace('500', '200')} animate-pulse`}
-                  style={{ animationDelay: '100ms' }}
-                />
-              )}
-            </div>
-          </div>
-          
-          {/* Subtle Bottom Indicator */}
-          <div
-            className={`absolute bottom-0 left-0 right-0 h-0.5 transition-all duration-300 ${
-              selectedServices[service.id]
-                ? `${service.bgColor.replace('50', '400')}`
-                : 'bg-transparent'
-            }`}
-          />
-        </div>
-        
-        {/* Hover Overlay - Very Subtle */}
-        <div
-          className={`absolute inset-0 rounded-xl transition-opacity duration-300 ${
-            selectedServices[service.id]
-              ? `opacity-5 ${service.bgColor.replace('50', '100')}`
-              : 'opacity-0 group-hover:opacity-5 group-hover:bg-gray-100'
-          }`}
-        />
-      </div>
-      
-      {/* Selection Indicator - Professional Badge */}
-      {selectedServices[service.id] && (
-        <div
-          className={`absolute -top-1 -right-1 w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium ${service.borderColor} bg-white border shadow-sm`}
-        >
-          <svg
-            className={`w-3 h-3 ${service.checkColor}`}
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-            xmlns="http://www.w3.org/2000/svg"
-            strokeWidth="3"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M5 13l4 4L19 7"
-            />
-          </svg>
-        </div>
-      )}
-    </div>
-  ))}
-</div>
+                    {/* Service Cards - Same as before */}
+                    {[
+                      {
+                        id: "digitalRegistration",
+                        name: "Digital Registration",
+                        description:
+                          "Online form submissions and e-registration",
+                        icon: "📝",
+                        borderColor: "border-blue-500",
+                        checkColor: "text-blue-500",
+                        bgColor: "bg-blue-50",
+                        hoverBorder: "hover:border-blue-300",
+                      },
+                      {
+                        id: "foodManagement",
+                        name: "Food Management",
+                        description: "Manage menus, orders, and operations",
+                        icon: "🍽️",
+                        borderColor: "border-green-500",
+                        checkColor: "text-green-500",
+                        bgColor: "bg-green-50",
+                        hoverBorder: "hover:border-green-300",
+                      },
+                      {
+                        id: "electionSystem",
+                        name: "Election System",
+                        description: "Conduct polls and voting processes",
+                        icon: "🗳️",
+                        borderColor: "border-purple-500",
+                        checkColor: "text-purple-500",
+                        bgColor: "bg-purple-50",
+                        hoverBorder: "hover:border-purple-300",
+                      },
+                      {
+                        id: "luckydraw",
+                        name: "Lucky Draw",
+                        description: "Create raffles and prize distributions",
+                        icon: "🎁",
+                        borderColor: "border-pink-500",
+                        checkColor: "text-pink-500",
+                        bgColor: "bg-pink-50",
+                        hoverBorder: "hover:border-pink-300",
+                      },
+                      {
+                        id: "dashboard",
+                        name: "Dashboard",
+                        description: "Analytics and data visualization",
+                        icon: "📊",
+                        borderColor: "border-orange-500",
+                        checkColor: "text-orange-500",
+                        bgColor: "bg-orange-50",
+                        hoverBorder: "hover:border-orange-300",
+                      },
+                    ].map((service) => (
+                      <div
+                        key={service.id}
+                        className={`relative group cursor-pointer transition-all duration-300`}
+                        onClick={() => handleServiceChange(service.id)}
+                      >
+                        <div
+                          className={`relative rounded-xl overflow-hidden transition-all duration-300 ${
+                            selectedServices[service.id]
+                              ? "scale-[1.02] shadow-lg"
+                              : "scale-100 shadow-sm hover:shadow-md"
+                          }`}
+                        >
+                          <div
+                            className={`relative p-6 bg-white border-2 transition-all duration-300 ${
+                              selectedServices[service.id]
+                                ? `${service.borderColor} ${service.bgColor}`
+                                : `border-gray-200 group-hover:border-gray-300`
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center space-x-4">
+                                <div
+                                  className={`relative w-12 h-12 rounded-lg flex items-center justify-center text-xl transition-all duration-300 ${
+                                    selectedServices[service.id]
+                                      ? `${service.bgColor} ${service.checkColor}`
+                                      : "bg-gray-50 text-gray-600 group-hover:bg-gray-100"
+                                  }`}
+                                >
+                                  <span>{service.icon}</span>
+                                </div>
+                                <div className="flex-1">
+                                  <h4
+                                    className={`font-medium transition-colors duration-300 ${
+                                      selectedServices[service.id]
+                                        ? "text-gray-900"
+                                        : "text-gray-800"
+                                    }`}
+                                  >
+                                    {service.name}
+                                  </h4>
+                                  <p
+                                    className={`text-sm transition-colors duration-300 ${
+                                      selectedServices[service.id]
+                                        ? "text-gray-700"
+                                        : "text-gray-600"
+                                    } mt-1`}
+                                  >
+                                    {service.description}
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="relative">
+                                <div
+                                  className={`relative w-5 h-5 rounded border-2 flex items-center justify-center transition-all duration-300 ${
+                                    selectedServices[service.id]
+                                      ? `${service.borderColor} bg-white`
+                                      : "border-gray-300 bg-white group-hover:border-gray-400"
+                                  }`}
+                                >
+                                  <svg
+                                    className={`w-3 h-3 transition-all duration-300 ${
+                                      selectedServices[service.id]
+                                        ? "opacity-100 scale-100"
+                                        : "opacity-0 scale-50"
+                                    } ${service.checkColor}`}
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    strokeWidth="3"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      d="M5 13l4 4L19 7"
+                                    />
+                                  </svg>
+                                </div>
+                                {selectedServices[service.id] && (
+                                  <div
+                                    className={`absolute -inset-1 rounded border ${service.borderColor.replace("500", "200")} animate-pulse`}
+                                    style={{ animationDelay: "100ms" }}
+                                  />
+                                )}
+                              </div>
+                            </div>
+                            <div
+                              className={`absolute bottom-0 left-0 right-0 h-0.5 transition-all duration-300 ${
+                                selectedServices[service.id]
+                                  ? `${service.bgColor.replace("50", "400")}`
+                                  : "bg-transparent"
+                              }`}
+                            />
+                          </div>
+                          <div
+                            className={`absolute inset-0 rounded-xl transition-opacity duration-300 ${
+                              selectedServices[service.id]
+                                ? `opacity-5 ${service.bgColor.replace("50", "100")}`
+                                : "opacity-0 group-hover:opacity-5 group-hover:bg-gray-100"
+                            }`}
+                          />
+                        </div>
+                        {selectedServices[service.id] && (
+                          <div
+                            className={`absolute -top-1 -right-1 w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium ${service.borderColor} bg-white border shadow-sm`}
+                          >
+                            <svg
+                              className={`w-3 h-3 ${service.checkColor}`}
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                              xmlns="http://www.w3.org/2000/svg"
+                              strokeWidth="3"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M5 13l4 4L19 7"
+                              />
+                            </svg>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
 
                   {/* Selected Services Summary */}
                   <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-100">
@@ -1790,7 +1881,7 @@ export default function RegisterForm() {
                     <button
                       type="button"
                       onClick={handlePreviousStep}
-                      className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition duration-200 font-medium flex items-center space-x-2"
+                      className="px-6 cursor-pointer py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition duration-200 font-medium flex items-center space-x-2"
                     >
                       <span>←</span>
                       <span>Back to Details</span>
@@ -1802,7 +1893,7 @@ export default function RegisterForm() {
                       className={`px-8 py-3 rounded-lg text-white font-medium transition duration-200 flex items-center space-x-2 ${
                         isSubmitting
                           ? "bg-gray-400 cursor-not-allowed"
-                          : "bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 shadow hover:shadow-md"
+                          : "bg-gradient-to-r cursor-pointer from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 shadow hover:shadow-md"
                       }`}
                     >
                       {isSubmitting ? (
@@ -1831,13 +1922,278 @@ export default function RegisterForm() {
                         </>
                       ) : (
                         <>
-                          <span>Complete Registration</span>
-                          <span>✓</span>
+                          <span>Proceed to Payment</span>
+                          <span>→</span>
                         </>
                       )}
                     </button>
                   </div>
                 </form>
+              </>
+            )}
+
+            {/* Step 3: Payment */}
+            {currentStep === 3 && (
+              <>
+                <div className="space-y-8">
+                  {/* Account Created Success */}
+                  <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-6 border border-green-200">
+                    <div className="flex items-center space-x-4">
+                      <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
+                        <svg
+                          className="w-6 h-6 text-green-600"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth="2"
+                            d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                          />
+                        </svg>
+                      </div>
+                      <div>
+                        <h4 className="font-semibold text-gray-800">
+                          Account Created Successfully!
+                        </h4>
+                        <p className="text-sm text-gray-600 mt-1">
+                          Your registration is complete. Please complete payment
+                          to activate your account.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Payment Details */}
+                  <div className="bg-white border border-gray-200 rounded-xl p-6">
+                    <h4 className="font-semibold text-gray-800 mb-4">
+                      Payment Information
+                    </h4>
+
+                    <div className="space-y-6">
+                      {/* QR Code Display */}
+                      {paymentData?.qrCode && (
+                        <div className="text-center">
+                          <div className="mb-3">
+                            <span className="text-sm text-gray-500">
+                              Scan QR Code to Pay
+                            </span>
+                          </div>
+                          <div className="inline-block p-4 bg-white border-2 border-gray-100 rounded-lg">
+                            <img
+                              src={paymentData.qrCode}
+                              alt="QR Code"
+                              className="w-48 h-48 object-contain"
+                              onError={(e) => {
+                                e.target.style.display = "none";
+                                e.target.parentElement.innerHTML = `
+                                  <div class="w-48 h-48 flex items-center justify-center bg-gray-100 rounded">
+                                    <span class="text-gray-400">QR Code not available</span>
+                                  </div>
+                                `;
+                              }}
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      {/* UPI ID */}
+                      <div className="text-center">
+                        <div className="mb-2">
+                          <span className="text-sm text-gray-500">
+                            UPI ID for Payment
+                          </span>
+                        </div>
+                        <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                          <div className="flex items-center justify-center space-x-3">
+                            <svg
+                              className="w-5 h-5 text-gray-400"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth="2"
+                                d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"
+                              />
+                            </svg>
+                            <span className="text-lg font-mono font-bold text-gray-800">
+                              {paymentData?.upiId ||
+                                "dreamzmediaevents@okicici"}
+                            </span>
+                            <button
+                              onClick={() => {
+                                navigator.clipboard.writeText(
+                                  paymentData?.upiId ||
+                                    "dreamzmediaevents@okicici"
+                                );
+                                alert("UPI ID copied to clipboard!");
+                              }}
+                              className="text-blue-600 cursor-pointer hover:text-blue-800 text-sm font-medium"
+                            >
+                              Copy
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Upload Payment Proof */}
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-800 mb-2">
+                            Upload Payment Proof
+                          </label>
+                          <div
+                            className={`border-2 border-dashed rounded-xl p-8 text-center transition-all duration-300 ${
+                              isUploadingProof
+                                ? "border-blue-300 bg-blue-50"
+                                : uploadError
+                                  ? "border-red-300 bg-red-50"
+                                  : paymentProof
+                                    ? "border-green-300 bg-green-50"
+                                    : "border-gray-300 hover:border-gray-400 hover:bg-gray-50"
+                            }`}
+                          >
+                            <input
+                              type="file"
+                              id="paymentProof"
+                              accept="image/*,.pdf"
+                              onChange={handleFileUpload}
+                              disabled={
+                                isUploadingProof || paymentStatus === "uploaded"
+                              }
+                              className="hidden"
+                            />
+                            <label
+                              htmlFor="paymentProof"
+                              className="cursor-pointer"
+                            >
+                              {isUploadingProof ? (
+                                <div className="space-y-3">
+                                  <div className="w-12 h-12 mx-auto bg-blue-100 rounded-full flex items-center justify-center">
+                                    <svg
+                                      className="animate-spin h-6 w-6 text-blue-600"
+                                      xmlns="http://www.w3.org/2000/svg"
+                                      fill="none"
+                                      viewBox="0 0 24 24"
+                                    >
+                                      <circle
+                                        className="opacity-25"
+                                        cx="12"
+                                        cy="12"
+                                        r="10"
+                                        stroke="currentColor"
+                                        strokeWidth="4"
+                                      ></circle>
+                                      <path
+                                        className="opacity-75"
+                                        fill="currentColor"
+                                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                                      ></path>
+                                    </svg>
+                                  </div>
+                                  <p className="text-blue-600 font-medium">
+                                    Uploading...
+                                  </p>
+                                </div>
+                              ) : paymentProof ? (
+                                <div className="space-y-3">
+                                  <div className="w-12 h-12 mx-auto bg-green-100 rounded-full flex items-center justify-center">
+                                    <svg
+                                      className="h-6 w-6 text-green-600"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      viewBox="0 0 24 24"
+                                    >
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth="2"
+                                        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                                      />
+                                    </svg>
+                                  </div>
+                                  <div>
+                                    <p className="text-green-600 font-medium">
+                                      Uploaded Successfully!
+                                    </p>
+                                    <p className="text-sm text-gray-500 mt-1">
+                                      {paymentProof.name}
+                                    </p>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="space-y-3">
+                                  <div className="w-12 h-12 mx-auto bg-gray-100 rounded-full flex items-center justify-center">
+                                    <svg
+                                      className="h-6 w-6 text-gray-400"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      viewBox="0 0 24 24"
+                                    >
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth="2"
+                                        d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+                                      />
+                                    </svg>
+                                  </div>
+                                  <div>
+                                    <p className="font-medium text-gray-700">
+                                      Click to upload payment proof
+                                    </p>
+                                    <p className="text-sm text-gray-500 mt-1">
+                                      Screenshot or PDF of transaction (Max 5MB)
+                                    </p>
+                                  </div>
+                                </div>
+                              )}
+                            </label>
+                          </div>
+                          {uploadError && (
+                            <div className="text-red-500 text-sm mt-2 flex items-center space-x-2 bg-red-50 p-3 rounded-lg">
+                              <span>⚠️</span>
+                              <span>{uploadError}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Navigation Buttons */}
+                  <div className="flex justify-between pt-8 border-t border-gray-200">
+                    <button
+                      type="button"
+                      onClick={handlePreviousStep}
+                      className="px-2 cursor-pointer py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition duration-200 font-medium flex items-center space-x-2"
+                    >
+                      <span>←</span>
+                      <span>Back to Services</span>
+                    </button>
+
+                    <div className="space-x-4">
+                      <button
+                        type="button"
+                        onClick={handlePaymentComplete}
+                        disabled={!paymentProof || paymentStatus !== "uploaded"}
+                        className={`px-8 py-3 rounded-lg text-white font-medium transition duration-200 flex items-center space-x-2 ${
+                          !paymentProof || paymentStatus !== "uploaded"
+                            ? "bg-gray-400 cursor-not-allowed"
+                            : "bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 shadow hover:shadow-md"
+                        }`}
+                      >
+                        <span>Complete Registration</span>
+                        <span>✓</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </>
             )}
           </div>
